@@ -1514,7 +1514,7 @@ abstract class BaseAppScreen {
             },
             onBack = onBack,
             optionsMenu = optionsMenu,
-            dialogOpen = showConfigDialog || manageModsRequested,
+            dialogOpen = showConfigDialog || communityConfigsRequested || manageModsRequested,
             otherSources = libraryItem.otherSources,
             isInstalledOnOtherSource = libraryItem.isInstalledOnOtherSource,
             onSourceClick = onSourceClick,
