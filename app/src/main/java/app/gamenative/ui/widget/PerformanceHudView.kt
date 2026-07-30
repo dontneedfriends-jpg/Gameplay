@@ -11,6 +11,8 @@ import android.graphics.Path
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.text.TextUtils
 import android.text.format.DateFormat
 import android.util.TypedValue
@@ -62,6 +64,10 @@ class PerformanceHudView(
     private var appearance = appearanceFor(initialConfig.size)
     private var smoothedBatteryRuntimeHours: Double? = null
     private var isPaused = false
+    private var activeBatteryWarning: BatteryWarning? = null
+    private var warningFlashOn = false
+    private var normalBackgroundColor = Color.BLACK
+    private var toneGenerator: ToneGenerator? = null
 
     private val backgroundDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
@@ -195,6 +201,8 @@ class PerformanceHudView(
 
     override fun onDetachedFromWindow() {
         stopUpdates()
+        toneGenerator?.release()
+        toneGenerator = null
         super.onDetachedFromWindow()
     }
 
@@ -216,6 +224,7 @@ class PerformanceHudView(
                     collectSnapshot(currentFps)
                 }
                 renderSnapshot(snapshot)
+                updateBatteryWarning(snapshot)
                 delay(UPDATE_INTERVAL_MS)
             }
         }
@@ -238,14 +247,13 @@ class PerformanceHudView(
         )
 
         backgroundDrawable.cornerRadius = appearance.cornerRadiusDp.dp.toFloat()
-        backgroundDrawable.setColor(
-            Color.argb(
-                (opacity * 255f).roundToInt(),
-                0,
-                0,
-                0,
-            ),
+        normalBackgroundColor = Color.argb(
+            (opacity * 255f).roundToInt(),
+            0,
+            0,
+            0,
         )
+        backgroundDrawable.setColor(normalBackgroundColor)
         backgroundDrawable.setStroke(
             appearance.strokeWidthDp.dp.coerceAtLeast(1),
             Color.argb(
@@ -321,11 +329,13 @@ class PerformanceHudView(
             gpu = gpuPercent?.let { "GPU $it%" },
             ram = "RAM ${readUsedRamText()}",
             battery = batterySnapshot.percent?.let { "BAT $it%" },
+            batteryPercent = batterySnapshot.percent,
             power = batterySnapshot.powerWatts?.let { watts ->
                 String.format(Locale.US, "PWR %.1fW", watts)
             },
             runtime = batterySnapshot.runtimeText,
             batteryTemp = batterySnapshot.temperatureC?.let { "BAT TEMP ${it}°C" },
+            batteryTemperatureC = batterySnapshot.temperatureC,
             clock = readClockText(),
             cpuTemp = readCpuTempC()?.let { "CPU TEMP ${it}°C" },
             gpuTemp = readGpuTempC()?.let { "GPU TEMP ${it}°C" },
@@ -397,6 +407,42 @@ class PerformanceHudView(
         applySnapshotText(snapshot)
         refreshVisibleMetrics()
     }
+
+    private fun updateBatteryWarning(snapshot: HudSnapshot) {
+        val warning = when {
+            config.highBatteryTemperatureWarningEnabled &&
+                snapshot.batteryTemperatureC?.let { it >= config.highBatteryTemperatureThresholdC } == true ->
+                BatteryWarning.HIGH_TEMPERATURE
+            config.lowBatteryWarningEnabled &&
+                snapshot.batteryPercent?.let { it <= config.lowBatteryThresholdPercent } == true ->
+                BatteryWarning.LOW_LEVEL
+            else -> null
+        }
+
+        if (warning != activeBatteryWarning && warning != null) {
+            val tone = if (warning == BatteryWarning.HIGH_TEMPERATURE) {
+                ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD
+            } else {
+                ToneGenerator.TONE_PROP_BEEP
+            }
+            val generator = toneGenerator ?: ToneGenerator(AudioManager.STREAM_ALARM, 70).also {
+                toneGenerator = it
+            }
+            generator.startTone(tone, 180)
+        }
+        activeBatteryWarning = warning
+        warningFlashOn = warning != null && !warningFlashOn
+        val warningColor = when (warning) {
+            BatteryWarning.HIGH_TEMPERATURE -> Color.argb(190, 112, 45, 78)
+            BatteryWarning.LOW_LEVEL -> Color.argb(190, 116, 43, 43)
+            null -> normalBackgroundColor
+        }
+        backgroundDrawable.setColor(
+            if (warning != null && warningFlashOn) warningColor else normalBackgroundColor,
+        )
+    }
+
+    private enum class BatteryWarning { LOW_LEVEL, HIGH_TEMPERATURE }
 
     private fun recordGraphSamples(snapshot: HudSnapshot) {
         fpsMetric.stackedGraph?.addSample(snapshot.fpsValue)

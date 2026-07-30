@@ -790,28 +790,6 @@ fun PluviaMain(
             }
         }
 
-        DialogType.SUPPORT -> {
-            onConfirmClick = {
-                uriHandler.openUri(Constants.Misc.KO_FI_LINK)
-                PrefManager.tipped = true
-                msgDialogState = MessageDialogState(visible = false)
-            }
-            onDismissRequest = {
-                msgDialogState = MessageDialogState(visible = false)
-            }
-            onDismissClick = {
-                msgDialogState = MessageDialogState(visible = false)
-            }
-            onActionClick = {
-                val shareIntent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    putExtra(Intent.EXTRA_TEXT, context.getString(R.string.main_share_text))
-                    type = "text/plain"
-                }
-                context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.main_share)))
-            }
-        }
-
         DialogType.SYNC_CONFLICT -> {
             onConfirmClick = {
                 preLaunchApp(
@@ -1372,17 +1350,6 @@ fun PluviaMain(
                                     title = context.getString(R.string.main_recent_crash_title),
                                     message = context.getString(R.string.main_recent_crash_message),
                                     confirmBtnText = context.getString(R.string.ok),
-                                )
-                            } else if (!(PrefManager.tipped || BuildConfig.GOLD)) {
-                                viewModel.setAnnoyingDialogShown(true)
-                                msgDialogState = MessageDialogState(
-                                    visible = true,
-                                    type = DialogType.SUPPORT,
-                                    title = context.getString(R.string.main_thank_you_title),
-                                    message = context.getString(R.string.main_thank_you_message),
-                                    confirmBtnText = context.getString(R.string.main_join_kofi),
-                                    dismissBtnText = context.getString(R.string.close),
-                                    actionBtnText = context.getString(R.string.main_share),
                                 )
                             }
                         }

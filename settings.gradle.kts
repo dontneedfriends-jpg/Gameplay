@@ -20,6 +20,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "gamenative"
+rootProject.name = "gameplay"
 include(":app")
 include(":ubuntufs")

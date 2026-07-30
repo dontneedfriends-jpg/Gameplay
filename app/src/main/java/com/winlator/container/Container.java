@@ -36,7 +36,11 @@ public class Container {
     public static final String DEFAULT_EXTERNAL_DISPLAY_MODE = EXTERNAL_DISPLAY_MODE_OFF;
 
     public static final String DEFAULT_ENV_VARS = "WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144";
-    public static final String DEFAULT_SCREEN_SIZE = "1280x720";
+    public static final String DEFAULT_SCREEN_SIZE_16_9 = "1280x720";
+    public static final String DEFAULT_SCREEN_SIZE_16_10 = "1280x800";
+    public static final String DEFAULT_SCREEN_SIZE_4_3 = "1280x960";
+    /** Stable fallback for code paths that run before Android display information is available. */
+    public static final String DEFAULT_SCREEN_SIZE = DEFAULT_SCREEN_SIZE_16_9;
     public static final String DEFAULT_GRAPHICS_DRIVER = DefaultVersion.DEFAULT_GRAPHICS_DRIVER;
     public static final String DEFAULT_AUDIO_DRIVER = "pulseaudio";
     public static final String DEFAULT_EMULATOR = "FEXCore";

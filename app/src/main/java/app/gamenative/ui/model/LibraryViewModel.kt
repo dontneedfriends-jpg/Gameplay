@@ -1,6 +1,7 @@
 package app.gamenative.ui.model
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,9 +15,6 @@ import app.gamenative.R
 import app.gamenative.data.GameCompatibilityStatus
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
-import app.gamenative.data.gog.GogRecommendationsRepository
-import app.gamenative.data.gog.GogSeedCollector
-import app.gamenative.service.gog.GOGAuthManager
 import app.gamenative.data.LibraryPlayHistory
 import app.gamenative.data.SteamApp
 import app.gamenative.data.SteamCollection
@@ -46,13 +44,16 @@ import app.gamenative.ui.enums.LibraryTab.Companion.previous
 import app.gamenative.ui.enums.SortOption
 import app.gamenative.ui.util.SnackbarManager
 import app.gamenative.utils.CustomGameScanner
-import app.gamenative.data.RecommendationRepository
-import app.gamenative.data.RecommendedGame
+import app.gamenative.localgames.LocalGameImporter
+import app.gamenative.localgames.InstallationSessionStore
+import app.gamenative.localgames.InstallationState
+import app.gamenative.localgames.LocalInstallerImporter
 import app.gamenative.utils.DeviceGameStatsCache
 import app.gamenative.utils.GpuGameStatsCache
 import app.gamenative.utils.GameCompatibilityCache
 import app.gamenative.utils.GameCompatibilityService
 import app.gamenative.utils.HardwareUtils
+import app.gamenative.utils.normalizeForComparison
 import app.gamenative.utils.unaccent
 import com.winlator.core.GPUInformation
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -74,6 +75,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 private const val PLAYABLE_FPS_THRESHOLD = 30
@@ -105,10 +107,6 @@ class LibraryViewModel @Inject constructor(
         onFilterApps(paginationCurrentPage)
     }
 
-    private val onRecommendationToggleChanged: (AndroidEvent.RecommendationToggleChanged) -> Unit = {
-        refreshRecommendationHero()
-    }
-
     // How many items loaded on one page of results
     @Volatile private var paginationCurrentPage: Int = 0
     @Volatile private var lastPageInCurrentFilter: Int = 0
@@ -118,16 +116,13 @@ class LibraryViewModel @Inject constructor(
     private var gogGameList: List<GOGGame> = emptyList()
     private var epicGameList: List<EpicGame> = emptyList()
     private var amazonGameList: List<AmazonGame> = emptyList()
+    @Volatile private var crossStoreItemsById: Map<String, List<LibraryItem>> = emptyMap()
     private var playHistoryByAppId: Map<String, Long> = emptyMap()
 
     @Volatile private var steamCollections: List<SteamCollection>? = null
 
     // Track if this is the first load to apply minimum load time
     private var isFirstLoad = true
-
-    // Cached recommendation (fetched once at startup)
-    @Volatile private var cachedRecommendation: RecommendedGame? = null
-    @Volatile private var cachedFeatured: app.gamenative.data.FeaturedItem? = null
 
     // Track debounce job for search
     private var searchDebounceJob: Job? = null
@@ -274,42 +269,12 @@ class LibraryViewModel @Inject constructor(
 
         PluviaApp.events.on<AndroidEvent.LibraryInstallStatusChanged, Unit>(onInstallStatusChanged)
         PluviaApp.events.on<AndroidEvent.CustomGameImagesFetched, Unit>(onCustomGameImagesFetched)
-        PluviaApp.events.on<AndroidEvent.RecommendationToggleChanged, Unit>(onRecommendationToggleChanged)
-
-        refreshRecommendationHero()
-    }
-
-    private fun refreshRecommendationHero() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val hero = RecommendationRepository.getHero(context)
-            cachedFeatured = hero.featured
-            cachedRecommendation = when {
-                // A live featured takes the slot (still gated by the showRecommendations
-                // toggle at display time), regardless of GOG consent.
-                hero.featured != null -> null
-                PrefManager.showRecommendations && PrefManager.recDisclosureShown -> runCatching {
-                    val owned = GogSeedCollector.collect(
-                        context,
-                        libraryPlayHistoryDao,
-                        gogGameDao,
-                        epicGameDao,
-                        amazonGameDao,
-                    )
-                    val userId = GOGAuthManager.getStoredCredentials(context).getOrNull()?.userId
-                    val daySeed = System.currentTimeMillis() / (24L * 60 * 60 * 1000)
-                    GogRecommendationsRepository.getDailyHero(context, owned, userId, daySeed)
-                }.getOrNull() ?: hero.recommendation
-                else -> hero.recommendation
-            }
-            onFilterApps(paginationCurrentPage)
-        }
     }
 
     override fun onCleared() {
         searchDebounceJob?.cancel()
         PluviaApp.events.off<AndroidEvent.LibraryInstallStatusChanged, Unit>(onInstallStatusChanged)
         PluviaApp.events.off<AndroidEvent.CustomGameImagesFetched, Unit>(onCustomGameImagesFetched)
-        PluviaApp.events.off<AndroidEvent.RecommendationToggleChanged, Unit>(onRecommendationToggleChanged)
         super.onCleared()
     }
 
@@ -374,7 +339,7 @@ class LibraryViewModel @Inject constructor(
 
     fun onNextTab() {
         _state.update { currentState ->
-            val nextTab = currentState.currentTab.next()
+            val nextTab = currentState.currentTab.next(context)
             Timber.tag("LibraryViewModel").d("Tab next via bumper: ${currentState.currentTab} -> $nextTab")
             currentState.copy(currentTab = nextTab)
         }
@@ -383,7 +348,7 @@ class LibraryViewModel @Inject constructor(
 
     fun onPreviousTab() {
         _state.update { currentState ->
-            val previousTab = currentState.currentTab.previous()
+            val previousTab = currentState.currentTab.previous(context)
             Timber.tag("LibraryViewModel").d("Tab previous via bumper: ${currentState.currentTab} -> $previousTab")
             currentState.copy(currentTab = previousTab)
         }
@@ -527,6 +492,61 @@ class LibraryViewModel @Inject constructor(
         }
     }
 
+    /** Imports a selected portable executable through SAF and refreshes the Custom Games tab. */
+    fun importPortableExecutable(
+        uri: Uri,
+        onResult: (LocalGameImporter.ImportResult) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = LocalGameImporter.importPortableExecutable(context, uri)
+            if (result is LocalGameImporter.ImportResult.Ready) {
+                onFilterApps(paginationCurrentPage)
+            }
+            onResult(result)
+        }
+    }
+
+    fun importInstaller(
+        uri: Uri,
+        onResult: (LocalInstallerImporter.ImportResult) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = LocalInstallerImporter.importInstaller(context, uri)
+            if (result is LocalInstallerImporter.ImportResult.Ready) {
+                onFilterApps(paginationCurrentPage)
+            }
+            onResult(result)
+        }
+    }
+
+    fun markInstallerLaunching(
+        sessionId: String,
+        onReady: (String) -> Unit,
+        onFailure: (String) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val store = InstallationSessionStore(context)
+                    val session = requireNotNull(store.load(sessionId)) {
+                        "Installation session was not found"
+                    }
+                    require(session.state == InstallationState.READY_TO_LAUNCH) {
+                        "Installation is not ready to launch"
+                    }
+                    val appId = requireNotNull(session.appId) {
+                        "Installation session has no container app id"
+                    }
+                    store.save(session.transitionTo(InstallationState.INSTALLER_RUNNING))
+                    appId
+                }
+            }
+            result.fold(onSuccess = onReady, onFailure = { error ->
+                onFailure(error.message ?: "Could not start the installer")
+            })
+        }
+    }
+
     /** Whether the current sort or any active filter depends on per-game stats. */
     private fun usesStats(state: LibraryState): Boolean {
         val statSorts = setOf(
@@ -563,6 +583,10 @@ class LibraryViewModel @Inject constructor(
         return true
     }
 
+    /** Resolves a sibling from the full owned library, independent of filters and pagination. */
+    fun resolveCrossStoreSibling(appId: String, targetSource: GameSource): LibraryItem? =
+        crossStoreItemsById[appId]?.firstOrNull { it.gameSource == targetSource }
+
     private fun onFilterApps(paginationPage: Int = 0): Job {
         Timber.tag("LibraryViewModel").d("onFilterApps - appList.size: ${appList.size}, isFirstLoad: $isFirstLoad")
         return viewModelScope.launch(Dispatchers.IO) {
@@ -582,6 +606,88 @@ class LibraryViewModel @Inject constructor(
                 val cached = GameCompatibilityCache.getCached(gameName) ?: return true
                 val status = compatibilityStatusFor(cached)
                 return status == GameCompatibilityStatus.COMPATIBLE || status == GameCompatibilityStatus.GPU_COMPATIBLE
+            }
+
+            val allCustomGameItems = CustomGameScanner.scanAsLibraryItems()
+            val allOwnedItems = buildList {
+                appList.forEach { game ->
+                    add(
+                        LibraryItem(
+                            appId = "${GameSource.STEAM.name}_${game.id}",
+                            name = game.name,
+                            iconHash = game.clientIconHash,
+                            capsuleImageUrl = game.getCapsuleUrl(),
+                            headerImageUrl = game.headerUrl,
+                            heroImageUrl = game.getHeroUrl(),
+                            gameSource = GameSource.STEAM,
+                            isInstalled = downloadDirectorySet.contains(SteamService.getAppDirName(game)),
+                        ),
+                    )
+                }
+                gogGameList.forEach { game ->
+                    add(
+                        LibraryItem(
+                            appId = "${GameSource.GOG.name}_${game.id}",
+                            name = game.title,
+                            iconHash = game.iconUrl.ifEmpty { game.imageUrl },
+                            capsuleImageUrl = game.verticalCoverUrl.ifEmpty { game.iconUrl.ifEmpty { game.imageUrl } },
+                            headerImageUrl = game.imageUrl.ifEmpty { game.iconUrl },
+                            heroImageUrl = game.imageUrl.ifEmpty { game.iconUrl },
+                            gameSource = GameSource.GOG,
+                            isInstalled = game.isInstalled,
+                        ),
+                    )
+                }
+                epicGameList.forEach { game ->
+                    add(
+                        LibraryItem(
+                            appId = "${GameSource.EPIC.name}_${game.id}",
+                            name = game.title,
+                            iconHash = game.artSquare.ifEmpty { game.artCover },
+                            capsuleImageUrl = game.artCover.ifEmpty { game.artSquare },
+                            headerImageUrl = game.artPortrait.ifEmpty { game.artSquare.ifEmpty { game.artCover } },
+                            heroImageUrl = game.artPortrait.ifEmpty { game.artSquare.ifEmpty { game.artCover } },
+                            gameSource = GameSource.EPIC,
+                            isInstalled = game.isInstalled,
+                        ),
+                    )
+                }
+                amazonGameList.forEach { game ->
+                    val hero = AmazonArtwork.layoutHeroFromProductJson(game.productJson)
+                        .ifEmpty { game.heroUrl.ifEmpty { game.artUrl } }
+                    add(
+                        LibraryItem(
+                            appId = "${GameSource.AMAZON.name}_${game.appId}",
+                            name = game.title,
+                            iconHash = game.artUrl,
+                            capsuleImageUrl = game.artUrl,
+                            headerImageUrl = hero,
+                            heroImageUrl = hero.ifEmpty { game.artUrl },
+                            gameSource = GameSource.AMAZON,
+                            isInstalled = game.isInstalled,
+                        ),
+                    )
+                }
+                addAll(allCustomGameItems.map { it.copy(isInstalled = true) })
+            }
+            val siblingGroups = allOwnedItems
+                .filter { it.name.normalizeForComparison().isNotEmpty() }
+                .groupBy { it.name.normalizeForComparison() }
+
+            fun enrichWithSiblings(item: LibraryItem): LibraryItem {
+                val siblings = siblingGroups[item.name.normalizeForComparison()].orEmpty()
+                    .filter { it.appId != item.appId && it.gameSource != item.gameSource }
+                return item.copy(
+                    otherSources = siblings.map { it.gameSource }.distinct(),
+                    isInstalledOnOtherSource = siblings.any { it.isInstalled },
+                )
+            }
+
+            crossStoreItemsById = allOwnedItems.associate { item ->
+                val siblings = siblingGroups[item.name.normalizeForComparison()].orEmpty()
+                    .filter { it.appId != item.appId && it.gameSource != item.gameSource }
+                    .map(::enrichWithSiblings)
+                item.appId to siblings
             }
 
             val steamOwnerTypeFiltered: List<SteamApp> = appList
@@ -710,9 +816,9 @@ class LibraryViewModel @Inject constructor(
             // Scan Custom Games roots and create UI items (filtered by search query inside scanner)
             // Only include custom games if GAME filter is selected
             val customGameItems = if (currentState.appInfoSortType.contains(AppFilter.GAME)) {
-                CustomGameScanner.scanAsLibraryItems(
-                    query = currentState.searchQuery,
-                )
+                allCustomGameItems.filter {
+                    currentState.searchQuery.isEmpty() || matches(it.name, currentState.searchQuery)
+                }
             } else {
                 emptyList()
             }
@@ -874,6 +980,7 @@ class LibraryViewModel @Inject constructor(
             // ALL tab uses user preferences, other tabs override with their presets
             // Use captured currentState (not _state.value) to avoid TOCTOU race
             val currentTab = currentState.currentTab
+            val isInstalledLibrary = currentTab == LibraryTab.INSTALLED
             val includeSteam = if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
                 currentState.showSteamInLibrary
             } else {
@@ -889,19 +996,19 @@ class LibraryViewModel @Inject constructor(
                 currentState.showGOGInLibrary
             } else {
                 currentTab.showGoG
-            }) && GOGService.hasStoredCredentials(context)
+            }) && (isInstalledLibrary || GOGService.hasStoredCredentials(context))
 
             val includeEpic = (if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
                 currentState.showEpicInLibrary
             } else {
                 currentTab.showEpic
-            }) && EpicService.hasStoredCredentials(context)
+            }) && (isInstalledLibrary || EpicService.hasStoredCredentials(context))
 
             val includeAmazon = (if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
                 currentState.showAmazonInLibrary
             } else {
                 currentTab.showAmazon
-            }) && AmazonService.hasStoredCredentials(context)
+            }) && (isInstalledLibrary || AmazonService.hasStoredCredentials(context))
 
             // Combine both lists and apply sort option
             val sortComparator: Comparator<LibraryEntry> = when (currentState.currentSortOption) {
@@ -952,7 +1059,8 @@ class LibraryViewModel @Inject constructor(
                 if (includeGOG && !steamCollectionSelected) addAll(gogEntries)
                 if (includeEpic && !steamCollectionSelected) addAll(epicEntries)
                 if (includeAmazon && !steamCollectionSelected) addAll(amazonEntries)
-            }.sortedWith(sortComparator).mapIndexed { idx, entry ->
+            }.map { entry -> entry.copy(item = enrichWithSiblings(entry.item)) }
+                .sortedWith(sortComparator).mapIndexed { idx, entry ->
                 entry.item.copy(index = idx, isInstalled = entry.isInstalled)
             }
 
@@ -966,49 +1074,7 @@ class LibraryViewModel @Inject constructor(
             lastPageInCurrentFilter = if (totalFound == 0) 0 else (totalFound - 1) / pageSize
             // Calculate how many items to show: (pagesLoaded * pageSize)
             val endIndex = min((paginationPage + 1) * pageSize, totalFound)
-            var pagedList = combined.take(endIndex)
-
-            // Prepend the hero (featured > recommendation) as first item on ALL tab when
-            // enabled and not searching.
-            val featured = cachedFeatured
-            val rec = cachedRecommendation
-            if (PrefManager.showRecommendations
-                && currentTab == LibraryTab.ALL
-                && currentState.searchQuery.isEmpty()
-            ) {
-                val heroItem = when {
-                    featured != null -> LibraryItem(
-                        index = -1,
-                        appId = "FEATURED_${featured.campaignId}",
-                        name = featured.title,
-                        heroImageUrl = featured.heroImageUrl,
-                        headerImageUrl = featured.heroImageUrl,
-                        capsuleImageUrl = featured.capsuleImageUrl ?: featured.heroImageUrl,
-                        iconHash = featured.iconUrl ?: featured.capsuleImageUrl ?: featured.heroImageUrl,
-                        isRecommended = true,
-                        isFeatured = true,
-                        recommendedGameId = featured.campaignId,
-                        recSource = "hero",
-                        gameSource = GameSource.STEAM,
-                    )
-                    rec != null -> LibraryItem(
-                        index = -1,
-                        appId = "RECOMMENDED_${rec.id}",
-                        name = rec.name,
-                        heroImageUrl = rec.heroImageUrl,
-                        capsuleImageUrl = rec.capsuleImageUrl,
-                        iconHash = rec.iconUrl ?: rec.capsuleImageUrl,
-                        isRecommended = true,
-                        recommendedGameId = rec.id,
-                        recSource = "hero",
-                        gameSource = GameSource.STEAM,
-                    )
-                    else -> null
-                }
-                if (heroItem != null) {
-                    pagedList = listOf(heroItem) + pagedList.map { it.copy(index = it.index + 1) }
-                }
-            }
+            val pagedList = combined.take(endIndex)
 
             Timber.tag("LibraryViewModel").d("Filtered list size (with Custom Games): $totalFound")
 

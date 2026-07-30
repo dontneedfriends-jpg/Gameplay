@@ -1,10 +1,10 @@
 <div align="center">
 
-# GameNative
+# Gameplay
 
 **Play the PC games you already own — from Steam, Epic and GOG — on your Android device, with cloud saves.**
 
-<a href="https://trendshift.io/repositories/14497" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14497" alt="utkarshdalal%2FGameNative | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+<a href="https://trendshift.io/repositories/14497" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14497" alt="utkarshdalal%2FGameplay | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 <a href="https://www.star-history.com/utkarshdalal/gamenative">
  <picture>
@@ -28,7 +28,9 @@
 
 ---
 
-GameNative lets you run the PC games in your Steam, Epic and GOG libraries directly on Android — no streaming required. Your saves sync to the cloud, so you can stop on your PC and keep going on your phone.
+Gameplay is a modified fork of [utkarshdalal/GameNative](https://github.com/utkarshdalal/GameNative). It preserves the original GPL-3.0 license and copyright notices; see [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+
+Gameplay lets you run the PC games in your Steam, Epic and GOG libraries directly on Android — no streaming required. Your saves sync to the cloud, so you can stop on your PC and keep going on your phone.
 
 It's still early. Not every game runs yet, and some need tweaking to play well, but the community is constantly finding and sharing configs that work — and these get applied automatically. You can see if anyone has tried running your game successfully at https://gamenative.app/compatibility.
 
@@ -43,7 +45,7 @@ It's still early. Not every game runs yet, and some need tweaking to play well, 
 
 ## Demo
 
-[TechDweeb](https://www.youtube.com/@TechDweeb) walks through setting up GameNative on an Android handheld in a couple of minutes:
+[TechDweeb](https://www.youtube.com/@TechDweeb) walks through setting up Gameplay on an Android handheld in a couple of minutes:
 
 <div align="center">
 
@@ -84,7 +86,7 @@ Most of the time you don't need this — if you just want to play, grab the rele
 
 ## Analytics & privacy
 
-GameNative uses [PostHog](https://posthog.com) for anonymous analytics. No personal information is ever collected — no names, emails, IPs or device identifiers.
+Gameplay uses [PostHog](https://posthog.com) for anonymous analytics. No personal information is ever collected — no names, emails, IPs or device identifiers.
 
 **Always collected**, to improve game compatibility:
 - Game launch, close and exit events (game name, store, session length, average FPS, container config)
@@ -109,7 +111,7 @@ Thanks to our [Ko-fi sponsors](https://ko-fi.com/gamenative) and [GitHub sponsor
 
 ## License
 
-[GPL 3.0](https://github.com/utkarshdalal/GameNative/blob/master/LICENSE).
+Gameplay is free software distributed under [GNU GPL version 3](LICENSE). The corresponding source for a distributed build must be provided under the same license.
 
 See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for attributions, copyleft source offers, and notices about third-party and proprietary components bundled with the app.
 

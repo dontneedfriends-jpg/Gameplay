@@ -12,6 +12,8 @@ import app.gamenative.data.LaunchInfo
 import app.gamenative.data.LibraryItem
 import app.gamenative.events.AndroidEvent
 import app.gamenative.PluviaApp
+import app.gamenative.data.GameSource
+import app.gamenative.service.GameDownloadQueue
 import app.gamenative.ui.util.SnackbarManager
 import app.gamenative.service.NotificationHelper
 import app.gamenative.utils.ContainerUtils
@@ -361,6 +363,11 @@ class GOGService : Service() {
             // Track in activeDownloads first
             instance.activeDownloads[gameId] = downloadInfo
             instance.notifierOrNull?.trackDownload(downloadInfo, "", NotificationHelper.NOTIFICATION_ID_GOG)
+            GameDownloadQueue.registerDownload(GameSource.GOG, gameId, downloadInfo) {
+                instance.scope.launch {
+                    downloadGame(context, gameId, installPath, containerLanguage)
+                }
+            }
 
             // Launch download in service scope so it runs independently
             val job = instance.scope.launch {
@@ -435,6 +442,7 @@ class GOGService : Service() {
                     // Remove from activeDownloads for both success and failure
                     // so UI knows download is complete and to prevent stale entries
                     instance.activeDownloads.remove(gameId)
+                    GameDownloadQueue.finishDownload(GameSource.GOG, gameId, downloadInfo)
                     Timber.d("[Download] Finished for game $gameId, progress: ${downloadInfo.getProgress()}, active: ${downloadInfo.isActive()}")
                 }
             }

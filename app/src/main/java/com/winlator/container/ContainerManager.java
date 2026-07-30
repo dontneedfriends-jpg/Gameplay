@@ -2,6 +2,7 @@ package com.winlator.container;
 
 import android.content.Context;
 import android.os.Handler;
+import app.gamenative.PluviaApp;
 import android.util.Log;
 
 // import com.winlator.R;
@@ -98,7 +99,7 @@ public class ContainerManager {
     public Future<Container> createDefaultContainerFuture(WineInfo wineInfo, String containerId) {
         String name = "container_" + containerId;
         Log.d("XServerScreen", "Creating container $name");
-        String screenSize = Container.DEFAULT_SCREEN_SIZE;
+        String screenSize = PluviaApp.getDefaultScreenSize();
         String envVars = Container.DEFAULT_ENV_VARS;
         String graphicsDriver = Container.DEFAULT_GRAPHICS_DRIVER;
         String dxwrapper = Container.DEFAULT_DXWRAPPER;

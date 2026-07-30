@@ -1,10 +1,9 @@
 package app.gamenative.ui.screen.library.components
 
 import android.view.KeyEvent
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.horizontalScroll
@@ -41,9 +40,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -56,7 +54,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import app.gamenative.BuildConfig
 import app.gamenative.R
 import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.enums.LibraryTab
@@ -65,12 +62,13 @@ import app.gamenative.ui.util.WindowWidthClass
 import app.gamenative.ui.util.rememberWindowWidthClass
 
 /**
- * Tab bar for library navigation with sliding pill indicator.
+ * Controller-first library navigation with a restrained selection rail.
  * Adapts to screen width
  */
 @Composable
 fun LibraryTabBar(
     currentTab: LibraryTab,
+    tabs: List<LibraryTab>,
     tabCounts: Map<LibraryTab, Int>,
     onTabSelected: (LibraryTab) -> Unit,
     onOptionsClick: () -> Unit,
@@ -87,6 +85,7 @@ fun LibraryTabBar(
     when (widthClass) {
         WindowWidthClass.COMPACT -> CompactLibraryTabBar(
             currentTab = currentTab,
+            tabs = tabs,
             tabCounts = tabCounts,
             onTabSelected = onTabSelected,
             onOptionsClick = onOptionsClick,
@@ -101,6 +100,7 @@ fun LibraryTabBar(
 
         else -> ExpandedLibraryTabBar(
             currentTab = currentTab,
+            tabs = tabs,
             tabCounts = tabCounts,
             onTabSelected = onTabSelected,
             onOptionsClick = onOptionsClick,
@@ -122,6 +122,7 @@ fun LibraryTabBar(
 @Composable
 private fun CompactLibraryTabBar(
     currentTab: LibraryTab,
+    tabs: List<LibraryTab>,
     tabCounts: Map<LibraryTab, Int>,
     onTabSelected: (LibraryTab) -> Unit,
     onOptionsClick: () -> Unit,
@@ -133,7 +134,6 @@ private fun CompactLibraryTabBar(
     onNextTab: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tabs = LibraryTab.visibleEntries
     val currentIndex = tabs.indexOf(currentTab)
     val scrollState = rememberScrollState()
     val tabPositions = remember { mutableStateMapOf<Int, Float>() }
@@ -150,15 +150,7 @@ private fun CompactLibraryTabBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
-                        Color.Transparent,
-                    ),
-                ),
-            )
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
             .padding(top = 8.dp, bottom = 12.dp, start = 8.dp, end = 8.dp),
     ) {
         Row(
@@ -218,7 +210,7 @@ private fun CompactLibraryTabBar(
                             .clip(RoundedCornerShape(16.dp))
                             .background(
                                 when {
-                                    isSelected -> MaterialTheme.colorScheme.primary
+                                    isSelected -> MaterialTheme.colorScheme.primaryContainer
                                     isTabFocused -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
                                     else -> Color.Transparent
                                 },
@@ -235,7 +227,7 @@ private fun CompactLibraryTabBar(
                     ) {
                         val count = tabCounts[tab]
                         val tabColor = when {
-                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                            isSelected -> MaterialTheme.colorScheme.onPrimaryContainer
                             isTabFocused -> MaterialTheme.colorScheme.primary
                             else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         }
@@ -270,13 +262,11 @@ private fun CompactLibraryTabBar(
                 contentDescription = stringResource(R.string.search),
                 onClick = onSearchClick,
             )
-            if (!BuildConfig.MODERN_ANDROID) {
-                CompactIconButton(
-                    icon = Icons.Default.Add,
-                    contentDescription = stringResource(R.string.action_add_game),
-                    onClick = onAddGameClick,
-                )
-            }
+            CompactIconButton(
+                icon = Icons.Default.Add,
+                contentDescription = stringResource(R.string.action_add_game),
+                onClick = onAddGameClick,
+            )
             CompactIconButton(
                 icon = Icons.Default.Menu,
                 contentDescription = stringResource(R.string.menu),
@@ -338,6 +328,7 @@ private fun CompactIconButton(
 @Composable
 private fun ExpandedLibraryTabBar(
     currentTab: LibraryTab,
+    tabs: List<LibraryTab>,
     tabCounts: Map<LibraryTab, Int>,
     onTabSelected: (LibraryTab) -> Unit,
     onOptionsClick: () -> Unit,
@@ -349,7 +340,6 @@ private fun ExpandedLibraryTabBar(
     onNextTab: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tabs = LibraryTab.visibleEntries
     val currentIndex = tabs.indexOf(currentTab)
     val scrollState = rememberScrollState()
 
@@ -360,19 +350,13 @@ private fun ExpandedLibraryTabBar(
 
     val indicatorOffset by animateDpAsState(
         targetValue = with(density) { (tabPositions[currentIndex] ?: 0f).toDp() },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = tween(durationMillis = 180),
         label = "indicatorOffset",
     )
 
     val indicatorWidth by animateDpAsState(
         targetValue = with(density) { (tabWidths[currentIndex] ?: 80f).toDp() },
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        animationSpec = tween(durationMillis = 180),
         label = "indicatorWidth",
     )
 
@@ -386,16 +370,8 @@ private fun ExpandedLibraryTabBar(
 
     Box(
         modifier = modifier
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                        Color.Transparent,
-                    ),
-                ),
-            )
-            .padding(top = 8.dp, bottom = 20.dp),
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+            .padding(vertical = 10.dp),
     ) {
         Row(
             modifier = Modifier
@@ -435,35 +411,18 @@ private fun ExpandedLibraryTabBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            ),
-                        ),
-                    )
                     .horizontalScroll(scrollState)
-                    .padding(4.dp),
+                    .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                // Sliding pill indicator (rendered behind tabs)
+                // A thin selection rail keeps the navigation calm while remaining legible at TV distance.
                 Box(
                     modifier = Modifier
+                        .align(Alignment.BottomStart)
                         .offset { IntOffset(indicatorOffset.roundToPx(), 0) }
                         .width(indicatorWidth)
-                        .height(40.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.primary,
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.9f),
-                                ),
-                            ),
-                        ),
+                        .height(3.dp)
+                        .background(MaterialTheme.colorScheme.primary),
                 )
 
                 Row(
@@ -491,13 +450,11 @@ private fun ExpandedLibraryTabBar(
                 onClick = onSearchClick,
             )
 
-            if (!BuildConfig.MODERN_ANDROID) {
-                IconActionButton(
-                    icon = Icons.Default.Add,
-                    contentDescription = stringResource(R.string.action_add_game),
-                    onClick = onAddGameClick,
-                )
-            }
+            IconActionButton(
+                icon = Icons.Default.Add,
+                contentDescription = stringResource(R.string.action_add_game),
+                onClick = onAddGameClick,
+            )
 
             IconActionButton(
                 icon = Icons.Default.Menu,
@@ -519,17 +476,14 @@ private fun IconActionButton(
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.15f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
+        targetValue = if (isFocused) 1.06f else 1f,
+        animationSpec = tween(durationMillis = 160),
         label = "iconButtonScale",
     )
 
     val alpha by animateFloatAsState(
         targetValue = if (isFocused) 1f else 0.7f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        animationSpec = tween(durationMillis = 160),
         label = "iconButtonAlpha",
     )
 
@@ -547,19 +501,11 @@ private fun IconActionButton(
             .size(44.dp)
             .clip(CircleShape)
             .background(
-                brush = Brush.radialGradient(
-                    colors = if (isFocused) {
-                        listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                        )
-                    } else {
-                        listOf(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
-                        )
-                    },
-                ),
+                if (isFocused) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                },
             )
             .focusRing(interactionSource, CircleShape, width = 2.dp)
             .selectable(
@@ -603,7 +549,7 @@ private fun TabItem(
             isFocused -> 0.9f
             else -> 0.6f
         },
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        animationSpec = tween(durationMillis = 160),
         label = "textAlpha",
     )
 
@@ -615,12 +561,13 @@ private fun TabItem(
 
     Box(
         modifier = modifier
-            // Min height = the sliding pill's height (40.dp) so the focus ring outlines the same
-            // 40dp-tall, 20dp-radius capsule the user sees. Uses heightIn (not a fixed height) so the
-            // label can grow at large accessibility font scales instead of being clipped.
+            // Preserve a large controller target without turning every tab into a decorative pill.
             .heightIn(min = 40.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .focusRing(interactionSource, RoundedCornerShape(20.dp), width = 2.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (isFocused) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
+            )
+            .focusRing(interactionSource, RoundedCornerShape(8.dp), width = 2.dp)
             .onGloballyPositioned { coordinates ->
                 onPositioned(
                     coordinates.positionInParent().x,
@@ -641,7 +588,7 @@ private fun TabItem(
                 imageVector = tab.icon,
                 contentDescription = stringResource(tab.labelResId),
                 tint = when {
-                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                    isSelected -> MaterialTheme.colorScheme.onSurface
                     else -> MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha)
                 },
                 modifier = Modifier.size(20.dp),
@@ -654,7 +601,7 @@ private fun TabItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = when {
-                    isSelected -> MaterialTheme.colorScheme.onPrimary
+                    isSelected -> MaterialTheme.colorScheme.onSurface
                     else -> MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha)
                 },
                 textAlign = TextAlign.Center,
@@ -674,6 +621,7 @@ private fun Preview_LibraryTabBar() {
         ) {
             LibraryTabBar(
                 currentTab = LibraryTab.ALL,
+                tabs = listOf(LibraryTab.INSTALLED, LibraryTab.ALL, LibraryTab.STEAM, LibraryTab.GOG, LibraryTab.EPIC, LibraryTab.LOCAL),
                 tabCounts = mapOf(
                     LibraryTab.ALL to 42,
                     LibraryTab.STEAM to 30,
@@ -703,6 +651,7 @@ private fun Preview_LibraryTabBar_Steam() {
         ) {
             LibraryTabBar(
                 currentTab = LibraryTab.STEAM,
+                tabs = listOf(LibraryTab.INSTALLED, LibraryTab.ALL, LibraryTab.STEAM, LibraryTab.GOG, LibraryTab.EPIC, LibraryTab.LOCAL),
                 tabCounts = mapOf(
                     LibraryTab.ALL to 42,
                     LibraryTab.STEAM to 30,

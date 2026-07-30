@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
@@ -169,6 +170,24 @@ fun GameSourceIcon(
             GameSource.GOG -> Icon(painter = painterResource(R.drawable.ic_gog), contentDescription = "Gog", modifier = Modifier.size(iconSize.dp).alpha(0.7f))
             GameSource.EPIC -> Icon(painter = painterResource(R.drawable.ic_epic), contentDescription = "Epic", modifier = Modifier.size(iconSize.dp).alpha(0.7f))
             GameSource.AMAZON -> Icon(imageVector = Icons.Filled.Amazon, contentDescription = "Amazon", modifier = Modifier.size(iconSize.dp).alpha(0.7f))
+        }
+    }
+}
+
+@Composable
+fun OtherSourceIcons(
+    sources: List<GameSource>,
+    modifier: Modifier = Modifier,
+    iconSize: Int = 11,
+) {
+    if (sources.isEmpty()) return
+    Row(modifier = modifier) {
+        sources.distinct().forEach { source ->
+            GameSourceIcon(
+                gameSource = source,
+                iconSize = iconSize,
+                alignmentBoxSize = 17,
+            )
         }
     }
 }

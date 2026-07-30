@@ -3,16 +3,13 @@ package app.gamenative.ui.screen.library.components
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -40,7 +37,6 @@ import androidx.compose.material.icons.automirrored.filled.AirplaneTicket
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -65,7 +61,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -82,7 +77,7 @@ import app.gamenative.R
 import app.gamenative.data.SteamFriend
 import app.gamenative.events.SteamEvent
 import app.gamenative.service.SteamService
-import app.gamenative.ui.component.dialog.SupportersDialog
+import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.screen.PluviaScreen
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.util.SteamIconImage
@@ -108,15 +103,6 @@ private fun SystemMenuItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.02f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
-        label = "menuItemScale",
-    )
-
     val backgroundColor = when {
         isFocused -> MaterialTheme.colorScheme.primaryContainer
         else -> Color.Transparent
@@ -131,9 +117,9 @@ private fun SystemMenuItem(
 
     Box(
         modifier = modifier
-            .scale(scale)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(backgroundColor)
+            .focusRing(interactionSource, RoundedCornerShape(10.dp), width = 2.dp)
             .focusRequester(focusRequester)
             .selectable(
                 selected = isFocused,
@@ -141,17 +127,17 @@ private fun SystemMenuItem(
                 indication = null,
                 onClick = onClick,
             )
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 13.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(24.dp),
             )
             Text(
                 text = text,
@@ -177,15 +163,6 @@ private fun StatusOption(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.02f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
-        label = "statusOptionScale",
-    )
-
     val backgroundColor = when {
         isFocused -> MaterialTheme.colorScheme.primaryContainer
         isSelected -> MaterialTheme.colorScheme.surfaceContainerHighest
@@ -195,9 +172,9 @@ private fun StatusOption(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .scale(scale)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(backgroundColor)
+            .focusRing(interactionSource, RoundedCornerShape(10.dp), width = 2.dp)
             .selectable(
                 selected = isFocused,
                 interactionSource = interactionSource,
@@ -266,7 +243,6 @@ fun SystemMenu(
 
     var persona by remember { mutableStateOf<SteamFriend?>(null) }
     var selectedStatus by remember(persona) { mutableStateOf(persona?.state ?: EPersonaState.Online) }
-    var showSupporters by remember { mutableStateOf(false) }
     var showStatusPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -303,8 +279,6 @@ fun SystemMenu(
     BackHandler(enabled = isOpen && !showStatusPicker) {
         onDismiss()
     }
-
-    SupportersDialog(visible = showSupporters, onDismiss = { showSupporters = false })
 
     val colorOnline = PluviaTheme.colors.statusInstalled
     val colorAway = PluviaTheme.colors.statusAway
@@ -343,17 +317,11 @@ fun SystemMenu(
             visible = isOpen,
             enter = slideInHorizontally(
                 initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow,
-                ),
+                animationSpec = tween(durationMillis = 200),
             ),
             exit = slideOutHorizontally(
                 targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium,
-                ),
+                animationSpec = tween(durationMillis = 160),
             ),
             modifier = Modifier.align(Alignment.CenterEnd),
         ) {
@@ -361,10 +329,11 @@ fun SystemMenu(
                 modifier = Modifier
                     .width(adaptivePanelWidth(380.dp))
                     .fillMaxHeight(),
-                shape = RoundedCornerShape(topStart = 32.dp, bottomStart = 32.dp),
+                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp,
-                shadowElevation = 24.dp,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             ) {
                 Column(
                     modifier = Modifier
@@ -399,21 +368,11 @@ fun SystemMenu(
                     // Profile section
                     val profileInteractionSource = remember { MutableInteractionSource() }
                     val isProfileFocused by profileInteractionSource.collectIsFocusedAsState()
-                    val profileScale by animateFloatAsState(
-                        targetValue = if (isProfileFocused) 1.02f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium,
-                        ),
-                        label = "profileScale",
-                    )
-
                     Box {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .scale(profileScale)
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     if (isProfileFocused) {
                                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -421,17 +380,7 @@ fun SystemMenu(
                                         MaterialTheme.colorScheme.surfaceContainerHigh
                                     },
                                 )
-                                .then(
-                                    if (isProfileFocused) {
-                                        Modifier.border(
-                                            2.dp,
-                                            MaterialTheme.colorScheme.primary,
-                                            RoundedCornerShape(16.dp),
-                                        )
-                                    } else {
-                                        Modifier
-                                    },
-                                )
+                                .focusRing(profileInteractionSource, RoundedCornerShape(12.dp), width = 2.dp)
                                 .focusRequester(profileFocusRequester)
                                 .selectable(
                                     selected = isProfileFocused,
@@ -595,12 +544,6 @@ fun SystemMenu(
                             onClick = {
                                 uriHandler.openUri("https://discord.gg/2hKv4VfZfE")
                             },
-                        )
-
-                        SystemMenuItem(
-                            text = stringResource(R.string.hall_of_fame),
-                            icon = Icons.AutoMirrored.Filled.StarHalf,
-                            onClick = { showSupporters = true },
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))

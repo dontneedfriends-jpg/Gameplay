@@ -164,7 +164,7 @@ object PrefManager {
     /* Container Default Settings */
     private val SCREEN_SIZE = stringPreferencesKey("screen_size")
     var screenSize: String
-        get() = getPref(SCREEN_SIZE, Container.DEFAULT_SCREEN_SIZE)
+        get() = getPref(SCREEN_SIZE, PluviaApp.getDefaultScreenSize())
         set(value) {
             setPref(SCREEN_SIZE, value)
         }
@@ -397,6 +397,16 @@ object PrefManager {
             setPref(PERFORMANCE_HUD_SHOW_BATTERY_LEVEL, value)
         }
 
+    private val PERFORMANCE_HUD_LOW_BATTERY_WARNING = booleanPreferencesKey("performance_hud_low_battery_warning")
+    var performanceHudLowBatteryWarning: Boolean
+        get() = getPref(PERFORMANCE_HUD_LOW_BATTERY_WARNING, false)
+        set(value) { setPref(PERFORMANCE_HUD_LOW_BATTERY_WARNING, value) }
+
+    private val PERFORMANCE_HUD_LOW_BATTERY_THRESHOLD = intPreferencesKey("performance_hud_low_battery_threshold")
+    var performanceHudLowBatteryThreshold: Int
+        get() = getPref(PERFORMANCE_HUD_LOW_BATTERY_THRESHOLD, 10)
+        set(value) { setPref(PERFORMANCE_HUD_LOW_BATTERY_THRESHOLD, value.coerceIn(5, 50)) }
+
     private val PERFORMANCE_HUD_SHOW_POWER_DRAW = booleanPreferencesKey("performance_hud_show_power_draw")
     var performanceHudShowPowerDraw: Boolean
         get() = getPref(PERFORMANCE_HUD_SHOW_POWER_DRAW, true)
@@ -417,6 +427,16 @@ object PrefManager {
         set(value) {
             setPref(PERFORMANCE_HUD_SHOW_BATTERY_TEMPERATURE, value)
         }
+
+    private val PERFORMANCE_HUD_HIGH_BATTERY_TEMP_WARNING = booleanPreferencesKey("performance_hud_high_battery_temp_warning")
+    var performanceHudHighBatteryTemperatureWarning: Boolean
+        get() = getPref(PERFORMANCE_HUD_HIGH_BATTERY_TEMP_WARNING, false)
+        set(value) { setPref(PERFORMANCE_HUD_HIGH_BATTERY_TEMP_WARNING, value) }
+
+    private val PERFORMANCE_HUD_HIGH_BATTERY_TEMP_THRESHOLD = intPreferencesKey("performance_hud_high_battery_temp_threshold")
+    var performanceHudHighBatteryTemperatureThreshold: Int
+        get() = getPref(PERFORMANCE_HUD_HIGH_BATTERY_TEMP_THRESHOLD, 40)
+        set(value) { setPref(PERFORMANCE_HUD_HIGH_BATTERY_TEMP_THRESHOLD, value.coerceIn(30, 60)) }
 
     private val PERFORMANCE_HUD_SHOW_CLOCK_TIME = booleanPreferencesKey("performance_hud_show_clock_time")
     var performanceHudShowClockTime: Boolean
@@ -955,16 +975,6 @@ object PrefManager {
         }
         set(value) {
             setPref(ALLOWED_ORIENTATION, Orientation.toInt(value))
-        }
-
-    private val TIPPED = booleanPreferencesKey("tipped")
-    var tipped: Boolean
-        get() {
-            val value = getPref(TIPPED, false)
-            return value
-        }
-        set(value) {
-            setPref(TIPPED, value)
         }
 
     private val APP_THEME = intPreferencesKey("app_theme")

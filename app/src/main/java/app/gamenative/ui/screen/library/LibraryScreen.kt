@@ -2,14 +2,18 @@ package app.gamenative.ui.screen.library
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import app.gamenative.ui.util.SnackbarManager
+import app.gamenative.localgames.LocalGameImporter
+import app.gamenative.localgames.LocalInstallerImporter
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,13 +35,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -69,7 +70,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import app.gamenative.BuildConfig
 import app.gamenative.PrefManager
 import app.gamenative.PluviaApp
 import app.gamenative.R
@@ -103,6 +103,7 @@ import app.gamenative.ui.screen.auth.AmazonOAuthActivity
 import app.gamenative.ui.screen.auth.EpicOAuthActivity
 import app.gamenative.ui.screen.auth.GOGOAuthActivity
 import app.gamenative.ui.screen.library.components.SystemMenu
+import app.gamenative.ui.screen.library.components.ConsoleImportPanel
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.util.PlatformAuthUiHelpers
 import app.gamenative.ui.util.PlatformLogoutCallbacks
@@ -151,6 +152,10 @@ fun HomeLibraryScreen(
         onDownloadsClick = onDownloadsClick,
         onSourceToggle = viewModel::onSourceToggle,
         onAddCustomGameFolder = viewModel::addCustomGameFolder,
+        onImportPortableExecutable = viewModel::importPortableExecutable,
+        onImportInstaller = viewModel::importInstaller,
+        onMarkInstallerLaunching = viewModel::markInstallerLaunching,
+        resolveCrossStoreSibling = viewModel::resolveCrossStoreSibling,
         onSortOptionChanged = viewModel::onSortOptionChanged,
         onSteamCollectionToggle = viewModel::onSteamCollectionToggle,
         onClearSteamCollections = viewModel::onClearSteamCollections,
@@ -192,6 +197,10 @@ private fun LibraryScreenContent(
     onDownloadsClick: () -> Unit = {},
     onSourceToggle: (GameSource) -> Unit,
     onAddCustomGameFolder: (String) -> Unit,
+    onImportPortableExecutable: (Uri, (LocalGameImporter.ImportResult) -> Unit) -> Unit,
+    onImportInstaller: (Uri, (LocalInstallerImporter.ImportResult) -> Unit) -> Unit,
+    onMarkInstallerLaunching: (String, (String) -> Unit, (String) -> Unit) -> Unit,
+    resolveCrossStoreSibling: (String, GameSource) -> LibraryItem?,
     onSortOptionChanged: (SortOption) -> Unit,
     onSteamCollectionToggle: (String) -> Unit,
     onClearSteamCollections: () -> Unit,
@@ -314,7 +323,13 @@ private fun LibraryScreenContent(
     val carouselListState = rememberLazyListState()
     val isViewWide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     var currentPaneType by remember { mutableStateOf(PrefManager.libraryLayout) }
-    var recDisclosureShown by remember { mutableStateOf(PrefManager.recDisclosureShown) }
+    val visibleTabs = LibraryTab.visibleEntries(context)
+
+    LaunchedEffect(visibleTabs, state.currentTab) {
+        if (state.currentTab !in visibleTabs) {
+            onTabChanged(LibraryTab.INSTALLED)
+        }
+    }
 
     // Initialize layout if undecided
     LaunchedEffect(Unit) {
@@ -331,8 +346,6 @@ private fun LibraryScreenContent(
     var carouselFocusTargetListIndex by remember { mutableIntStateOf(0) }
     var pendingGridFocusRequest by remember { mutableStateOf(false) }
     var pendingCarouselFocusRequest by remember { mutableStateOf(false) }
-
-    var recommendationItemCount by remember { mutableIntStateOf(0) }
 
     var isSystemMenuOpen by remember { mutableStateOf(false) }
     // Track previous overlay states to detect when they close
@@ -352,7 +365,6 @@ private fun LibraryScreenContent(
 
     // Dialog state for add custom game prompt
     var showAddCustomGameDialog by remember { mutableStateOf(false) }
-    var dontShowAgain by remember { mutableStateOf(false) }
     var previousAppCount by remember { mutableIntStateOf(state.appInfoList.size) }
     var controllerBootstrapNeeded by remember { mutableStateOf(true) }
     var rootHasFocus by remember { mutableStateOf(false) }
@@ -363,11 +375,7 @@ private fun LibraryScreenContent(
     var lastBootstrapAtMs by remember { mutableLongStateOf(0L) }
 
     fun getContentLastIndex(): Int {
-        return if (state.currentTab == LibraryTab.RECOMMENDED) {
-            (recommendationItemCount - 1).coerceAtLeast(0)
-        } else {
-            state.appInfoList.lastIndex.coerceAtLeast(0)
-        }
+        return state.appInfoList.lastIndex.coerceAtLeast(0)
     }
 
     fun firstVisibleContentIndex(): Int {
@@ -401,7 +409,7 @@ private fun LibraryScreenContent(
     }
 
     // Moved all state.appInfoList.isNotEmpty() checking to this function
-    fun isListFocusable(): Boolean = state.appInfoList.isNotEmpty() || state.currentTab == LibraryTab.RECOMMENDED
+    fun isListFocusable(): Boolean = state.appInfoList.isNotEmpty()
 
     fun requestGridFocusOrDefer() {
         if (!isListFocusable()) return
@@ -449,6 +457,42 @@ private fun LibraryScreenContent(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
 
+    val portableExecutablePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        onImportPortableExecutable(uri) { result ->
+            val message = when (result) {
+                is LocalGameImporter.ImportResult.Ready -> "Imported ${result.title}"
+                is LocalGameImporter.ImportResult.Rejected -> result.reason
+                is LocalGameImporter.ImportResult.Failed -> result.reason
+            }
+            SnackbarManager.show(message)
+        }
+    }
+
+    val installerPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        onImportInstaller(uri) { result ->
+            when (result) {
+                is LocalInstallerImporter.ImportResult.Ready -> {
+                    onMarkInstallerLaunching(
+                        result.session.id,
+                        { appId ->
+                            SnackbarManager.show("Starting ${result.session.title} installer")
+                            onClickPlay(appId, false)
+                        },
+                        SnackbarManager::show,
+                    )
+                }
+                is LocalInstallerImporter.ImportResult.Rejected -> SnackbarManager.show(result.reason)
+                is LocalInstallerImporter.ImportResult.Failed -> SnackbarManager.show(result.reason)
+            }
+        }
+    }
+
     val folderPicker = rememberCustomGameFolderPicker(
         onPathSelected = { path ->
             // When a folder is selected via OpenDocumentTree, the user has already granted
@@ -473,14 +517,7 @@ private fun LibraryScreenContent(
         },
     )
 
-    // Handle opening folder picker (with dialog check)
-    val onAddCustomGameClick = {
-        if (PrefManager.showAddCustomGameDialog) {
-            showAddCustomGameDialog = true
-        } else {
-            folderPicker.launchPicker()
-        }
-    }
+    val onAddCustomGameClick = { showAddCustomGameDialog = true }
 
     BackHandler(enabled = isSystemMenuOpen) {
         isSystemMenuOpen = false
@@ -874,7 +911,7 @@ private fun LibraryScreenContent(
 
                         // X button - add custom game
                         KeyEvent.KEYCODE_BUTTON_X -> {
-                            if (!BuildConfig.MODERN_ANDROID && selectedAppId == null && !state.isSearching && !state.isOptionsPanelOpen && !isSystemMenuOpen) {
+                            if (selectedAppId == null && !state.isSearching && !state.isOptionsPanelOpen && !isSystemMenuOpen) {
                                 onAddCustomGameClick()
                                 true
                             } else {
@@ -914,34 +951,6 @@ private fun LibraryScreenContent(
         if (selectedAppId == null) {
             // Use Box to allow content to scroll behind the tab bar
             Box(modifier = Modifier.fillMaxSize()) {
-                // When on Steam/GOG/Epic/Amazon tab and not logged in, or LOCAL tab with no custom games, show splash
-                if (state.currentTab == LibraryTab.RECOMMENDED) {
-                    if (recDisclosureShown) {
-                        RecommendedTabPane(
-                            currentPaneType = currentPaneType,
-                            onNavigate = { item ->
-                                selectedAppId = item.appId
-                                selectedLibraryItem = item
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                            firstCarouselItemFocusRequester = carouselFocusRequester,
-                            firstGridItemFocusRequester = gridFirstItemFocusRequester,
-                            focusTargetListIndex = if (currentPaneType == PaneType.CAROUSEL) currentCarouselFocusTargetIndex() else gridFocusTargetListIndex,
-                            onFocusedIndexChanged = { carouselFocusTargetListIndex = it },
-                            onItemCountChanged = { recommendationItemCount = it },
-                        )
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize())
-                        RecommendationDisclosureDialog(
-                            onContinue = {
-                                PrefManager.recDisclosureShown = true
-                                recDisclosureShown = true
-                                PluviaApp.events.emit(AndroidEvent.RecommendationToggleChanged)
-                            },
-                            onDismiss = { onTabChanged(LibraryTab.ALL) },
-                        )
-                    }
-                } else {
                 val showEmptyStateSplash = when (state.currentTab) {
                     LibraryTab.STEAM -> !SteamUtils.hasStoredCredentials() && !state.isLoading
                     LibraryTab.GOG -> !GOGService.hasStoredCredentials(context)
@@ -1019,7 +1028,6 @@ private fun LibraryScreenContent(
                         )
                     }
                 }
-                }
 
                 // Top overlay: Tab bar OR Search bar
                 if (state.isSearching) {
@@ -1047,6 +1055,7 @@ private fun LibraryScreenContent(
                     // Tab bar when not searching
                     LibraryTabBar(
                         currentTab = state.currentTab,
+                        tabs = visibleTabs,
                         tabCounts = mapOf(
                             LibraryTab.ALL to state.allCount,
                             LibraryTab.STEAM to state.steamCount,
@@ -1104,6 +1113,14 @@ private fun LibraryScreenContent(
                         onPlayWithDiagnostics(libraryItem.appId)
                     }
                 },
+                onSourceClick = { targetSource ->
+                    selectedLibraryItem?.let { current ->
+                        resolveCrossStoreSibling(current.appId, targetSource)?.let { target ->
+                            selectedAppId = target.appId
+                            selectedLibraryItem = target
+                        }
+                    }
+                },
             )
         }
 
@@ -1144,17 +1161,12 @@ private fun LibraryScreenContent(
                         labelResId = R.string.search,
                         onClick = { onIsSearching(true) },
                     ),
-                ) + if (!BuildConfig.MODERN_ANDROID) {
-                    listOf(
-                        GamepadAction(
-                            button = GamepadButton.X,
-                            labelResId = R.string.action_add_game,
-                            onClick = onAddCustomGameClick,
-                        ),
-                    )
-                } else {
-                    emptyList()
-                }
+                    GamepadAction(
+                        button = GamepadButton.X,
+                        labelResId = R.string.action_add_game,
+                        onClick = onAddCustomGameClick,
+                    ),
+                )
             }
 
             GamepadActionBar(
@@ -1238,55 +1250,22 @@ private fun LibraryScreenContent(
             )
         }
 
-        // Add custom game dialog
-        if (showAddCustomGameDialog) {
-            AlertDialog(
-                onDismissRequest = { showAddCustomGameDialog = false },
-                title = { Text(stringResource(R.string.add_custom_game_dialog_title)) },
-                text = {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.add_custom_game_dialog_message),
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = dontShowAgain,
-                                onCheckedChange = { dontShowAgain = it },
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = stringResource(R.string.add_custom_game_dont_show_again),
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            if (dontShowAgain) {
-                                PrefManager.showAddCustomGameDialog = false
-                            }
-                            showAddCustomGameDialog = false
-                            folderPicker.launchPicker()
-                        },
-                    ) {
-                        Text(stringResource(android.R.string.ok))
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showAddCustomGameDialog = false },
-                    ) {
-                        Text(stringResource(android.R.string.cancel))
-                    }
-                },
-            )
-        }
+        ConsoleImportPanel(
+            isOpen = showAddCustomGameDialog,
+            onDismiss = { showAddCustomGameDialog = false },
+            onInstall = {
+                showAddCustomGameDialog = false
+                installerPicker.launch(arrayOf("*/*"))
+            },
+            onImportExecutable = {
+                showAddCustomGameDialog = false
+                portableExecutablePicker.launch(arrayOf("*/*"))
+            },
+            onChooseFolder = {
+                showAddCustomGameDialog = false
+                folderPicker.launchPicker()
+            },
+        )
     }
 }
 
@@ -1354,6 +1333,10 @@ private fun Preview_LibraryScreenContent() {
             onGoOnline = {},
             onSourceToggle = {},
             onAddCustomGameFolder = {},
+            onImportPortableExecutable = { _, _ -> },
+            onImportInstaller = { _, _ -> },
+            onMarkInstallerLaunching = { _, _, _ -> },
+            resolveCrossStoreSibling = { _, _ -> null },
             onSortOptionChanged = {},
             onSteamCollectionToggle = {},
             onClearSteamCollections = {},

@@ -1833,6 +1833,16 @@ class SteamService : Service(), IChallengeUrlChanged {
                 downloadJobs[appId] = di
                 notifyDownloadStarted(appId)
                 instance?.notifierOrNull?.trackDownload(di, getAppInfoOf(appId)?.name.orEmpty(), NotificationHelper.NOTIFICATION_ID_STEAM)
+                GameDownloadQueue.registerDownload(GameSource.STEAM, appId.toString(), di) {
+                    downloadApp(
+                        appId,
+                        downloadableDepots,
+                        userSelectedDlcAppIds,
+                        branch,
+                        containerLanguage,
+                        isUpdateOrVerify,
+                    )
+                }
 
                 val chunkStagingRedirectDir = File(DownloadService.baseCacheDirPath, "depot_chunks/$appId")
                     .takeIf { !appDirPath.startsWith(DownloadService.baseDataDirPath) }
@@ -2117,6 +2127,7 @@ class SteamService : Service(), IChallengeUrlChanged {
                     // handlers, and cancellations thrown out of suspension points.
                     // second call is a no-op if the inline path already removed the entry.
                     removeDownloadJob(appId)
+                    GameDownloadQueue.finishDownload(GameSource.STEAM, appId.toString(), di)
                     chunkStagingRedirectDir?.deleteRecursively()
                     if (throwable is kotlinx.coroutines.CancellationException) {
                         Timber.d(throwable, "Download canceled for app $appId")

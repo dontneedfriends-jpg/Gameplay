@@ -3,9 +3,11 @@ package app.gamenative.utils
 import android.text.Html
 import app.gamenative.Constants
 import java.text.Normalizer
+import java.util.Locale
 
 private val REGEX_UNACCENT = "\\p{M}+".toRegex()
 private val REGEX_FILENAME_UNSAFE = Regex("[^a-zA-Z0-9_-]")
+private val REGEX_NON_LETTER_OR_DIGIT = Regex("[^\\p{L}\\p{N}]")
 
 
 /**
@@ -24,6 +26,11 @@ fun CharSequence.unaccent(): String {
     val temp = Normalizer.normalize(this, Normalizer.Form.NFKD)
     return REGEX_UNACCENT.replace(temp, "")
 }
+
+/** Stable, Unicode-safe key for matching the same title across different stores. */
+fun CharSequence.normalizeForComparison(): String = unaccent()
+    .lowercase(Locale.ROOT)
+    .replace(REGEX_NON_LETTER_OR_DIGIT, "")
 
 /**
  * Replaces any character that isn't ASCII alphanumeric, underscore, or hyphen with an

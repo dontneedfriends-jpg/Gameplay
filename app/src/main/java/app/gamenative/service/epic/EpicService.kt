@@ -15,6 +15,8 @@ import app.gamenative.utils.MarkerUtils
 import app.gamenative.enums.Marker
 import app.gamenative.events.AndroidEvent
 import app.gamenative.PluviaApp
+import app.gamenative.data.GameSource
+import app.gamenative.service.GameDownloadQueue
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.service.NotificationHelper
 import com.winlator.container.Container
@@ -433,6 +435,11 @@ class EpicService : Service() {
             instance.activeDownloads[appId] = downloadInfo
             downloadInfo.setActive(true)
             instance.notifierOrNull?.trackDownload(downloadInfo, game.title ?: "", NotificationHelper.NOTIFICATION_ID_EPIC)
+            GameDownloadQueue.registerDownload(GameSource.EPIC, appId.toString(), downloadInfo) {
+                instance.scope.launch {
+                    downloadGame(context, appId, dlcGameIds, installPath, containerLanguage)
+                }
+            }
 
             // Start download in background
             val job = instance.scope.launch {
@@ -506,6 +513,7 @@ class EpicService : Service() {
                     SnackbarManager.show("Download error: ${e.message ?: "Unknown error"}")
                 } finally {
                     instance.activeDownloads.remove(appId)
+                    GameDownloadQueue.finishDownload(GameSource.EPIC, appId.toString(), downloadInfo)
                     Timber.d("[Download] Finished for game $gameId, progress: ${downloadInfo.getProgress()}, active: ${downloadInfo.isActive()}")
                 }
             }

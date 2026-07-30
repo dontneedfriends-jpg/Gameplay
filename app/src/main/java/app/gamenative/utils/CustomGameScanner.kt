@@ -15,6 +15,7 @@ import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.enums.Marker
 import app.gamenative.events.AndroidEvent
+import app.gamenative.localgames.LocalContainerLaunch
 import app.gamenative.service.DownloadService
 import app.gamenative.service.SteamService
 import app.gamenative.service.SteamService.Companion.INVALID_APP_ID
@@ -365,6 +366,16 @@ object CustomGameScanner {
      * When container has a configured path, verifies the file exists to avoid launching stale/missing paths.
      */
     fun getLaunchExecutable(container: Container): String {
+        if (container.getExtra(LocalContainerLaunch.EXTRA_MODE) == LocalContainerLaunch.MODE_INSTALLED_EXE_C) {
+            val target = container.getExtra(LocalContainerLaunch.EXTRA_TARGET)
+                .replace('\\', File.separatorChar)
+                .replace('/', File.separatorChar)
+                .trimStart(File.separatorChar)
+            if (target.isEmpty()) return ""
+            val installedExecutable = File(container.rootDir, ".wine/drive_c/$target")
+            return if (installedExecutable.isFile) target else ""
+        }
+
         val gameFolderPath = ContainerUtils.getADrivePath(container.drives) ?: return ""
         val exe = container.executablePath
         if (exe.isNotEmpty()) {
@@ -563,14 +574,17 @@ object CustomGameScanner {
         }
     }
 
-    fun createLibraryItemFromFolder(folderPath: String): LibraryItem? {
+    fun createLibraryItemFromFolder(
+        folderPath: String,
+        allowSteamAssociation: Boolean = true,
+    ): LibraryItem? {
         val folder = File(folderPath)
         if (!folder.exists() || !folder.isDirectory) {
             Timber.tag("CustomGameScanner").w("Folder does not exist or is not a directory: $folderPath")
             return null
         }
 
-        if (SteamService.instance != null && PrefManager.importCustomGameAsSteamGame) {
+        if (allowSteamAssociation && SteamService.instance != null && PrefManager.importCustomGameAsSteamGame) {
             val steamApps = SteamService.findSteamAppWithInstallDir(dirName = folder.name)
             if (steamApps?.size == 1) {
                 val steamApp = steamApps[0]

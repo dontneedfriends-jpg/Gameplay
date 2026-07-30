@@ -96,6 +96,7 @@ import app.gamenative.data.ShooterModeConfig
 import app.gamenative.data.SteamApp
 import app.gamenative.events.AndroidEvent
 import app.gamenative.events.SteamEvent
+import app.gamenative.localgames.LocalContainerLaunch
 import app.gamenative.ui.enums.Orientation
 import java.util.EnumSet
 import app.gamenative.externaldisplay.ExternalDisplayInputController
@@ -336,6 +337,39 @@ private fun buildEssentialProcessAllowlist(): Set<String> {
     return (essentialServices + CORE_WINE_PROCESSES).toSet()
 }
 
+@Composable
+private fun rememberKeyboardEscMenuHandler(): KeyboardEscMenuHandler {
+    val scope = rememberCoroutineScope()
+    return remember(scope) { KeyboardEscMenuHandler(scope) }
+}
+
+@Composable
+private fun PlayingBlockedDialog(
+    visible: Boolean,
+    remoteName: String?,
+    onPlayAnyway: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    if (!visible) return
+
+    val displayName = remoteName ?: stringResource(R.string.main_app_running_unknown_game)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = {},
+        title = { Text(text = stringResource(R.string.main_app_running_title)) },
+        text = { Text(text = stringResource(R.string.main_app_running_message, displayName)) },
+        confirmButton = {
+            TextButton(onClick = onPlayAnyway) {
+                Text(text = stringResource(R.string.main_play_anyway))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(text = stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
 // TODO logs in composables are 'unstable' which can cause recomposition (performance issues)
 
 @Composable
@@ -357,7 +391,6 @@ fun XServerScreen(
     Timber.i("Starting up XServerScreen")
     val context = LocalContext.current
     val view = LocalView.current
-    val scope = rememberCoroutineScope()
     val imm = remember(context) {
         context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
     }
@@ -477,10 +510,12 @@ fun XServerScreen(
     var win32AppWorkarounds: Win32AppWorkarounds? by remember { mutableStateOf(null) }
     var physicalControllerHandler: PhysicalControllerHandler? by remember { mutableStateOf(null) }
     var exitWatchJob: Job? by remember { mutableStateOf(null) }
-    val keyboardEscMenuHandler = remember(scope) { KeyboardEscMenuHandler(scope) }
+    val keyboardEscMenuHandler = rememberKeyboardEscMenuHandler()
 
     DisposableEffect(Unit) {
         onDispose {
+            PluviaApp.radialMenuCoordinator?.detach()
+            PluviaApp.radialMenuCoordinator = null
             physicalControllerHandler?.cleanup()
             physicalControllerHandler = null
             exitWatchJob?.cancel()
@@ -563,9 +598,13 @@ fun XServerScreen(
             showGpuUsage = PrefManager.performanceHudShowGpuUsage,
             showRamUsage = PrefManager.performanceHudShowRamUsage,
             showBatteryLevel = PrefManager.performanceHudShowBatteryLevel,
+            lowBatteryWarningEnabled = PrefManager.performanceHudLowBatteryWarning,
+            lowBatteryThresholdPercent = PrefManager.performanceHudLowBatteryThreshold,
             showPowerDraw = PrefManager.performanceHudShowPowerDraw,
             showBatteryRuntime = PrefManager.performanceHudShowBatteryRuntime,
             showBatteryTemperature = PrefManager.performanceHudShowBatteryTemperature,
+            highBatteryTemperatureWarningEnabled = PrefManager.performanceHudHighBatteryTemperatureWarning,
+            highBatteryTemperatureThresholdC = PrefManager.performanceHudHighBatteryTemperatureThreshold,
             showClockTime = PrefManager.performanceHudShowClockTime,
             showCpuTemperature = PrefManager.performanceHudShowCpuTemperature,
             showGpuTemperature = PrefManager.performanceHudShowGpuTemperature,
@@ -596,9 +635,13 @@ fun XServerScreen(
         PrefManager.performanceHudShowGpuUsage = config.showGpuUsage
         PrefManager.performanceHudShowRamUsage = config.showRamUsage
         PrefManager.performanceHudShowBatteryLevel = config.showBatteryLevel
+        PrefManager.performanceHudLowBatteryWarning = config.lowBatteryWarningEnabled
+        PrefManager.performanceHudLowBatteryThreshold = config.lowBatteryThresholdPercent
         PrefManager.performanceHudShowPowerDraw = config.showPowerDraw
         PrefManager.performanceHudShowBatteryRuntime = config.showBatteryRuntime
         PrefManager.performanceHudShowBatteryTemperature = config.showBatteryTemperature
+        PrefManager.performanceHudHighBatteryTemperatureWarning = config.highBatteryTemperatureWarningEnabled
+        PrefManager.performanceHudHighBatteryTemperatureThreshold = config.highBatteryTemperatureThresholdC
         PrefManager.performanceHudShowClockTime = config.showClockTime
         PrefManager.performanceHudShowCpuTemperature = config.showCpuTemperature
         PrefManager.performanceHudShowGpuTemperature = config.showGpuTemperature
@@ -1164,6 +1207,8 @@ fun XServerScreen(
 
                             // Apply the new profile to InputControlsView
                             PluviaApp.inputControlsView?.setProfile(activeProfile)
+                            PluviaApp.radialMenuCoordinator?.setProfile(activeProfile)
+                            physicalControllerHandler?.setProfile(activeProfile)
                         } catch (e: Exception) {
                             Timber.e(e, "Failed to auto-create profile for container %s", container.name)
                             // Fallback to existing profile
@@ -1276,6 +1321,11 @@ fun XServerScreen(
                 keepPausedForEditor = true
                 showPhysicalControllerDialog = true
                 true
+            }
+
+            QuickMenuAction.RADIAL_MENU -> {
+                if (PrefManager.usageAnalyticsEnabled) PostHog.capture(event = "edit_radial_menu_from_menu")
+                PluviaApp.radialMenuCoordinator?.showSettingsDialog() == true
             }
 
             QuickMenuAction.PERFORMANCE_HUD -> {
@@ -1770,6 +1820,9 @@ fun XServerScreen(
                     }
                 }
 
+                val radialMenuHandled = PluviaApp.radialMenuCoordinator?.onHostTouchEvent(event) == true
+                if (radialMenuHandled) return@pointerInteropFilter true
+
                 val overlayHandled = swapInputOverlay
                     ?.takeIf { it.visibility == View.VISIBLE }
                     ?.dispatchTouchEvent(event) == true
@@ -2227,6 +2280,20 @@ fun XServerScreen(
             gameHost.addView(xServerView as View)
 
             PluviaApp.inputControlsManager = InputControlsManager(context)
+            RadialMenuCoordinator.install(
+                context = context,
+                host = mainRoot,
+                anchor = view,
+                container = container,
+                xServer = xServerView.getxServer(),
+                gameNameProvider = { currentAppInfo?.name ?: container.name },
+                showKeyboard = showSoftKeyboard,
+                openQuickMenu = { showQuickMenu = true },
+                onSettingsVisibilityChanged = { visible ->
+                    keepPausedForEditor = visible
+                    if (!visible) resumeIfAllowedAfterOverlay()
+                },
+            )
 
             // Store the loaded profile for auto-show logic later (declared outside apply block)
             var loadedProfile: ControlsProfile? = null
@@ -2272,7 +2339,9 @@ fun XServerScreen(
 
                     Timber.d("=== Profile Loading Complete ===")
                     setProfile(targetProfile)
+                    PluviaApp.radialMenuCoordinator?.setProfile(targetProfile)
 
+                    val radialMenuCoordinator = PluviaApp.radialMenuCoordinator
                     physicalControllerHandler = PhysicalControllerHandler(
                         targetProfile,
                         xServerView.getxServer(),
@@ -2280,7 +2349,12 @@ fun XServerScreen(
                         onShowKeyboard = {
                             PluviaApp.inputControlsView?.triggerShowKeyboard()
                         },
+                        onRadialMenuButtonStateChanged = radialMenuCoordinator?.let { coordinator ->
+                            { isDown, commit -> coordinator.onRadialMenuButtonStateChanged(isDown, commit) }
+                        },
+                        onRadialMenuVectorChanged = radialMenuCoordinator?.let { it::onRadialMenuVectorChanged },
                     )
+                    radialMenuCoordinator?.bindPhysicalControllerHandler(physicalControllerHandler)
 
                     // Store profile for auto-show logic
                     loadedProfile = targetProfile
@@ -2300,6 +2374,7 @@ fun XServerScreen(
             icView.setShowKeyboardCallback {
                 showSoftKeyboard(icView, "onscreen_keyboard_enabled_from_binding")
             }
+            PluviaApp.radialMenuCoordinator?.bindInputControlsView(icView)
 
             xServerView.getxServer().winHandler.setInputControlsView(PluviaApp.inputControlsView)
 
@@ -2737,35 +2812,31 @@ fun XServerScreen(
         )
     }
 
-    if (showPlayingBlockedDialog) {
-        val remoteName = playingBlockedRemoteName ?: stringResource(R.string.main_app_running_unknown_game)
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = {},
-            title = { Text(text = stringResource(R.string.main_app_running_title)) },
-            text = { Text(text = stringResource(R.string.main_app_running_message, remoteName)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showPlayingBlockedDialog = false
-                    playingBlockedRemoteName = null
-                    SteamService.clearPlayingConflict()
-                    scope.launch {
-                        SteamService.kickPlayingSession(onlyGame = true)
-                    }
-                }) {
-                    Text(text = stringResource(R.string.main_play_anyway))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showPlayingBlockedDialog = false
-                    playingBlockedRemoteName = null
-                    exit(xServerView?.getxServer()?.winHandler, frameRating, currentAppInfo, container, appId, onExit, navigateBack)
-                }) {
-                    Text(text = stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
+    PlayingBlockedDialog(
+        visible = showPlayingBlockedDialog,
+        remoteName = playingBlockedRemoteName,
+        onPlayAnyway = {
+            showPlayingBlockedDialog = false
+            playingBlockedRemoteName = null
+            SteamService.clearPlayingConflict()
+            CoroutineScope(Dispatchers.IO).launch {
+                SteamService.kickPlayingSession(onlyGame = true)
+            }
+        },
+        onCancel = {
+            showPlayingBlockedDialog = false
+            playingBlockedRemoteName = null
+            exit(
+                xServerView?.getxServer()?.winHandler,
+                frameRating,
+                currentAppInfo,
+                container,
+                appId,
+                onExit,
+                navigateBack,
+            )
+        },
+    )
 
     // Physical Controller Config Dialog
     if (showPhysicalControllerDialog) {
@@ -2847,6 +2918,7 @@ fun XServerScreen(
                                 PluviaApp.inputControlsView?.setProfile(profile)
                             }
                             physicalControllerHandler?.setProfile(profile)
+                            PluviaApp.radialMenuCoordinator?.setProfile(profile)
                             showPhysicalControllerDialog = false
                             keepPausedForEditor = false
                             resumeIfAllowedAfterOverlay()
@@ -2983,6 +3055,7 @@ private fun EditModeToolbar(
 
 private fun showInputControls(profile: ControlsProfile, winHandler: WinHandler, container: Container) {
     profile.setVirtualGamepad(true)
+    PluviaApp.radialMenuCoordinator?.setProfile(profile)
 
     PluviaApp.inputControlsView?.let { icView ->
         icView.setContainerShooterMode(container.isShooterMode)
@@ -4286,8 +4359,7 @@ private fun getWineStartCommand(
         return launchCommand
     } else if (isCustomGame) {
         // For Custom Games, we can launch even without appLaunchInfo
-        // Use the executable path from container config. If missing, try to auto-detect
-        // a unique .exe in the game folder (ignoring installers like "unins*").
+        // Installer sessions and finalized local installations have explicit launch modes.
         var executablePath = container.executablePath
 
         // Find the A: drive (which should map to the game folder)
@@ -4296,6 +4368,42 @@ private fun getWineStartCommand(
             if (drive[0] == "A") {
                 gameFolderPath = drive[1]
                 break
+            }
+        }
+
+        val localLaunchMode = container.getExtra(LocalContainerLaunch.EXTRA_MODE)
+        val localLaunchTarget = container.getExtra(LocalContainerLaunch.EXTRA_TARGET)
+            .ifBlank { executablePath }
+            .trimStart('\\', '/')
+        if (localLaunchMode == LocalContainerLaunch.MODE_INSTALLED_EXE_C) {
+            if (localLaunchTarget.isBlank()) {
+                Timber.tag("XServerScreen").e("Installed local game has no C: launch target: $appId")
+                return "winhandler.exe \"wfm.exe\""
+            }
+            val targetFile = File(
+                container.rootDir,
+                ".wine/drive_c/" + localLaunchTarget.replace('\\', File.separatorChar),
+            )
+            guestProgramLauncherComponent.workingDir = targetFile.parentFile
+            val normalizedTarget = localLaunchTarget.replace('/', '\\')
+            return "\"C:\\$normalizedTarget\""
+        }
+
+        if (
+            localLaunchMode == LocalContainerLaunch.MODE_INSTALLER_EXE_A ||
+            localLaunchMode == LocalContainerLaunch.MODE_INSTALLER_MSI_A
+        ) {
+            if (gameFolderPath == null || localLaunchTarget.isBlank()) {
+                Timber.tag("XServerScreen").e("Installer session has no mapped source target: $appId")
+                return "winhandler.exe \"wfm.exe\""
+            }
+            guestProgramLauncherComponent.workingDir = File(gameFolderPath)
+            envVars.put("WINEPATH", "A:\\")
+            val normalizedTarget = localLaunchTarget.replace('/', '\\')
+            return if (localLaunchMode == LocalContainerLaunch.MODE_INSTALLER_MSI_A) {
+                "\"C:\\windows\\system32\\msiexec.exe\" /i \"A:\\$normalizedTarget\""
+            } else {
+                "\"A:\\$normalizedTarget\""
             }
         }
 

@@ -2,23 +2,15 @@ package app.gamenative.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import app.gamenative.R
 
-// Define Bricolage Grotesque font family
-val BricolageGrotesque = FontFamily(
-    Font(R.font.bricolage_grotesque_light, FontWeight.Light),
-    Font(R.font.bricolage_grotesque_regular, FontWeight.Normal),
-    Font(R.font.bricolage_grotesque_medium, FontWeight.Medium),
-    Font(R.font.bricolage_grotesque_semibold, FontWeight.SemiBold),
-    Font(R.font.bricolage_grotesque_bold, FontWeight.Bold),
-    Font(R.font.bricolage_grotesque_extrabold, FontWeight.ExtraBold),
-)
+// Keep the existing symbol for source compatibility while using the highly legible
+// platform sans expected from a controller-first system interface.
+val BricolageGrotesque = FontFamily.SansSerif
 
-// Custom typography using Bricolage Grotesque
+// Compact product typography suitable for handheld and TV-distance navigation.
 val PluviaTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = BricolageGrotesque,

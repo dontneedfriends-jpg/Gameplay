@@ -1,6 +1,7 @@
 package com.winlator.container
 
 import androidx.compose.runtime.saveable.mapSaver
+import app.gamenative.PluviaApp
 import com.winlator.box86_64.Box86_64Preset
 import com.winlator.core.DefaultVersion
 import com.winlator.core.WineInfo
@@ -11,7 +12,7 @@ import kotlin.String
 
 data class ContainerData(
     val name: String = "",
-    val screenSize: String = Container.DEFAULT_SCREEN_SIZE,
+    val screenSize: String = PluviaApp.getDefaultScreenSize(),
     val envVars: String = Container.DEFAULT_ENV_VARS,
     val graphicsDriver: String = Container.DEFAULT_GRAPHICS_DRIVER,
     val graphicsDriverVersion: String = "",
@@ -108,6 +109,8 @@ data class ContainerData(
     val lsfgEnabled: Boolean = false,
     /** Whether bionic-fg AI frame generation is enabled for this container */
     val bionicFgEnabled: Boolean = false,
+    /** True only when an external launch request explicitly supplied screenSize. */
+    val explicitScreenSizeOverride: Boolean = false,
 ) {
     companion object {
         val Saver = mapSaver(

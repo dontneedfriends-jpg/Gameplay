@@ -15,6 +15,7 @@ import app.gamenative.db.dao.AmazonGameDao
 import app.gamenative.enums.Marker
 import app.gamenative.events.AndroidEvent
 import app.gamenative.service.NotificationHelper
+import app.gamenative.service.GameDownloadQueue
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.ExecutableSelectionUtils
 import app.gamenative.utils.MarkerUtils
@@ -467,6 +468,11 @@ class AmazonService : Service() {
             PluviaApp.events.emitJava(
                 AndroidEvent.DownloadStatusChanged(game.appId, true)
             )
+            GameDownloadQueue.registerDownload(GameSource.AMAZON, productId, downloadInfo) {
+                instance.serviceScope.launch {
+                    downloadGame(context, productId, installPath)
+                }
+            }
 
             val job = instance.serviceScope.launch {
                 try {
@@ -502,6 +508,7 @@ class AmazonService : Service() {
                     downloadInfo.setActive(false)
                 } finally {
                     instance.activeDownloads.remove(productId)
+                    GameDownloadQueue.finishDownload(GameSource.AMAZON, productId, downloadInfo)
                     instance.activeDownloadPaths.remove(productId)
                     PluviaApp.events.emitJava(
                         AndroidEvent.DownloadStatusChanged(game.appId, false)

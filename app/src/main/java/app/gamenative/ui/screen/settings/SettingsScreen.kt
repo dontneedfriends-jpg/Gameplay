@@ -1,11 +1,8 @@
 package app.gamenative.ui.screen.settings
 
 import android.content.res.Configuration
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +28,6 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,8 +39,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.enums.AppTheme
+import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.theme.PluviaTheme
 import com.materialkolor.PaletteStyle
 
@@ -90,15 +85,7 @@ private fun SettingsScreenContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        PluviaTheme.colors.surfacePanel,
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.background,
-                    ),
-                ),
-            ),
+            .background(MaterialTheme.colorScheme.background),
     ) {
         Column(
             modifier = Modifier
@@ -125,7 +112,7 @@ private fun SettingsScreenContent(
                 SettingsSection(
                     title = stringResource(R.string.settings_emulation_title),
                     icon = Icons.Default.Gamepad,
-                    iconTint = PluviaTheme.colors.accentCyan,
+                iconTint = MaterialTheme.colorScheme.primary,
                 ) {
                     SettingsGroupEmulation()
                 }
@@ -134,7 +121,7 @@ private fun SettingsScreenContent(
                 SettingsSection(
                     title = stringResource(R.string.settings_interface_title),
                     icon = Icons.Default.Palette,
-                    iconTint = PluviaTheme.colors.accentPurple,
+                iconTint = MaterialTheme.colorScheme.primary,
                 ) {
                     SettingsGroupInterface(
                         appTheme = appTheme,
@@ -148,7 +135,7 @@ private fun SettingsScreenContent(
                 SettingsSection(
                     title = stringResource(R.string.settings_info_title),
                     icon = Icons.Default.Info,
-                    iconTint = PluviaTheme.colors.accentSuccess,
+                iconTint = MaterialTheme.colorScheme.primary,
                 ) {
                     SettingsGroupInfo()
                 }
@@ -157,7 +144,7 @@ private fun SettingsScreenContent(
                 SettingsSection(
                     title = stringResource(R.string.settings_debug_title),
                     icon = Icons.Default.BugReport,
-                    iconTint = PluviaTheme.colors.accentWarning,
+                iconTint = MaterialTheme.colorScheme.primary,
                 ) {
                     SettingsGroupDebug()
                 }
@@ -184,10 +171,7 @@ private fun SettingsHeader(
         Column {
             Text(
                 text = stringResource(R.string.settings_title),
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.5.sp,
-                ),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
@@ -198,29 +182,6 @@ private fun SettingsHeader(
         }
 
         Spacer(modifier = Modifier.weight(1f))
-
-        // Settings icon decoration
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            PluviaTheme.colors.accentCyan.copy(alpha = 0.2f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = null,
-                tint = PluviaTheme.colors.accentCyan.copy(alpha = 0.6f),
-                modifier = Modifier.size(24.dp),
-            )
-        }
     }
 }
 
@@ -232,42 +193,18 @@ private fun BackButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.1f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium,
-        ),
-        label = "backButtonScale",
-    )
-
     Box(
         modifier = modifier
-            .scale(scale)
             .size(44.dp)
             .clip(CircleShape)
             .background(
                 if (isFocused) {
-                    PluviaTheme.colors.accentCyan.copy(alpha = 0.2f)
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
                     PluviaTheme.colors.surfaceElevated
                 },
             )
-            .then(
-                if (isFocused) {
-                    Modifier.border(
-                        2.dp,
-                        PluviaTheme.colors.accentCyan.copy(alpha = 0.6f),
-                        CircleShape,
-                    )
-                } else {
-                    Modifier.border(
-                        1.dp,
-                        PluviaTheme.colors.borderDefault.copy(alpha = 0.3f),
-                        CircleShape,
-                    )
-                },
-            )
+            .focusRing(interactionSource, CircleShape, width = 2.dp)
             .selectable(
                 selected = isFocused,
                 interactionSource = interactionSource,
@@ -279,7 +216,7 @@ private fun BackButton(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
             contentDescription = stringResource(R.string.back),
-            tint = if (isFocused) PluviaTheme.colors.accentCyan else Color.White.copy(alpha = 0.8f),
+            tint = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(24.dp),
         )
     }
@@ -295,8 +232,9 @@ private fun SettingsSection(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = PluviaTheme.colors.surfaceElevated,
+        shape = RoundedCornerShape(12.dp),
+        color = PluviaTheme.colors.surfacePanel,
+        border = BorderStroke(1.dp, PluviaTheme.colors.borderDefault.copy(alpha = 0.55f)),
         tonalElevation = 0.dp,
     ) {
         Column(
@@ -310,12 +248,11 @@ private fun SettingsSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // Icon with glow background
                 Box(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(iconTint.copy(alpha = 0.15f)),
+                        .background(iconTint.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -332,7 +269,7 @@ private fun SettingsSection(
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 0.3.sp,
                     ),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
 

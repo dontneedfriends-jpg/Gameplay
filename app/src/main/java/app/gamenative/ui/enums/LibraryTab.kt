@@ -1,12 +1,14 @@
 package app.gamenative.ui.enums
 
+import android.content.Context
 import androidx.annotation.StringRes
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.ui.graphics.vector.ImageVector
 import app.gamenative.BuildConfig
-import app.gamenative.PrefManager
 import app.gamenative.R
+import app.gamenative.service.amazon.AmazonService
+import app.gamenative.service.epic.EpicService
+import app.gamenative.service.gog.GOGService
+import app.gamenative.utils.SteamUtils
 
 enum class LibraryTab(
     @get:StringRes val labelResId: Int,
@@ -18,15 +20,14 @@ enum class LibraryTab(
     val installedOnly: Boolean,
     val icon: ImageVector? = null,
 ) {
-    RECOMMENDED(
-        labelResId = R.string.tab_recommended,
-        showCustom = false,
-        showSteam = false,
-        showGoG = false,
-        showEpic = false,
-        showAmazon = false,
-        installedOnly = false,
-        icon = Icons.Rounded.Explore,
+    INSTALLED(
+        labelResId = R.string.tab_installed,
+        showCustom = true,
+        showSteam = true,
+        showGoG = true,
+        showEpic = true,
+        showAmazon = true,
+        installedOnly = true,
     ),
     ALL(
         labelResId = R.string.tab_all,
@@ -88,21 +89,25 @@ enum class LibraryTab(
          * Tabs shown in the UI. Custom (LOCAL) games rely on all-files access, which only the
          * legacy storage flavors have, so the tab is hidden on modern (scoped-storage) builds.
          */
-        val visibleEntries: List<LibraryTab>
-            get() {
-                var result = if (BuildConfig.MODERN_ANDROID) entries.filter { it != LOCAL } else entries.toList()
-                if (!PrefManager.showRecommendations) result = result.filter { it != RECOMMENDED }
-                return result
+        fun visibleEntries(context: Context): List<LibraryTab> = entries.filter { tab ->
+            when (tab) {
+                STEAM -> SteamUtils.hasStoredCredentials()
+                GOG -> GOGService.hasStoredCredentials(context)
+                EPIC -> EpicService.hasStoredCredentials(context)
+                AMAZON -> AmazonService.hasStoredCredentials(context)
+                LOCAL -> !BuildConfig.MODERN_ANDROID
+                INSTALLED, ALL -> true
             }
+        }
 
-        fun LibraryTab.next(): LibraryTab {
-            val values = visibleEntries
+        fun LibraryTab.next(context: Context): LibraryTab {
+            val values = visibleEntries(context)
             val index = values.indexOf(this).coerceAtLeast(0)
             return values[(index + 1) % values.size]
         }
 
-        fun LibraryTab.previous(): LibraryTab {
-            val values = visibleEntries
+        fun LibraryTab.previous(context: Context): LibraryTab {
+            val values = visibleEntries(context)
             val index = values.indexOf(this).coerceAtLeast(0)
             return values[if (index == 0) values.size - 1 else index - 1]
         }

@@ -45,8 +45,6 @@ import app.gamenative.ui.component.NoExtractOutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,6 +67,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -82,6 +81,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.tooling.preview.Preview
 import app.gamenative.BuildConfig
+import app.gamenative.PluviaApp
 import app.gamenative.R
 import app.gamenative.ui.util.SnackbarManager
 import app.gamenative.ui.component.dialog.state.MessageDialogState
@@ -91,6 +91,7 @@ import app.gamenative.ui.component.settings.SettingsListDropdown
 import app.gamenative.ui.components.rememberCustomGameFolderPicker
 import app.gamenative.ui.components.requestPermissionsForPath
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
 import app.gamenative.utils.CustomGameScanner
@@ -150,6 +151,27 @@ internal fun winComponentsItemTitleRes(string: String): Int {
         "wmdecoder" -> R.string.wmdecoder
         "opengl" -> R.string.opengl
         else -> throw IllegalArgumentException("No string res found for Win Components title: $string")
+    }
+}
+
+/** GPU-compatible nearest-even rounding for render-target dimensions. */
+internal fun evenRound(value: Float): Int = (value / 2f).roundToInt() * 2
+
+internal tailrec fun gcd(a: Int, b: Int): Int {
+    val positiveA = kotlin.math.abs(a)
+    val positiveB = kotlin.math.abs(b)
+    return if (positiveB == 0) positiveA else gcd(positiveB, positiveA % positiveB)
+}
+
+internal fun calculateAspectRatio(width: Int, height: Int): String {
+    require(width > 0 && height > 0) { "Resolution dimensions must be positive" }
+    val divisor = gcd(width, height)
+    val ratioWidth = width / divisor
+    val ratioHeight = height / divisor
+    return when {
+        ratioWidth == 13 && ratioHeight == 6 -> "19.5:9"
+        ratioWidth == 43 && ratioHeight == 18 -> "21.5:9"
+        else -> "$ratioWidth:$ratioHeight"
     }
 }
 
@@ -213,8 +235,30 @@ private fun rememberContainerConfigDialogStaticData(): ContainerConfigDialogStat
             }
         }
 
+    val physicalSize = PluviaApp.getPhysicalDisplaySize()
+    val displayMetrics = context.resources.displayMetrics
+    val physicalWidth = physicalSize?.first ?: maxOf(displayMetrics.widthPixels, displayMetrics.heightPixels)
+    val physicalHeight = physicalSize?.second ?: minOf(displayMetrics.widthPixels, displayMetrics.heightPixels)
+    val adaptiveSizes = listOf(
+        Triple(1f, context.getString(R.string.resolution_native), "native"),
+        Triple(0.75f, context.getString(R.string.resolution_optimized), "quality"),
+        Triple(0.5f, context.getString(R.string.resolution_half), "performance"),
+    ).map { (scale, label, _) ->
+        val width = evenRound(physicalWidth * scale)
+        val height = evenRound(physicalHeight * scale)
+        "${width}x$height (${calculateAspectRatio(width, height)}, $label)"
+    }.distinctBy { it.substringBefore(' ') }
+
+    val baseScreenSizes = stringArrayResource(R.array.screen_size_entries).toList()
+    val adaptiveResolutions = adaptiveSizes.map { it.substringBefore(' ') }.toSet()
+    val screenSizes = buildList {
+        add(baseScreenSizes.first())
+        addAll(adaptiveSizes)
+        addAll(baseScreenSizes.drop(1).filterNot { it.substringBefore(' ') in adaptiveResolutions })
+    }
+
     return ContainerConfigDialogStaticData(
-        screenSizes = stringArrayResource(R.array.screen_size_entries).toList(),
+        screenSizes = screenSizes,
         baseGraphicsDrivers = stringArrayResource(R.array.graphics_driver_entries).toList(),
         dxWrappers = stringArrayResource(R.array.dxwrapper_entries).toList(),
         displayRenderers = stringArrayResource(R.array.displayrenderers_entries).toList(),
@@ -1030,8 +1074,10 @@ fun ContainerConfigDialog(
 
         val applyScreenSizeToConfig: () -> Unit = {
             val screenSize = if (screenSizeIndex == 0) {
-                if (customScreenWidth.isNotEmpty() && customScreenHeight.isNotEmpty()) {
-                    "${customScreenWidth}x$customScreenHeight"
+                val width = customScreenWidth.toIntOrNull()
+                val height = customScreenHeight.toIntOrNull()
+                if (width != null && height != null && width > 0 && height > 0) {
+                    "${evenRound(width.toFloat())}x${evenRound(height.toFloat())}"
                 } else {
                     config.screenSize
                 }
@@ -1269,12 +1315,9 @@ fun ContainerConfigDialog(
                     // container (not a focusable wrapper, which would break up/down
                     // traversal), so it fires whenever focus is anywhere in the tabs or
                     // content below.
-                    val firstTabFocusRequester = remember { FocusRequester() }
-                    // Seed focus onto the first tab when the dialog opens so the gamepad
-                    // can navigate immediately instead of needing a button press first.
-                    LaunchedEffect(Unit) { runCatching { firstTabFocusRequester.requestFocus() } }
+                    val categoryRailWidth = if (LocalConfiguration.current.screenWidthDp < 600) 156.dp else 228.dp
 
-                    Column(
+                    Row(
                         modifier = Modifier
                             .onPreviewKeyEvent { event ->
                                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -1298,22 +1341,20 @@ fun ContainerConfigDialog(
                             )
                             .fillMaxSize(),
                     ) {
-                        ScrollableTabRow(selectedTabIndex = selectedTab, edgePadding = 0.dp) {
-                            tabs.forEachIndexed { index, label ->
-                                Tab(
-                                    selected = selectedTab == index,
-                                    onClick = { selectedTab = index },
-                                    text = { Text(text = label) },
-                                    modifier = if (index == 0) {
-                                        Modifier.focusRequester(firstTabFocusRequester)
-                                    } else {
-                                        Modifier
-                                    },
-                                )
-                            }
-                        }
+                        ConsoleCategoryRail(
+                            items = tabs.indices.toList(),
+                            selectedItem = selectedTab,
+                            label = { tabs[it] },
+                            onSelected = { selectedTab = it },
+                            footer = stringResource(R.string.container_config_console_controls_hint),
+                            requestInitialFocus = true,
+                            modifier = Modifier
+                                .width(categoryRailWidth)
+                                .fillMaxSize(),
+                        )
                         Column(
                             modifier = Modifier
+                                .padding(horizontal = 22.dp)
                                 .verticalScroll(scrollState)
                                 .weight(1f),
                         ) {

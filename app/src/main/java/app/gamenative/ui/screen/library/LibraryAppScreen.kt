@@ -23,6 +23,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -107,6 +108,7 @@ import androidx.compose.ui.unit.dp
 import app.gamenative.NetworkMonitor
 import app.gamenative.PrefManager
 import app.gamenative.R
+import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.service.SteamService
 import app.gamenative.ui.component.GamepadAction
@@ -124,6 +126,7 @@ import app.gamenative.ui.screen.library.appscreen.EpicAppScreen
 import app.gamenative.ui.screen.library.appscreen.GOGAppScreen
 import app.gamenative.ui.screen.library.appscreen.SteamAppScreen
 import app.gamenative.ui.screen.library.components.GameOptionsPanel
+import app.gamenative.ui.screen.library.components.GameSourceIcon
 import app.gamenative.utils.HltbService
 import app.gamenative.ui.theme.PluviaTheme
 import com.skydoves.landscapist.ImageOptions
@@ -514,6 +517,7 @@ fun AppScreen(
     onTestGraphics: () -> Unit,
     onPlayWithDiagnostics: () -> Unit,
     onBack: () -> Unit,
+    onSourceClick: (GameSource) -> Unit = {},
 ) {
     // Get the appropriate screen model based on game source
     val screenModel = remember(libraryItem.gameSource) {
@@ -533,6 +537,7 @@ fun AppScreen(
         onTestGraphics = onTestGraphics,
         onPlayWithDiagnostics = onPlayWithDiagnostics,
         onBack = onBack,
+        onSourceClick = onSourceClick,
     )
 }
 
@@ -550,6 +555,237 @@ private fun formatBytes(bytes: Long): String {
         bytes >= kb -> String.format("%.1f KB", bytes / kb)
         else -> "$bytes B"
     }
+}
+
+private data class AppScreenNetworkState(
+    val hasInternet: Boolean,
+    val hasWifiOrEthernet: Boolean,
+    val downloadStatusMessage: String?,
+)
+
+private class AppScreenRuntimeState {
+    val scrollState = androidx.compose.foundation.ScrollState(0)
+    val playButtonFocusRequester = FocusRequester()
+    var optionsMenuVisible by mutableStateOf(false)
+    var progressBarBounds by mutableStateOf<Rect?>(null)
+    var ambientInteractionCounter by mutableStateOf(0)
+
+    fun downloadAllowed(network: AppScreenNetworkState): Boolean =
+        !PrefManager.downloadOnWifiOnly || network.hasWifiOrEthernet
+
+    fun pauseResumeEnabled(
+        isDownloading: Boolean,
+        hasPartialDownload: Boolean,
+        network: AppScreenNetworkState,
+    ): Boolean = if (!isDownloading && hasPartialDownload) downloadAllowed(network) else true
+
+    fun buttonEnabled(
+        isInstalled: Boolean,
+        isValidToDownload: Boolean,
+        network: AppScreenNetworkState,
+    ): Boolean {
+        val installEnabled = if (!isInstalled) downloadAllowed(network) && network.hasInternet else true
+        return if (isInstalled) installEnabled else installEnabled && isValidToDownload
+    }
+
+    fun startActionEnabled(
+        isInstalled: Boolean,
+        isValidToDownload: Boolean,
+        isDownloading: Boolean,
+        hasPartialDownload: Boolean,
+        network: AppScreenNetworkState,
+    ): Boolean = if (isDownloading || hasPartialDownload) {
+        pauseResumeEnabled(isDownloading, hasPartialDownload, network)
+    } else {
+        buttonEnabled(isInstalled, isValidToDownload, network)
+    }
+
+    fun performStartAction(
+        isDownloading: Boolean,
+        hasPartialDownload: Boolean,
+        onPauseResumeClick: () -> Unit,
+        onDownloadInstallClick: () -> Unit,
+    ) {
+        if (isDownloading || hasPartialDownload) onPauseResumeClick() else onDownloadInstallClick()
+    }
+
+    fun handleKeyEvent(
+        event: KeyEvent,
+        startActionEnabled: Boolean,
+        onStartAction: () -> Unit,
+        onBack: () -> Unit,
+    ): Boolean {
+        if (event.action != KeyEvent.ACTION_DOWN) return false
+        return when (event.keyCode) {
+            KeyEvent.KEYCODE_BUTTON_SELECT -> {
+                optionsMenuVisible = true
+                true
+            }
+            KeyEvent.KEYCODE_BUTTON_START -> {
+                if (!optionsMenuVisible && startActionEnabled) onStartAction()
+                true
+            }
+            KeyEvent.KEYCODE_BUTTON_B -> {
+                if (optionsMenuVisible) optionsMenuVisible = false else onBack()
+                true
+            }
+            else -> false
+        }
+    }
+
+    fun downloadTimeLeftText(
+        downloadProgress: Float,
+        downloadInfo: app.gamenative.data.DownloadInfo?,
+        isDownloading: Boolean,
+        statusMessage: String?,
+    ): String {
+        val etaMs = downloadInfo?.getEstimatedTimeRemaining()
+        return if (etaMs != null && etaMs > 0L) {
+            val totalSeconds = etaMs / 1000
+            "${totalSeconds / 60}m ${totalSeconds % 60}s left"
+        } else if (isDownloading && downloadProgress >= 1f) {
+            statusMessage?.takeUnless { it.isBlank() } ?: "Unpacking..."
+        } else if (downloadProgress in 0f..1f && downloadProgress < 1f) {
+            statusMessage?.takeUnless { it.isBlank() } ?: ""
+        } else {
+            ""
+        }
+    }
+
+    fun downloadSizeText(downloadInfo: app.gamenative.data.DownloadInfo?, downloadingLabel: String): String {
+        val (bytesDone, bytesTotal) = downloadInfo?.getBytesProgress() ?: (0L to 0L)
+        return when {
+            bytesTotal > 0L -> "${formatBytes(bytesDone)} / ${formatBytes(bytesTotal)}"
+            bytesDone > 0L -> formatBytes(bytesDone)
+            else -> downloadingLabel
+        }
+    }
+}
+
+@Composable
+private fun rememberAppScreenNetworkState(
+    downloadInfo: app.gamenative.data.DownloadInfo?,
+): AppScreenNetworkState {
+    val hasInternet by NetworkMonitor.hasInternet.collectAsState()
+    val hasWifiOrEthernet by NetworkMonitor.hasWifiOrEthernet.collectAsState()
+    val statusFlow = remember(downloadInfo) { downloadInfo?.getStatusMessageFlow() }
+    val statusMessage by (
+        statusFlow?.collectAsState(initial = statusFlow.value)
+            ?: remember { mutableStateOf<String?>(null) }
+        )
+    return AppScreenNetworkState(hasInternet, hasWifiOrEthernet, statusMessage)
+}
+
+@Composable
+private fun AppScreenGamepadActions(
+    runtime: AppScreenRuntimeState,
+    network: AppScreenNetworkState,
+    isInstalled: Boolean,
+    isValidToDownload: Boolean,
+    isDownloading: Boolean,
+    hasPartialDownload: Boolean,
+    onPauseResumeClick: () -> Unit,
+    onDownloadInstallClick: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val runPrimaryAction = {
+        if (runtime.startActionEnabled(isInstalled, isValidToDownload, isDownloading, hasPartialDownload, network)) {
+            runtime.performStartAction(isDownloading, hasPartialDownload, onPauseResumeClick, onDownloadInstallClick)
+        }
+    }
+    val primaryLabel = when {
+        isInstalled -> R.string.run_app
+        isDownloading -> R.string.pause_download
+        hasPartialDownload -> R.string.resume_download
+        else -> R.string.install_app
+    }
+    GamepadActionBar(
+        actions = listOf(
+            GamepadAction(GamepadButton.START, primaryLabel, runPrimaryAction),
+            GamepadAction(GamepadButton.SELECT, R.string.options) {
+                runtime.optionsMenuVisible = true
+            },
+            GamepadAction(GamepadButton.B, R.string.back, onBack),
+        ),
+        modifier = modifier,
+        visible = !runtime.optionsMenuVisible,
+    )
+}
+
+@Composable
+private fun BoxScope.GameHeroBackdrop(
+    displayInfo: GameDisplayInfo,
+    parallaxOffset: Float,
+) {
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .graphicsLayer { translationY = parallaxOffset },
+    ) {
+        if (displayInfo.heroImageUrl != null) {
+            CoilImage(
+                modifier = Modifier.fillMaxSize(),
+                imageModel = { displayInfo.heroImageUrl },
+                imageOptions = ImageOptions(contentScale = ContentScale.Crop),
+                loading = { LoadingScreen() },
+                failure = { GameHeroFallback() },
+                previewPlaceholder = painterResource(R.drawable.testhero),
+            )
+        } else {
+            GameHeroFallback()
+        }
+    }
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.3f),
+                        Color.Black.copy(alpha = 0.85f),
+                    ),
+                    endY = Float.POSITIVE_INFINITY,
+                ),
+            ),
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 0.5f),
+                        Color.Black.copy(alpha = 0.15f),
+                        Color.Transparent,
+                    ),
+                    endY = Float.POSITIVE_INFINITY,
+                ),
+            ),
+    )
+}
+
+@Composable
+private fun GameHeroFallback() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.primaryContainer,
+                    ),
+                ),
+            ),
+    )
+}
+
+@Composable
+private fun AppScreenBody(content: @Composable () -> Unit) {
+    content()
 }
 
 @Composable
@@ -571,252 +807,92 @@ internal fun AppScreenContent(
     onBack: () -> Unit = {},
     optionsMenu: List<AppMenuOption>,
     dialogOpen: Boolean = false,
+    otherSources: List<GameSource> = emptyList(),
+    isInstalledOnOtherSource: Boolean = false,
+    onSourceClick: (GameSource) -> Unit = {},
 ) {
     val context = LocalContext.current
     // reactive — recomposes when network state changes
-    val hasInternet by NetworkMonitor.hasInternet.collectAsState()
-    val hasWifiOrEthernet by NetworkMonitor.hasWifiOrEthernet.collectAsState()
-    val downloadAllowed = !PrefManager.downloadOnWifiOnly || hasWifiOrEthernet
-    val scrollState = rememberScrollState()
-
-    var optionsMenuVisible by remember { mutableStateOf(false) }
-
-    // Track the original progress bar bounds for ambient mode morph animation
-    var progressBarBounds by remember { mutableStateOf<Rect?>(null) }
-    var ambientInteractionCounter by remember { mutableStateOf(0) }
-
-    // Focus requesters for gamepad navigation
-    val playButtonFocusRequester = remember { FocusRequester() }
-
-    // Calculate parallax offset based on scroll
-    val parallaxOffset = scrollState.value * 0.5f
+    val runtime = remember { AppScreenRuntimeState() }
+    val network = rememberAppScreenNetworkState(downloadInfo)
 
     LaunchedEffect(displayInfo.appId) {
-        scrollState.animateScrollTo(0)
+        runtime.scrollState.animateScrollTo(0)
     }
 
     LaunchedEffect(Unit) {
-        playButtonFocusRequester.requestFocus()
+        runtime.playButtonFocusRequester.requestFocus()
     }
 
     // Restore focus when options menu, dialogs
-    LaunchedEffect(optionsMenuVisible, dialogOpen) {
-        if (!optionsMenuVisible && !dialogOpen) {
+    LaunchedEffect(runtime.optionsMenuVisible, dialogOpen) {
+        if (!runtime.optionsMenuVisible && !dialogOpen) {
             kotlinx.coroutines.delay(100) // Brief delay for menu/dialog animation
             try {
-                playButtonFocusRequester.requestFocus()
+                runtime.playButtonFocusRequester.requestFocus()
             } catch (_: IllegalStateException) {
                 // FocusRequester not attached
             }
         }
     }
 
-    // Button state calculations (needed by key event handler)
-    val isResume = !isDownloading && hasPartialDownload
-    val pauseResumeEnabled = if (isResume) downloadAllowed else true
-    val isInstall = !isInstalled
-    val installEnabled = if (isInstall) downloadAllowed && hasInternet else true
-    val buttonEnabled = if (isInstalled) {
-        installEnabled
-    } else {
-        installEnabled && isValidToDownload
-    }
-    val startActionEnabled = if (isDownloading || hasPartialDownload) {
-        pauseResumeEnabled
-    } else {
-        buttonEnabled
-    }
-    val onStartAction = {
-        if (isDownloading || hasPartialDownload) {
-            onPauseResumeClick()
-        } else {
-            onDownloadInstallClick()
-        }
-    }
-
-    // Download progress texts hoisted here so they can be shown inside the button
-    val downloadStatusMessageFlow = remember(downloadInfo) { downloadInfo?.getStatusMessageFlow() }
-    val downloadStatusMessage by (
-        downloadStatusMessageFlow?.collectAsState(initial = downloadStatusMessageFlow.value)
-            ?: remember { mutableStateOf<String?>(null) }
-        )
-    val downloadingLabel = stringResource(R.string.downloading)
-    val downloadTimeLeftText = remember(displayInfo.appId, downloadProgress, downloadInfo, isDownloading, downloadStatusMessage) {
-        val etaMs = downloadInfo?.getEstimatedTimeRemaining()
-        if (etaMs != null && etaMs > 0L) {
-            val totalSeconds = etaMs / 1000
-            val minutesLeft = totalSeconds / 60
-            val secondsPart = totalSeconds % 60
-            "${minutesLeft}m ${secondsPart}s left"
-        } else if (isDownloading && downloadProgress >= 1f) {
-            downloadStatusMessage?.takeUnless { it.isBlank() } ?: "Unpacking..."
-        } else if (downloadProgress in 0f..1f && downloadProgress < 1f) {
-            downloadStatusMessage?.takeUnless { it.isBlank() } ?: ""
-        } else {
-            ""
-        }
-    }
-    val downloadSizeText = remember(displayInfo.gameId, downloadProgress, downloadInfo) {
-        val (bytesDone, bytesTotal) = downloadInfo?.getBytesProgress() ?: (0L to 0L)
-        if (bytesTotal > 0L) {
-            "${formatBytes(bytesDone)} / ${formatBytes(bytesTotal)}"
-        } else if (bytesDone > 0L) {
-            formatBytes(bytesDone)
-        } else {
-            downloadingLabel
-        }
-    }
-
-    // Handle gamepad button presses
-    val handleKeyEvent: (KeyEvent) -> Boolean = { event ->
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            when (event.keyCode) {
-                // SELECT button - open options menu
-                KeyEvent.KEYCODE_BUTTON_SELECT -> {
-                    optionsMenuVisible = true
-                    true
-                }
-
-                // START button - primary action (play/download/pause)
-                KeyEvent.KEYCODE_BUTTON_START -> {
-                    if (!optionsMenuVisible && startActionEnabled) {
-                        onStartAction()
-                    }
-                    true
-                }
-
-                // B button - back
-                KeyEvent.KEYCODE_BUTTON_B -> {
-                    if (optionsMenuVisible) {
-                        optionsMenuVisible = false
-                    } else {
-                        onBack()
-                    }
-                    true
-                }
-
-                else -> false
-            }
-        } else {
-            false
-        }
-    }
-
     // Handle back press when options panel is open
-    BackHandler(enabled = optionsMenuVisible) {
-        optionsMenuVisible = false
+    BackHandler(enabled = runtime.optionsMenuVisible) {
+        runtime.optionsMenuVisible = false
     }
 
-    Box(
-        modifier = modifier
+    AppScreenBody {
+        Box(
+            modifier = modifier
             .fillMaxSize()
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
                         val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
                         if (pointerEvent.changes.any { it.changedToDownIgnoreConsumed() }) {
-                            ambientInteractionCounter++
+                            runtime.ambientInteractionCounter++
                         }
                     }
                 }
             }
             .onKeyEvent {
                 if (it.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
-                    ambientInteractionCounter++
+                    runtime.ambientInteractionCounter++
                 }
-                handleKeyEvent(it.nativeKeyEvent)
+                runtime.handleKeyEvent(
+                    event = it.nativeKeyEvent,
+                    startActionEnabled = runtime.startActionEnabled(
+                        isInstalled,
+                        isValidToDownload,
+                        isDownloading,
+                        hasPartialDownload,
+                        network,
+                    ),
+                    onStartAction = {
+                        runtime.performStartAction(
+                            isDownloading,
+                            hasPartialDownload,
+                            onPauseResumeClick,
+                            onDownloadInstallClick,
+                        )
+                    },
+                    onBack = onBack,
+                )
             },
-    ) {
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState),
+                .verticalScroll(runtime.scrollState),
         ) {
             // Hero Section (Parallax)
             Box(
                 modifier = Modifier
                     .fillMaxWidth(),
             ) {
-                // Hero background image
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .graphicsLayer {
-                            translationY = parallaxOffset
-                        },
-                ) {
-                    if (displayInfo.heroImageUrl != null) {
-                        CoilImage(
-                            modifier = Modifier.fillMaxSize(),
-                            imageModel = { displayInfo.heroImageUrl },
-                            imageOptions = ImageOptions(contentScale = ContentScale.Crop),
-                            loading = { LoadingScreen() },
-                            failure = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            brush = Brush.verticalGradient(
-                                                colors = listOf(
-                                                    MaterialTheme.colorScheme.primary,
-                                                    MaterialTheme.colorScheme.primaryContainer,
-                                                ),
-                                            ),
-                                        ),
-                                )
-                            },
-                            previewPlaceholder = painterResource(R.drawable.testhero),
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            MaterialTheme.colorScheme.primary,
-                                            MaterialTheme.colorScheme.primaryContainer,
-                                        ),
-                                    ),
-                                ),
-                        )
-                    }
-                }
-
-                // Gradient overlay (bottom, for title/action bar)
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(alpha = 0.3f),
-                                    Color.Black.copy(alpha = 0.85f),
-                                ),
-                                startY = 0f,
-                                endY = Float.POSITIVE_INFINITY,
-                            ),
-                        ),
-                )
-
-                // Top gradient overlay (so back button is visible on light/white images)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .align(Alignment.TopCenter)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.5f),
-                                    Color.Black.copy(alpha = 0.15f),
-                                    Color.Transparent,
-                                ),
-                                startY = 0f,
-                                endY = Float.POSITIVE_INFINITY,
-                            ),
-                        ),
+                GameHeroBackdrop(
+                    displayInfo = displayInfo,
+                    parallaxOffset = runtime.scrollState.value * 0.5f,
                 )
 
                 // Back button (top left).
@@ -901,26 +977,26 @@ internal fun AppScreenContent(
                                     stringResource(R.string.resume_download)
                                 },
                                 onClick = onPauseResumeClick,
-                                enabled = pauseResumeEnabled,
+                                enabled = runtime.pauseResumeEnabled(isDownloading, hasPartialDownload, network),
                                 isInstalled = false,
                                 isDownloading = isDownloading,
                                 downloadProgress = downloadProgress,
-                                focusRequester = playButtonFocusRequester,
-                                onProgressBarPositioned = { progressBarBounds = it },
+                                focusRequester = runtime.playButtonFocusRequester,
+                                onProgressBarPositioned = { runtime.progressBarBounds = it },
                             )
                         } else {
                             val text = when {
                                 isInstalled -> stringResource(R.string.run_app)
-                                !hasInternet -> stringResource(R.string.library_need_internet)
-                                !hasWifiOrEthernet && PrefManager.downloadOnWifiOnly -> stringResource(R.string.library_wifi_only_enabled)
+                                !network.hasInternet -> stringResource(R.string.library_need_internet)
+                                !network.hasWifiOrEthernet && PrefManager.downloadOnWifiOnly -> stringResource(R.string.library_wifi_only_enabled)
                                 else -> stringResource(R.string.install_app)
                             }
                             PrimaryActionButton(
                                 text = text,
                                 onClick = onDownloadInstallClick,
-                                enabled = buttonEnabled,
+                                enabled = runtime.buttonEnabled(isInstalled, isValidToDownload, network),
                                 isInstalled = isInstalled,
-                                focusRequester = playButtonFocusRequester,
+                                focusRequester = runtime.playButtonFocusRequester,
                             )
                         }
 
@@ -932,18 +1008,18 @@ internal fun AppScreenContent(
                                     .padding(horizontal = 8.dp),
                                 verticalArrangement = Arrangement.Center,
                             ) {
-                                if (downloadSizeText.isNotEmpty()) {
+                                if (runtime.downloadSizeText(downloadInfo, stringResource(R.string.downloading)).isNotEmpty()) {
                                     Text(
-                                        text = downloadSizeText,
+                                        text = runtime.downloadSizeText(downloadInfo, stringResource(R.string.downloading)),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color.White.copy(alpha = 0.9f),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
-                                if (downloadTimeLeftText.isNotEmpty()) {
+                                if (runtime.downloadTimeLeftText(downloadProgress, downloadInfo, isDownloading, network.downloadStatusMessage).isNotEmpty()) {
                                     Text(
-                                        text = downloadTimeLeftText,
+                                        text = runtime.downloadTimeLeftText(downloadProgress, downloadInfo, isDownloading, network.downloadStatusMessage),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color.White.copy(alpha = 0.65f),
                                         maxLines = 1,
@@ -959,7 +1035,7 @@ internal fun AppScreenContent(
                         ActionIconButton(
                             icon = Icons.Default.Settings,
                             contentDescription = stringResource(R.string.options),
-                            onClick = { optionsMenuVisible = true },
+                            onClick = { runtime.optionsMenuVisible = true },
                         )
 
                         if (isInstalled || hasPartialDownload || hasLeftoverInstall) {
@@ -979,17 +1055,17 @@ internal fun AppScreenContent(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (downloadSizeText.isNotEmpty()) {
+                            if (runtime.downloadSizeText(downloadInfo, stringResource(R.string.downloading)).isNotEmpty()) {
                                 Text(
-                                    text = downloadSizeText,
+                                    text = runtime.downloadSizeText(downloadInfo, stringResource(R.string.downloading)),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Color.White.copy(alpha = 0.9f),
                                     maxLines = 1,
                                 )
                             }
-                            if (downloadTimeLeftText.isNotEmpty()) {
+                            if (runtime.downloadTimeLeftText(downloadProgress, downloadInfo, isDownloading, network.downloadStatusMessage).isNotEmpty()) {
                                 Text(
-                                    text = downloadTimeLeftText,
+                                    text = runtime.downloadTimeLeftText(downloadProgress, downloadInfo, isDownloading, network.downloadStatusMessage),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color.White.copy(alpha = 0.65f),
                                     maxLines = 1,
@@ -1052,6 +1128,22 @@ internal fun AppScreenContent(
                                 Text(stringResource(R.string.update_now))
                             }
                         }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                if (!isInstalled && isInstalledOnOtherSource) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.library_already_installed_on_other_store),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(14.dp),
+                        )
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -1173,55 +1265,66 @@ internal fun AppScreenContent(
                     }
                 }
 
+                if (otherSources.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.library_available_on),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        otherSources.forEach { source ->
+                            Surface(
+                                onClick = { onSourceClick(source) },
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    GameSourceIcon(gameSource = source, iconSize = 16)
+                                    Text(
+                                        text = when (source) {
+                                            GameSource.STEAM -> stringResource(R.string.tab_steam)
+                                            GameSource.GOG -> stringResource(R.string.tab_gog)
+                                            GameSource.EPIC -> stringResource(R.string.tab_epic)
+                                            GameSource.AMAZON -> stringResource(R.string.tab_amazon)
+                                            GameSource.CUSTOM_GAME -> stringResource(R.string.tab_local)
+                                        },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
             }
         }
 
-        GamepadActionBar(
-            actions = listOf(
-                if (isInstalled) {
-                    GamepadAction(
-                        button = GamepadButton.START,
-                        labelResId = R.string.run_app,
-                        onClick = { if (startActionEnabled) onStartAction() },
-                    )
-                } else if (isDownloading) {
-                    GamepadAction(
-                        button = GamepadButton.START,
-                        labelResId = R.string.pause_download,
-                        onClick = { if (startActionEnabled) onStartAction() },
-                    )
-                } else if (hasPartialDownload) {
-                    GamepadAction(
-                        button = GamepadButton.START,
-                        labelResId = R.string.resume_download,
-                        onClick = { if (startActionEnabled) onStartAction() },
-                    )
-                } else {
-                    GamepadAction(
-                        button = GamepadButton.START,
-                        labelResId = R.string.install_app,
-                        onClick = { if (startActionEnabled) onStartAction() },
-                    )
-                },
-                GamepadAction(
-                    button = GamepadButton.SELECT,
-                    labelResId = R.string.options,
-                    onClick = { optionsMenuVisible = true },
-                ),
-                GamepadAction(
-                    button = GamepadButton.B,
-                    labelResId = R.string.back,
-                    onClick = onBack,
-                ),
-            ),
+        AppScreenGamepadActions(
+            runtime = runtime,
+            network = network,
+            isInstalled = isInstalled,
+            isValidToDownload = isValidToDownload,
+            isDownloading = isDownloading,
+            hasPartialDownload = hasPartialDownload,
+            onPauseResumeClick = onPauseResumeClick,
+            onDownloadInstallClick = onDownloadInstallClick,
+            onBack = onBack,
             modifier = Modifier.align(Alignment.BottomCenter),
-            visible = !optionsMenuVisible,
         )
 
         // Options panel - slides in from right
         GameOptionsPanel(
-            isOpen = optionsMenuVisible,
-            onDismiss = { optionsMenuVisible = false },
+            isOpen = runtime.optionsMenuVisible,
+            onDismiss = { runtime.optionsMenuVisible = false },
             options = optionsMenu.toList(),
             modifier = Modifier.align(Alignment.CenterEnd),
         )
@@ -1232,9 +1335,10 @@ internal fun AppScreenContent(
                 gameName = displayInfo.name,
                 downloadProgress = downloadProgress,
                 iconUrl = displayInfo.iconUrl,
-                originBounds = progressBarBounds,
-                userInteractionCounter = ambientInteractionCounter,
+                originBounds = runtime.progressBarBounds,
+                userInteractionCounter = runtime.ambientInteractionCounter,
             )
+        }
         }
     }
 }

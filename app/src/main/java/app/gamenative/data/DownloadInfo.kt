@@ -34,9 +34,21 @@ data class DownloadInfo(
     private var isActive: Boolean = true
     private val statusMessage = MutableStateFlow<String?>(null)
     private val postInstallSyncing = MutableStateFlow(false)
+    @Volatile private var autoPaused = false
+    private var queueGameSource: GameSource? = null
+    private var queueGameId: String? = null
 
     fun cancel() {
         cancel("Cancelled by user")
+    }
+
+    fun pause(message: String = "Paused", autoPaused: Boolean = false) {
+        this.autoPaused = autoPaused
+        persistProgressSnapshot()
+        setActive(false)
+        setPostInstallSyncing(false)
+        downloadJob?.cancel(CancellationException(message))
+        if (!autoPaused) unregisterFromQueue()
     }
 
     fun failedToDownload() {
@@ -52,6 +64,26 @@ data class DownloadInfo(
         setPostInstallSyncing(false)
         resetSpeedTracking()
         downloadJob?.cancel(CancellationException(message))
+        unregisterFromQueue()
+    }
+
+    fun wasAutoPaused(): Boolean = autoPaused
+
+    fun consumeAutoPaused(): Boolean = synchronized(this) {
+        if (!autoPaused) return@synchronized false
+        autoPaused = false
+        true
+    }
+
+    fun setQueueIdentifiers(gameSource: GameSource, gameId: String) {
+        queueGameSource = gameSource
+        queueGameId = gameId
+    }
+
+    private fun unregisterFromQueue() {
+        val source = queueGameSource ?: return
+        val id = queueGameId ?: return
+        app.gamenative.service.GameDownloadQueue.unregisterDownload(source, id)
     }
 
     fun setDownloadJob(job: Job) {

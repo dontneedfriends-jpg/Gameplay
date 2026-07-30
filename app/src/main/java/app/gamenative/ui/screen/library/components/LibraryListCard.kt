@@ -160,6 +160,8 @@ internal fun ListViewCard(
                 ) {
                     InstallStatusBadge(appInfo = appInfo, isRefreshing = isRefreshing)
 
+                    OtherSourceIcons(appInfo.otherSources)
+
                     // Family share indicator
                     if (appInfo.isShared) {
                         Row(
@@ -223,9 +225,7 @@ private fun InstallStatusBadge(
         mutableStateOf(
             if (isSteam) {
                 SteamService.isAppInstalled(appInfo.gameId)
-            } else {
-                true // Custom Games always installed
-            },
+            } else appInfo.isInstalled,
         )
     }
 
@@ -242,11 +242,14 @@ private fun InstallStatusBadge(
     }
 
     val (text, color) = when {
-        !isSteam -> stringResource(R.string.library_status_ready) to MaterialTheme.colorScheme.tertiary
+        !isSteam && isInstalled -> stringResource(R.string.library_status_ready) to MaterialTheme.colorScheme.tertiary
 
         isDownloading -> "${(downloadProgress * 100).toInt()}%" to MaterialTheme.colorScheme.primary
 
         isInstalled -> stringResource(R.string.library_installed) to MaterialTheme.colorScheme.tertiary
+
+        appInfo.isInstalledOnOtherSource -> stringResource(R.string.library_installed_elsewhere) to
+            MaterialTheme.colorScheme.secondary
 
         else -> stringResource(R.string.library_not_installed) to MaterialTheme.colorScheme.onSurfaceVariant.copy(
             alpha = 0.6f,

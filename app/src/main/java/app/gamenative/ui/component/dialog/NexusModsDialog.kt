@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -34,8 +35,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +53,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -65,6 +69,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import app.gamenative.R
+import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.data.LibraryItem
 import app.gamenative.data.ModInstall
 import app.gamenative.data.ModInstallSource
@@ -370,34 +375,24 @@ private fun ManageModsSummaryBar(
 private fun ManageModsTabs(
     selectedTab: ManageModsTab,
     onSelect: (ManageModsTab) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val tabs = ManageModsTab.entries
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val compact = maxWidth < 420.dp
-        TabRow(
-            selectedTabIndex = tabs.indexOf(selectedTab),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            tabs.forEach { tab ->
-                Tab(
-                    selected = tab == selectedTab,
-                    onClick = { onSelect(tab) },
-                    text = {
-                        Text(
-                            text = when (tab) {
-                                ManageModsTab.IMPORT -> stringResource(R.string.nexus_tab_import)
-                                ManageModsTab.MODS -> stringResource(R.string.nexus_tab_mods)
-                                ManageModsTab.PLACEMENT -> stringResource(if (compact) R.string.nexus_tab_placement_short else R.string.nexus_tab_placement)
-                                ManageModsTab.ISSUES -> stringResource(R.string.nexus_tab_issues)
-                            },
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    },
-                )
+    ConsoleCategoryRail(
+        items = ManageModsTab.entries,
+        selectedItem = selectedTab,
+        label = { tab ->
+            when (tab) {
+                ManageModsTab.IMPORT -> stringResource(R.string.nexus_tab_import)
+                ManageModsTab.MODS -> stringResource(R.string.nexus_tab_mods)
+                ManageModsTab.PLACEMENT -> stringResource(R.string.nexus_tab_placement)
+                ManageModsTab.ISSUES -> stringResource(R.string.nexus_tab_issues)
             }
-        }
-    }
+        },
+        onSelected = onSelect,
+        footer = stringResource(R.string.container_config_console_controls_hint),
+        modifier = modifier,
+        requestInitialFocus = true,
+    )
 }
 
 @Composable
@@ -2774,11 +2769,6 @@ fun NexusModsDialog(
                         .padding(horizontal = 20.dp, vertical = 8.dp),
                 )
 
-                ManageModsTabs(
-                    selectedTab = selectedTab,
-                    onSelect = { selectedTab = it },
-                )
-
                 val importScrollState = rememberScrollState()
                 val modsScrollState = rememberScrollState()
                 val placementScrollState = rememberScrollState()
@@ -2790,15 +2780,40 @@ fun NexusModsDialog(
                     ManageModsTab.ISSUES -> issuesScrollState
                 }
 
-                Column(
+                val tabs = ManageModsTab.entries
+                Row(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .verticalScroll(selectedScrollState)
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            val currentIndex = tabs.indexOf(selectedTab)
+                            when (event.key) {
+                                Key.ButtonR1, Key.ButtonR2 -> {
+                                    selectedTab = tabs[(currentIndex + 1) % tabs.size]
+                                    true
+                                }
+                                Key.ButtonL1, Key.ButtonL2 -> {
+                                    selectedTab = tabs[(currentIndex - 1 + tabs.size) % tabs.size]
+                                    true
+                                }
+                                else -> false
+                            }
+                        },
                 ) {
-                    when (selectedTab) {
+                    ManageModsTabs(
+                        selectedTab = selectedTab,
+                        onSelect = { selectedTab = it },
+                        modifier = Modifier.width(214.dp),
+                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(selectedScrollState)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        when (selectedTab) {
                         ManageModsTab.IMPORT -> {
                             LocalModImportSection(
                                 onChooseArchive = { launchLocalSourcePicker(LocalModSourceType.ARCHIVE) },
@@ -3004,6 +3019,7 @@ fun NexusModsDialog(
                                     onFixOrder = ::movePluginMastersBefore,
                                 )
                             }
+                        }
                         }
                     }
                 }

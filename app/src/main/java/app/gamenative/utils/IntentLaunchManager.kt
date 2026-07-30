@@ -2,6 +2,7 @@ package app.gamenative.utils
 
 import android.content.Context
 import android.content.Intent
+import app.gamenative.PluviaApp
 import app.gamenative.PrefManager
 import app.gamenative.data.GameSource
 import com.winlator.container.Container
@@ -189,7 +190,7 @@ object IntentLaunchManager {
         // Only include non-default values to avoid overriding existing container settings
         val config = ContainerData(
             name = if (json.has("name")) json.getString("name") else "",
-            screenSize = if (json.has("screenSize")) json.getString("screenSize") else Container.DEFAULT_SCREEN_SIZE,
+            screenSize = if (json.has("screenSize")) json.getString("screenSize") else PluviaApp.getDefaultScreenSize(),
             envVars = if (json.has("envVars")) json.getString("envVars") else Container.DEFAULT_ENV_VARS,
             graphicsDriver = if (json.has("graphicsDriver")) json.getString("graphicsDriver") else Container.DEFAULT_GRAPHICS_DRIVER,
             graphicsDriverVersion = if (json.has("graphicsDriverVersion")) json.getString("graphicsDriverVersion") else "",
@@ -243,6 +244,7 @@ object IntentLaunchManager {
             },
             shaderBackend = if (json.has("shaderBackend")) json.getString("shaderBackend") else "glsl",
             useGLSL = if (json.has("useGLSL")) json.getString("useGLSL") else "enabled",
+            explicitScreenSizeOverride = json.has("screenSize"),
         )
 
         val validationIssues = validateContainerConfig(config)
@@ -259,11 +261,7 @@ object IntentLaunchManager {
 
         return ContainerData(
             name = override.name.ifEmpty { base.name },
-            screenSize = if (override.screenSize != Container.DEFAULT_SCREEN_SIZE) {
-                override.screenSize
-            } else {
-                base.screenSize
-            },
+            screenSize = if (override.explicitScreenSizeOverride) override.screenSize else base.screenSize,
             envVars = if (override.envVars != Container.DEFAULT_ENV_VARS) override.envVars else base.envVars,
             graphicsDriver = if (override.graphicsDriver != Container.DEFAULT_GRAPHICS_DRIVER) {
                 override.graphicsDriver

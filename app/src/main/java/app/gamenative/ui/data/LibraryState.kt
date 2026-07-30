@@ -62,7 +62,7 @@ data class LibraryState(
     val isOptionsPanelOpen: Boolean = false,
 
     // Current library tab for quick filter access
-    val currentTab: LibraryTab = LibraryTab.ALL,
+    val currentTab: LibraryTab = LibraryTab.INSTALLED,
 
     // Per-source game counts for tab badges
     val allCount: Int = 0,

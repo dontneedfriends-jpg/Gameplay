@@ -6,8 +6,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -45,8 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -75,35 +72,20 @@ fun LibrarySearchBar(
     AnimatedVisibility(
         visible = isVisible,
         enter = expandVertically(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium,
-            ),
+            animationSpec = tween(durationMillis = 180),
             expandFrom = Alignment.Top,
         ) + fadeIn(),
         exit = shrinkVertically(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessHigh,
-            ),
+            animationSpec = tween(durationMillis = 150),
             shrinkTowards = Alignment.Top,
         ) + fadeOut(),
         modifier = modifier,
     ) {
-        // Gradient background container
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                            Color.Transparent,
-                        ),
-                    ),
-                )
-                .padding(top = 8.dp, bottom = 20.dp, start = 12.dp, end = 12.dp),
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -163,22 +145,14 @@ private fun SearchBarInput(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    ),
-                ),
-            )
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f))
             .then(
                 if (isFocused) {
                     Modifier.border(
                         2.dp,
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        RoundedCornerShape(24.dp),
+                        RoundedCornerShape(12.dp),
                     )
                 } else {
                     Modifier

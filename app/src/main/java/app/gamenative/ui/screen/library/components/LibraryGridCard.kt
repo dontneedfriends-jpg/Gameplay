@@ -40,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -101,28 +100,6 @@ internal fun GridViewCard(
     val cardContentBottomPadding = if (isCapsule) 12.dp else 8.dp
     val topIconPadding = if (isCapsule) 10.dp else 8.dp
     val bottomGradientHeight = if (isCapsule) 80.dp else 56.dp
-    val glowColor = MaterialTheme.colorScheme.primary
-    val focusHaloModifier = if (isFocused && showFocusGlow) {
-        Modifier.drawWithCache {
-            val glowBrush = Brush.radialGradient(
-                colors = listOf(
-                    glowColor.copy(alpha = 0.3f),
-                    Color.Transparent,
-                ),
-                radius = size.maxDimension * 0.7f,
-            )
-            val glowRadius = size.maxDimension * 0.6f
-            onDrawBehind {
-                drawCircle(
-                    brush = glowBrush,
-                    radius = glowRadius,
-                    center = center,
-                )
-            }
-        }
-    } else {
-        Modifier
-    }
     val cardShape = RoundedCornerShape(12.dp)
     val interactionSource = remember { MutableInteractionSource() }
     val isItemFocused by interactionSource.collectIsFocusedAsState()
@@ -135,8 +112,7 @@ internal fun GridViewCard(
     Box(
         modifier = modifier
             .padding(vertical = 4.dp)
-            .scale(scale)
-            .then(focusHaloModifier),
+            .scale(scale),
     ) {
         Card(
             modifier = Modifier
@@ -360,13 +336,18 @@ internal fun GridViewCard(
                         )
                     }
                 } else if (!appInfo.isRecommended) {
-                    GameSourceIcon(
-                        gameSource = appInfo.gameSource,
+                    Row(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(top = topIconPadding, end = topIconPadding),
-                        iconSize = if (isCapsule) 14 else 12,
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OtherSourceIcons(appInfo.otherSources)
+                        GameSourceIcon(
+                            gameSource = appInfo.gameSource,
+                            iconSize = if (isCapsule) 14 else 12,
+                        )
+                    }
                 }
             }
         }
@@ -417,20 +398,20 @@ private fun FeaturedBadge(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFFFC107))
+            .background(PluviaTheme.colors.accentWarning)
             .padding(horizontal = 8.dp, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             imageVector = Icons.Rounded.Star,
             contentDescription = null,
-            tint = Color.Black,
+            tint = MaterialTheme.colorScheme.background,
             modifier = Modifier.size(12.dp),
         )
         Text(
             text = stringResource(R.string.featured_badge),
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-            color = Color.Black,
+            color = MaterialTheme.colorScheme.background,
             modifier = Modifier.padding(start = 3.dp),
         )
     }

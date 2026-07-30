@@ -113,6 +113,7 @@ object QuickMenuAction {
     const val TOUCHSCREEN_MODE = 7
     const val DISABLE_MOUSE = 8
     const val SHOOTER_MODE = 9
+    const val RADIAL_MENU = 10
 }
 
 private object QuickMenuTab {
@@ -341,6 +342,14 @@ fun QuickMenu(
                 id = QuickMenuAction.SHOOTER_MODE,
                 icon = Icons.Default.Gamepad,
                 labelResId = R.string.shooter_mode_toggle,
+                accentColor = PluviaTheme.colors.accentPurple,
+            )
+        )
+        add(
+            QuickMenuItem(
+                id = QuickMenuAction.RADIAL_MENU,
+                icon = Icons.Default.Settings,
+                labelResId = R.string.radial_menu,
                 accentColor = PluviaTheme.colors.accentPurple,
             )
         )
@@ -1212,6 +1221,41 @@ private fun PerformanceHudQuickMenuTab(
             accentColor = accentColor,
         )
         QuickMenuToggleRow(
+            title = stringResource(R.string.performance_hud_low_battery_warning),
+            enabled = performanceHudConfig.lowBatteryWarningEnabled,
+            onToggle = {
+                onPerformanceHudConfigChanged(
+                    performanceHudConfig.copy(lowBatteryWarningEnabled = !performanceHudConfig.lowBatteryWarningEnabled),
+                )
+            },
+            accentColor = accentColor,
+        )
+        if (performanceHudConfig.lowBatteryWarningEnabled) {
+            QuickMenuAdjustmentRow(
+                title = stringResource(R.string.performance_hud_low_battery_threshold),
+                valueText = stringResource(
+                    R.string.performance_hud_percentage_value,
+                    performanceHudConfig.lowBatteryThresholdPercent,
+                ),
+                progress = normalizedProgress(performanceHudConfig.lowBatteryThresholdPercent.toFloat(), 5f, 50f),
+                onDecrease = {
+                    onPerformanceHudConfigChanged(
+                        performanceHudConfig.copy(
+                            lowBatteryThresholdPercent = (performanceHudConfig.lowBatteryThresholdPercent - 5).coerceAtLeast(5),
+                        ),
+                    )
+                },
+                onIncrease = {
+                    onPerformanceHudConfigChanged(
+                        performanceHudConfig.copy(
+                            lowBatteryThresholdPercent = (performanceHudConfig.lowBatteryThresholdPercent + 5).coerceAtMost(50),
+                        ),
+                    )
+                },
+                accentColor = accentColor,
+            )
+        }
+        QuickMenuToggleRow(
             title = stringResource(R.string.performance_hud_power_draw),
             enabled = performanceHudConfig.showPowerDraw,
             onToggle = {
@@ -1241,6 +1285,46 @@ private fun PerformanceHudQuickMenuTab(
             },
             accentColor = accentColor,
         )
+        QuickMenuToggleRow(
+            title = stringResource(R.string.performance_hud_high_battery_temperature_warning),
+            enabled = performanceHudConfig.highBatteryTemperatureWarningEnabled,
+            onToggle = {
+                onPerformanceHudConfigChanged(
+                    performanceHudConfig.copy(
+                        highBatteryTemperatureWarningEnabled =
+                            !performanceHudConfig.highBatteryTemperatureWarningEnabled,
+                    ),
+                )
+            },
+            accentColor = accentColor,
+        )
+        if (performanceHudConfig.highBatteryTemperatureWarningEnabled) {
+            QuickMenuAdjustmentRow(
+                title = stringResource(R.string.performance_hud_high_battery_temperature_threshold),
+                valueText = stringResource(
+                    R.string.performance_hud_temperature_value,
+                    performanceHudConfig.highBatteryTemperatureThresholdC,
+                ),
+                progress = normalizedProgress(performanceHudConfig.highBatteryTemperatureThresholdC.toFloat(), 30f, 60f),
+                onDecrease = {
+                    onPerformanceHudConfigChanged(
+                        performanceHudConfig.copy(
+                            highBatteryTemperatureThresholdC =
+                                (performanceHudConfig.highBatteryTemperatureThresholdC - 1).coerceAtLeast(30),
+                        ),
+                    )
+                },
+                onIncrease = {
+                    onPerformanceHudConfigChanged(
+                        performanceHudConfig.copy(
+                            highBatteryTemperatureThresholdC =
+                                (performanceHudConfig.highBatteryTemperatureThresholdC + 1).coerceAtMost(60),
+                        ),
+                    )
+                },
+                accentColor = accentColor,
+            )
+        }
         QuickMenuToggleRow(
             title = stringResource(R.string.performance_hud_clock_time),
             enabled = performanceHudConfig.showClockTime,
