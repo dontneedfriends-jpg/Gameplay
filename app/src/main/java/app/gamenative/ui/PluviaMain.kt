@@ -76,6 +76,7 @@ import app.gamenative.ui.component.dialog.ContainerConfigDialog
 import app.gamenative.ui.component.dialog.GameFeedbackDialog
 import app.gamenative.ui.component.dialog.LoadingDialog
 import app.gamenative.ui.component.dialog.MessageDialog
+import app.gamenative.ui.component.dialog.SingleChoiceDialog
 import app.gamenative.ui.component.dialog.state.GameFeedbackDialogState
 import app.gamenative.ui.component.dialog.state.MessageDialogState
 import app.gamenative.ui.components.BootingSplash
@@ -135,6 +136,12 @@ import timber.log.Timber
 
 private const val PENDING_LAUNCH_TIMEOUT_MS = 10_000L
 private const val SNACKBAR_SHOW_TIMEOUT_MS = 15_000L
+
+private data class InstallerExecutableSelection(
+    val sessionId: String,
+    val title: String,
+    val candidates: List<String>,
+)
 
 /** Used to suspend preLaunchApp while the user decides on large workshop updates. */
 private var workshopUpdateDeferred: CompletableDeferred<Boolean>? = null
@@ -295,6 +302,9 @@ fun PluviaMain(
 
     var gameFeedbackState by rememberSaveable(stateSaver = GameFeedbackDialogState.Saver) {
         mutableStateOf(GameFeedbackDialogState(false))
+    }
+    var installerExecutableSelection by remember {
+        mutableStateOf<InstallerExecutableSelection?>(null)
     }
 
     var hasBack by rememberSaveable { mutableStateOf(navController.previousBackStackEntry?.destination?.route != null) }
@@ -621,8 +631,34 @@ fun PluviaMain(
                         appId = event.appId,
                     )
                 }
+
+                is MainViewModel.MainUiEvent.SelectInstallerExecutable -> {
+                    installerExecutableSelection = InstallerExecutableSelection(
+                        sessionId = event.sessionId,
+                        title = event.title,
+                        candidates = event.candidates,
+                    )
+                }
+
+                is MainViewModel.MainUiEvent.InstallerCompletionFailed -> {
+                    msgDialogState = MessageDialogState(
+                        visible = true,
+                        type = DialogType.SYNC_FAIL,
+                        title = context.getString(R.string.installer_completion_failed_title, event.title),
+                        message = event.reason,
+                        dismissBtnText = context.getString(R.string.ok),
+                    )
+                }
+
+                is MainViewModel.MainUiEvent.InstallerCompleted -> {
+                    SnackbarManager.show(context.getString(R.string.installer_completed_message, event.title))
+                }
             }
         }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.recoverInstallerSessions(context)
     }
 
     LaunchedEffect(navController) {
@@ -1245,6 +1281,22 @@ fun PluviaMain(
                     uriHandler.openUri("https://discord.gg/2hKv4VfZfE")
                 },
             )
+
+            installerExecutableSelection?.let { selection ->
+                SingleChoiceDialog(
+                    openDialog = true,
+                    title = context.getString(R.string.installer_select_executable_title, selection.title),
+                    items = selection.candidates,
+                    currentItem = -1,
+                    onSelected = { index ->
+                        val candidate = selection.candidates.getOrNull(index) ?: return@SingleChoiceDialog
+                        installerExecutableSelection = null
+                        viewModel.selectInstalledExecutable(context, selection.sessionId, candidate)
+                    },
+                    // A container cannot safely leave installer mode until its launch target is known.
+                    onDismiss = { },
+                )
+            }
 
             Box(modifier = Modifier.zIndex(10f)) {
                 BootingSplash(

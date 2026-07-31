@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -25,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -38,7 +36,6 @@ import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -46,7 +43,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -239,7 +235,6 @@ fun SystemMenu(
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     val firstItemFocusRequester = remember { FocusRequester() }
-    val profileFocusRequester = remember { FocusRequester() }
 
     var persona by remember { mutableStateOf<SteamFriend?>(null) }
     var selectedStatus by remember(persona) { mutableStateOf(persona?.state ?: EPersonaState.Online) }
@@ -297,13 +292,13 @@ fun SystemMenu(
         // Backdrop
         AnimatedVisibility(
             visible = isOpen,
-            enter = fadeIn(animationSpec = tween(200)),
-            exit = fadeOut(animationSpec = tween(150)),
+            enter = fadeIn(animationSpec = tween(140)),
+            exit = fadeOut(animationSpec = tween(110)),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f))
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -317,53 +312,33 @@ fun SystemMenu(
             visible = isOpen,
             enter = slideInHorizontally(
                 initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = 200),
+                animationSpec = tween(durationMillis = 180),
             ),
             exit = slideOutHorizontally(
                 targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = 160),
+                animationSpec = tween(durationMillis = 140),
             ),
             modifier = Modifier.align(Alignment.CenterEnd),
         ) {
             Surface(
                 modifier = Modifier
-                    .width(adaptivePanelWidth(380.dp))
+                    .width(adaptivePanelWidth(460.dp))
                     .fillMaxHeight(),
-                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .statusBarsPadding()
-                        .padding(24.dp),
+                        .padding(horizontal = 28.dp, vertical = 20.dp),
                 ) {
-                    // Header with close button
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.system_menu_title),
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        IconButton(onClick = onDismiss) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = stringResource(R.string.options_panel_close),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
+                    ConsolePanelHeader(
+                        title = stringResource(R.string.system_menu_title),
+                        onBack = onDismiss,
+                    )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Profile section
                     val profileInteractionSource = remember { MutableInteractionSource() }
@@ -381,7 +356,6 @@ fun SystemMenu(
                                     },
                                 )
                                 .focusRing(profileInteractionSource, RoundedCornerShape(12.dp), width = 2.dp)
-                                .focusRequester(profileFocusRequester)
                                 .selectable(
                                     selected = isProfileFocused,
                                     interactionSource = profileInteractionSource,
@@ -396,7 +370,7 @@ fun SystemMenu(
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .clip(CircleShape)
+                                    .clip(RoundedCornerShape(12.dp))
                                     .background(MaterialTheme.colorScheme.surfaceVariant),
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -535,7 +509,6 @@ fun SystemMenu(
                                 onDownloadsClick()
                                 onDismiss()
                             },
-                            focusRequester = firstItemFocusRequester,
                         )
 
                         SystemMenuItem(
@@ -675,11 +648,8 @@ fun SystemMenu(
     // Request focus on first item when menu opens
     LaunchedEffect(isOpen) {
         if (isOpen) {
-            try {
-                firstItemFocusRequester.requestFocus()
-            } catch (_: Exception) {
-                // TODO: Focus request may fail if composition is not ready
-            }
+            kotlinx.coroutines.delay(80)
+            runCatching { firstItemFocusRequester.requestFocus() }
         }
     }
 }

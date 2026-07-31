@@ -17,6 +17,9 @@ import app.gamenative.enums.LoginResult
 import app.gamenative.enums.PathType
 import app.gamenative.events.AndroidEvent
 import app.gamenative.events.SteamEvent
+import app.gamenative.localgames.LocalInstallerCompletionCoordinator
+import app.gamenative.localgames.InstallationSessionStore
+import app.gamenative.localgames.InstallationState
 import app.gamenative.ui.enums.Orientation
 import java.util.EnumSet
 import app.gamenative.service.ActiveGameRegistry
@@ -75,6 +78,13 @@ class MainViewModel @Inject constructor(
         data class SteamDisconnected(val isTerminal: Boolean) : MainUiEvent()
         data object ShowDiscordSupportDialog : MainUiEvent()
         data class ShowGameFeedbackDialog(val appId: String) : MainUiEvent()
+        data class SelectInstallerExecutable(
+            val sessionId: String,
+            val title: String,
+            val candidates: List<String>,
+        ) : MainUiEvent()
+        data class InstallerCompletionFailed(val title: String, val reason: String) : MainUiEvent()
+        data class InstallerCompleted(val title: String) : MainUiEvent()
         data object ServiceReady : MainUiEvent()
     }
 
@@ -550,10 +560,32 @@ class MainViewModel @Inject constructor(
                 val hadTemporaryOverride = IntentLaunchManager.hasTemporaryOverride(appId)
 
                 val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
+                val gameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
                 Timber.tag("Exit").i("Got game id: $gameId")
                 ActiveGameRegistry.clearIfMatches(gameId)
                 SteamService.notifyRunningProcesses()
                 handleExitCloudSync(context, appId, gameId)
+
+                if (gameSource == GameSource.CUSTOM_GAME) {
+                    when (val result = LocalInstallerCompletionCoordinator.handleInstallerExit(context, appId)) {
+                        LocalInstallerCompletionCoordinator.Result.NotAnInstallerSession -> Unit
+                        is LocalInstallerCompletionCoordinator.Result.Completed -> {
+                            _uiEvent.send(MainUiEvent.InstallerCompleted(result.session.title))
+                        }
+                        is LocalInstallerCompletionCoordinator.Result.NeedsExecutableSelection -> {
+                            _uiEvent.send(
+                                MainUiEvent.SelectInstallerExecutable(
+                                    sessionId = result.session.id,
+                                    title = result.session.title,
+                                    candidates = result.session.candidateExecutablePaths,
+                                ),
+                            )
+                        }
+                        is LocalInstallerCompletionCoordinator.Result.Failed -> {
+                            _uiEvent.send(MainUiEvent.InstallerCompletionFailed(result.session.title, result.reason))
+                        }
+                    }
+                }
 
                 // Prompt user to save temporary container configuration if one was applied
                 if (hadTemporaryOverride) {
@@ -565,8 +597,7 @@ class MainViewModel @Inject constructor(
                 // Show feedback if: first time running this game OR config was changed
                 try {
                     // Show feedback for all stores except custom games.
-                    val feedbackGameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
-                    if (feedbackGameSource != GameSource.CUSTOM_GAME) {
+                    if (gameSource != GameSource.CUSTOM_GAME) {
                         val container = ContainerUtils.getContainer(context, appId)
 
                         val shown = container.getExtra("discord_support_prompt_shown", "false") == "true"
@@ -594,6 +625,70 @@ class MainViewModel @Inject constructor(
             } finally {
                 onComplete?.invoke()
             }
+        }
+    }
+
+    fun selectInstalledExecutable(
+        context: Context,
+        sessionId: String,
+        relativePath: String,
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                LocalInstallerCompletionCoordinator.selectExecutable(context, sessionId, relativePath)
+            }.onSuccess { result ->
+                if (result is LocalInstallerCompletionCoordinator.Result.Completed) {
+                    _uiEvent.send(MainUiEvent.InstallerCompleted(result.session.title))
+                }
+            }.onFailure { error ->
+                _uiEvent.send(
+                    MainUiEvent.InstallerCompletionFailed(
+                        title = "Installation",
+                        reason = error.message ?: "Could not select the game executable",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun recoverInstallerSessions(context: Context) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val sessions = InstallationSessionStore(context).loadAll()
+            val pendingSelection = sessions.firstOrNull {
+                it.state == InstallationState.CANDIDATE_SELECTION && it.candidateExecutablePaths.isNotEmpty()
+            }
+            if (pendingSelection != null) {
+                _uiEvent.send(
+                    MainUiEvent.SelectInstallerExecutable(
+                        sessionId = pendingSelection.id,
+                        title = pendingSelection.title,
+                        candidates = pendingSelection.candidateExecutablePaths,
+                    ),
+                )
+                return@launch
+            }
+
+            sessions.firstOrNull { it.state == InstallationState.INSTALLER_RUNNING && it.appId != null }
+                ?.let { interrupted ->
+                    when (val result = LocalInstallerCompletionCoordinator.handleInstallerExit(context, interrupted.appId!!)) {
+                        LocalInstallerCompletionCoordinator.Result.NotAnInstallerSession -> Unit
+                        is LocalInstallerCompletionCoordinator.Result.Completed -> {
+                            _uiEvent.send(MainUiEvent.InstallerCompleted(result.session.title))
+                        }
+                        is LocalInstallerCompletionCoordinator.Result.NeedsExecutableSelection -> {
+                            _uiEvent.send(
+                                MainUiEvent.SelectInstallerExecutable(
+                                    result.session.id,
+                                    result.session.title,
+                                    result.session.candidateExecutablePaths,
+                                ),
+                            )
+                        }
+                        is LocalInstallerCompletionCoordinator.Result.Failed -> {
+                            _uiEvent.send(MainUiEvent.InstallerCompletionFailed(result.session.title, result.reason))
+                        }
+                    }
+                }
         }
     }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import org.json.JSONArray
 import org.json.JSONObject
 
 class InstallationSessionStore(context: Context) {
@@ -64,13 +65,15 @@ class InstallationSessionStore(context: Context) {
         put("appId", appId)
         put("containerId", containerId)
         put("selectedExecutablePath", selectedExecutablePath)
+        put("candidateExecutablePaths", JSONArray(candidateExecutablePaths))
+        put("baselineExecutablePaths", JSONArray(baselineExecutablePaths))
         put("createdAt", createdAt)
         put("updatedAt", updatedAt)
         put("lastError", lastError)
     }
 
     private fun sessionFromJson(json: JSONObject): InstallationSession {
-        require(json.optInt("schemaVersion") == SCHEMA_VERSION) { "Unsupported session schema" }
+        require(json.optInt("schemaVersion") in 1..SCHEMA_VERSION) { "Unsupported session schema" }
         return InstallationSession(
             id = json.getString("id"),
             title = json.getString("title"),
@@ -84,6 +87,20 @@ class InstallationSessionStore(context: Context) {
             appId = json.optNullableString("appId"),
             containerId = json.optNullableString("containerId"),
             selectedExecutablePath = json.optNullableString("selectedExecutablePath"),
+            candidateExecutablePaths = json.optJSONArray("candidateExecutablePaths")?.let { array ->
+                buildList {
+                    for (index in 0 until array.length()) {
+                        array.optString(index).takeIf(String::isNotBlank)?.let(::add)
+                    }
+                }
+            }.orEmpty(),
+            baselineExecutablePaths = json.optJSONArray("baselineExecutablePaths")?.let { array ->
+                buildList {
+                    for (index in 0 until array.length()) {
+                        array.optString(index).takeIf(String::isNotBlank)?.let(::add)
+                    }
+                }
+            }.orEmpty(),
             createdAt = json.getLong("createdAt"),
             updatedAt = json.getLong("updatedAt"),
             lastError = json.optNullableString("lastError"),
@@ -95,7 +112,7 @@ class InstallationSessionStore(context: Context) {
 
     private companion object {
         const val DIRECTORY_NAME = "local-installations"
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
         val SAFE_SESSION_ID = Regex("[A-Za-z0-9-]{1,80}")
     }
 }

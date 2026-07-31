@@ -19,8 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import app.gamenative.ui.component.NoExtractOutlinedTextField
 import com.winlator.inputcontrols.Binding
 
@@ -35,7 +33,6 @@ import com.winlator.inputcontrols.Binding
  * @param onDismiss Callback when dialog is dismissed without selection
  * @param onBindingSelected Callback when a binding is selected (null for NONE)
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ControllerBindingDialog(
     buttonName: String,
@@ -108,56 +105,22 @@ fun ControllerBindingDialog(
         }
     }
 
-    Dialog(
+    ConsoleSettingsPage(
+        visible = true,
+        title = stringResource(app.gamenative.R.string.bind_button, buttonName),
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,  // Allow custom width beyond platform default
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false
-        )
     ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.98f)  // Nearly full width for better space utilization
-                .fillMaxHeight(0.92f),  // Taller to maximize vertical space
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surface
-        ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header with title, current binding, and close button
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Title and current binding
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = stringResource(app.gamenative.R.string.bind_button, buttonName),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (currentBinding != null) {
-                            Text(
-                                text = stringResource(app.gamenative.R.string.current_binding, currentBinding.toString()),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-
-                    // Close button
-                    IconButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(Icons.Default.Close, null)
-                    }
+                if (currentBinding != null) {
+                    Text(
+                        text = stringResource(
+                            app.gamenative.R.string.current_binding,
+                            currentBinding.toString(),
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                    )
                 }
 
                 // Two-column layout: Left = Controls, Right = Bindings list
@@ -402,7 +365,6 @@ fun ControllerBindingDialog(
                         }
                     }
                 }
-            }
         }
     }
 }

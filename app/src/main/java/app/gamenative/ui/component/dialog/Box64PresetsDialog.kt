@@ -12,18 +12,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.outlined.AddCircle
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,8 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import app.gamenative.R
 import app.gamenative.ui.component.NoExtractOutlinedTextField
 import app.gamenative.ui.component.settings.SettingsEnvVars
@@ -48,40 +42,25 @@ import com.winlator.core.envvars.EnvVarInfo
 import com.winlator.core.envvars.EnvVars
 import timber.log.Timber
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Box64PresetsDialog(
     visible: Boolean = true,
     onDismissRequest: () -> Unit,
 ) {
-    if (visible) {
-        val context = LocalContext.current
-        val prefix = "box64"
-        val scrollState = rememberScrollState()
+    if (!visible) return
 
-        Dialog(
-            onDismissRequest = onDismissRequest,
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnClickOutside = false,
-            ),
-            content = {
-                Scaffold(
-                    topBar = {
-                        CenterAlignedTopAppBar(
-                            title = { Text(text = stringResource(R.string.box64_presets)) },
-                            actions = {
-                                IconButton(
-                                    onClick = onDismissRequest,
-                                    content = {
-                                        Icon(Icons.Default.Done, "Close Box64 Presets")
-                                    },
-                                )
-                            },
-                        )
-                    },
-                ) { paddingValues ->
-                    val getPresets: () -> ArrayList<Box86_64Preset> = { Box86_64PresetManager.getPresets(prefix, context) }
+    val context = LocalContext.current
+    val prefix = "box64"
+    val scrollState = rememberScrollState()
+
+    ConsoleSettingsPage(
+        visible = true,
+        title = stringResource(R.string.box64_presets),
+        onDismissRequest = onDismissRequest,
+    ) {
+                    val getPresets: () -> ArrayList<Box86_64Preset> = {
+                        Box86_64PresetManager.getPresets(prefix, context)
+                    }
                     val getPreset: (String) -> Box86_64Preset = { id -> getPresets().first { it.id == id } }
                     var showPresets by rememberSaveable { mutableStateOf(false) }
                     var presetId by rememberSaveable { mutableStateOf(getPresets().first().id) }
@@ -95,11 +74,10 @@ fun Box64PresetsDialog(
 
                     Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
+                            .fillMaxSize(),
                     ) {
                         NoExtractOutlinedTextField(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             value = presetName,
                             enabled = isCustom(),
                             onValueChange = {
@@ -144,7 +122,9 @@ fun Box64PresetsDialog(
                             },
                         )
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, bottom = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -231,8 +211,5 @@ fun Box64PresetsDialog(
                             )
                         }
                     }
-                }
-            },
-        )
     }
 }

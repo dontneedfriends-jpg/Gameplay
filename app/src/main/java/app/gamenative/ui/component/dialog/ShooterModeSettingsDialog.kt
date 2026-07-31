@@ -8,43 +8,49 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import app.gamenative.R
 import app.gamenative.data.ShooterModeConfig
+import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.component.settings.SettingsListDropdown
-import app.gamenative.ui.theme.PluviaBackground
 import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
 import com.alorma.compose.settings.ui.SettingsSwitch
 import java.util.Locale
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+private enum class ShooterSettingsCategory {
+    INPUT,
+    LOOK,
+    JOYSTICKS,
+}
+
 @Composable
 fun ShooterModeSettingsDialog(
     shooterConfig: ShooterModeConfig,
@@ -53,64 +59,87 @@ fun ShooterModeSettingsDialog(
     onSave: (ShooterModeConfig) -> Unit,
 ) {
     var config by remember(shooterConfig) { mutableStateOf(shooterConfig) }
+    var selectedCategory by remember { mutableStateOf(ShooterSettingsCategory.INPUT) }
     val locale = Locale.getDefault()
+    val showMouseLookOptions = config.lookType == ShooterModeConfig.LOOK_MOUSE
+    val categories = remember(showMouseLookOptions) {
+        buildList {
+            add(ShooterSettingsCategory.INPUT)
+            if (showMouseLookOptions) add(ShooterSettingsCategory.LOOK)
+            add(ShooterSettingsCategory.JOYSTICKS)
+        }
+    }
+    LaunchedEffect(categories, selectedCategory) {
+        if (selectedCategory !in categories) selectedCategory = ShooterSettingsCategory.INPUT
+    }
 
-    Dialog(
+    ConsoleSettingsPage(
+        visible = true,
+        title = stringResource(R.string.shooter_mode_settings_title),
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
-    ) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = PluviaBackground,
-            topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            text = stringResource(R.string.shooter_mode_settings_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { config = ShooterModeConfig() }) {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.reset_shooter_settings),
-                            )
-                        }
-                        IconButton(onClick = { onSave(config) }) {
-                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
-                        }
-                    },
+        actions = {
+            IconButton(onClick = { config = ShooterModeConfig() }) {
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.reset_shooter_settings),
                 )
-            },
-        ) { padding ->
-            Column(
+            }
+            IconButton(onClick = { onSave(config) }) {
+                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
+            }
+        },
+    ) {
+            Row(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
-                    .padding(bottom = 16.dp),
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val index = categories.indexOf(selectedCategory).coerceAtLeast(0)
+                        when (event.key) {
+                            Key.ButtonR1, Key.ButtonR2 -> {
+                                selectedCategory = categories[(index + 1) % categories.size]
+                                true
+                            }
+                            Key.ButtonL1, Key.ButtonL2 -> {
+                                selectedCategory = categories[(index - 1 + categories.size) % categories.size]
+                                true
+                            }
+                            else -> false
+                        }
+                    },
             ) {
+                ConsoleCategoryRail(
+                    items = categories,
+                    selectedItem = selectedCategory,
+                    label = { category ->
+                        when (category) {
+                            ShooterSettingsCategory.INPUT -> stringResource(R.string.shooter_section_input)
+                            ShooterSettingsCategory.LOOK -> stringResource(R.string.shooter_section_mouse_look)
+                            ShooterSettingsCategory.JOYSTICKS -> stringResource(R.string.shooter_section_joysticks)
+                        }
+                    },
+                    onSelected = { selectedCategory = it },
+                    footer = stringResource(R.string.container_config_console_controls_hint),
+                    requestInitialFocus = true,
+                    compact = true,
+                    modifier = Modifier.width(230.dp),
+                )
                 val scrollState = rememberScrollState()
+                LaunchedEffect(selectedCategory) {
+                    scrollState.scrollTo(0)
+                }
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .weight(1f)
+                        .padding(start = 16.dp, bottom = 16.dp)
                         .verticalScroll(scrollState),
                 ) {
-                        val showMouseLookOptions = config.lookType == ShooterModeConfig.LOOK_MOUSE
                         val showRightStickOptions = config.lookType == ShooterModeConfig.LOOK_GAMEPAD_RIGHT_STICK
                         val showAnalogMovementOptions =
                             config.movementType == ShooterModeConfig.MOVEMENT_GAMEPAD_LEFT_STICK
 
+                    when (selectedCategory) {
+                        ShooterSettingsCategory.INPUT -> {
                         SettingsDialogSectionHeader(stringResource(R.string.shooter_section_input))
 
                         ShooterDropdownBlock(
@@ -165,6 +194,9 @@ fun ShooterModeSettingsDialog(
                                 onValueChange = { config = config.copy(buttonLookThroughDragThreshold = it) },
                             )
                         }
+
+                        }
+                        ShooterSettingsCategory.LOOK -> {
 
                         if (showMouseLookOptions) {
                             SettingsDialogSectionHeader(stringResource(R.string.shooter_section_mouse_look))
@@ -241,6 +273,9 @@ fun ShooterModeSettingsDialog(
                                 )
                             }
                         }
+
+                        }
+                        ShooterSettingsCategory.JOYSTICKS -> {
 
                         SettingsDialogSectionHeader(stringResource(R.string.shooter_section_joysticks))
 
@@ -368,9 +403,10 @@ fun ShooterModeSettingsDialog(
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
                 }
             }
-        }
     }
 }
 

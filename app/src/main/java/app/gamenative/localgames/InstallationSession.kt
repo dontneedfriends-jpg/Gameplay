@@ -32,6 +32,8 @@ data class InstallationSession(
     val appId: String? = null,
     val containerId: String? = null,
     val selectedExecutablePath: String? = null,
+    val candidateExecutablePaths: List<String> = emptyList(),
+    val baselineExecutablePaths: List<String> = emptyList(),
     val createdAt: Long,
     val updatedAt: Long,
     val lastError: String? = null,

@@ -62,19 +62,22 @@ fun ConsoleImportPanel(
     val firstItemFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(isOpen) {
-        if (isOpen) firstItemFocusRequester.requestFocus()
+        if (isOpen) {
+            kotlinx.coroutines.delay(80)
+            runCatching { firstItemFocusRequester.requestFocus() }
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = isOpen,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(120)),
+            enter = fadeIn(tween(140)),
+            exit = fadeOut(tween(110)),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.64f))
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f))
                     .clickable(onClick = onDismiss),
             )
         }
@@ -82,30 +85,29 @@ fun ConsoleImportPanel(
         AnimatedVisibility(
             visible = isOpen,
             modifier = Modifier.align(Alignment.CenterEnd),
-            enter = slideInHorizontally(tween(190)) { it },
-            exit = slideOutHorizontally(tween(150)) { it },
+            enter = slideInHorizontally(tween(180)) { it },
+            exit = slideOutHorizontally(tween(140)) { it },
         ) {
             Surface(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(adaptivePanelWidth(440.dp)),
+                    .width(adaptivePanelWidth(460.dp)),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 0.dp,
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 36.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Text(
-                        text = stringResource(R.string.add_custom_game_dialog_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.SemiBold,
+                    ConsolePanelHeader(
+                        title = stringResource(R.string.add_custom_game_dialog_title),
+                        onBack = onDismiss,
                     )
                     Text(
                         text = stringResource(R.string.add_custom_game_dialog_message),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = 18.dp),
+                        modifier = Modifier.padding(bottom = 8.dp),
                     )
                     ConsoleImportAction(
                         icon = Icons.Default.Download,
@@ -144,7 +146,7 @@ private fun ConsoleImportAction(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(10.dp)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -158,14 +160,14 @@ private fun ConsoleImportAction(
                 indication = null,
                 onClick = onClick,
             )
-            .padding(horizontal = 18.dp, vertical = 17.dp),
+            .padding(horizontal = 16.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(23.dp),
             tint = if (focused) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(

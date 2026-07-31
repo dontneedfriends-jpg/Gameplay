@@ -1,0 +1,132 @@
+package app.gamenative.localgames
+
+import android.content.Context
+import app.gamenative.utils.ContainerUtils
+import com.winlator.container.Container
+import java.io.File
+import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+object LocalInstallerCompletionCoordinator {
+    sealed interface Result {
+        data object NotAnInstallerSession : Result
+        data class Completed(val session: InstallationSession) : Result
+        data class NeedsExecutableSelection(val session: InstallationSession) : Result
+        data class Failed(val session: InstallationSession, val reason: String) : Result
+    }
+
+    suspend fun handleInstallerExit(context: Context, appId: String): Result = withContext(Dispatchers.IO) {
+        val container = runCatching { ContainerUtils.getContainer(context, appId) }.getOrNull()
+            ?: return@withContext Result.NotAnInstallerSession
+        val sessionId = container.getExtra(LocalContainerLaunch.EXTRA_INSTALLATION_SESSION_ID)
+            .takeIf(String::isNotBlank)
+            ?: return@withContext Result.NotAnInstallerSession
+        val store = InstallationSessionStore(context)
+        val session = store.load(sessionId) ?: return@withContext Result.NotAnInstallerSession
+
+        if (container.getExtra(LocalContainerLaunch.EXTRA_MODE) == LocalContainerLaunch.MODE_INSTALLED_EXE_C) {
+            val target = container.getExtra(LocalContainerLaunch.EXTRA_TARGET)
+            return@withContext completePersistedContainer(store, session, target)
+        }
+
+        val awaiting = when (session.state) {
+            InstallationState.INSTALLER_RUNNING -> session.transitionTo(InstallationState.AWAITING_RESULT)
+            InstallationState.AWAITING_RESULT,
+            InstallationState.CANDIDATE_SELECTION,
+            -> session
+            InstallationState.COMPLETED -> return@withContext Result.Completed(session)
+            else -> return@withContext Result.Failed(session, "Installer session is not awaiting a result")
+        }
+        store.save(awaiting)
+
+        val baseline = awaiting.baselineExecutablePaths.map(String::lowercase).toSet()
+        val candidates = InstalledExecutableScanner.findCandidates(File(container.rootDir, ".wine/drive_c"))
+            .filterNot { it.lowercase() in baseline }
+        if (candidates.isEmpty()) {
+            val failed = awaiting.transitionTo(
+                InstallationState.FAILED,
+                error = "The installer exited but no launchable game executable was found on drive C:",
+            )
+            store.save(failed)
+            return@withContext Result.Failed(failed, requireNotNull(failed.lastError))
+        }
+
+        val selecting = if (awaiting.state == InstallationState.CANDIDATE_SELECTION) {
+            awaiting.copy(candidateExecutablePaths = candidates, updatedAt = System.currentTimeMillis())
+        } else {
+            awaiting.copy(candidateExecutablePaths = candidates)
+                .transitionTo(InstallationState.CANDIDATE_SELECTION)
+        }
+        store.save(selecting)
+
+        if (candidates.size == 1) {
+            finalizeSelection(store, selecting, container, candidates.single())
+        } else {
+            Result.NeedsExecutableSelection(selecting)
+        }
+    }
+
+    suspend fun selectExecutable(context: Context, sessionId: String, relativePath: String): Result =
+        withContext(Dispatchers.IO) {
+            val store = InstallationSessionStore(context)
+            val session = requireNotNull(store.load(sessionId)) { "Installation session was not found" }
+            require(session.state == InstallationState.CANDIDATE_SELECTION) {
+                "Installation session is not waiting for executable selection"
+            }
+            require(relativePath in session.candidateExecutablePaths) { "Executable is not a known candidate" }
+            val appId = requireNotNull(session.appId) { "Installation session has no app id" }
+            val container = ContainerUtils.getContainer(context, appId)
+            finalizeSelection(store, session, container, relativePath)
+        }
+
+    private fun finalizeSelection(
+        store: InstallationSessionStore,
+        session: InstallationSession,
+        container: Container,
+        relativePath: String,
+    ): Result {
+        val normalized = relativePath.replace('\\', '/').trimStart('/')
+        val driveC = File(container.rootDir, ".wine/drive_c").canonicalFile
+        val executable = File(driveC, normalized).canonicalFile
+        if (!executable.isFile || !executable.path.startsWith(driveC.path + File.separator)) {
+            throw IOException("Selected executable is missing or outside drive C:")
+        }
+
+        container.executablePath = normalized
+        container.putExtra(LocalContainerLaunch.EXTRA_MODE, LocalContainerLaunch.MODE_INSTALLED_EXE_C)
+        container.putExtra(LocalContainerLaunch.EXTRA_TARGET, normalized)
+        container.putExtra(LocalContainerLaunch.EXTRA_INSTALLATION_SESSION_ID, null)
+        container.saveData()
+
+        val completed = session.copy(
+            selectedExecutablePath = normalized,
+            candidateExecutablePaths = session.candidateExecutablePaths.ifEmpty { listOf(normalized) },
+        ).transitionTo(InstallationState.COMPLETED)
+        store.save(completed)
+        return Result.Completed(completed)
+    }
+
+    private fun completePersistedContainer(
+        store: InstallationSessionStore,
+        session: InstallationSession,
+        target: String,
+    ): Result {
+        if (session.state == InstallationState.COMPLETED) return Result.Completed(session)
+        if (target.isBlank()) return Result.Failed(session, "Installed container has no launch target")
+        val selecting = when (session.state) {
+            InstallationState.INSTALLER_RUNNING -> session
+                .transitionTo(InstallationState.AWAITING_RESULT)
+                .transitionTo(InstallationState.CANDIDATE_SELECTION)
+            InstallationState.AWAITING_RESULT -> session.transitionTo(InstallationState.CANDIDATE_SELECTION)
+            InstallationState.CANDIDATE_SELECTION -> session
+            else -> return Result.Failed(session, "Installation state cannot be recovered")
+        }
+        val completed = selecting.copy(
+            selectedExecutablePath = target,
+            candidateExecutablePaths = selecting.candidateExecutablePaths.ifEmpty { listOf(target) },
+        ).transitionTo(InstallationState.COMPLETED)
+        store.save(completed)
+        return Result.Completed(completed)
+    }
+}

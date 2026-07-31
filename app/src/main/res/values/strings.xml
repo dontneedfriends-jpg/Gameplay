@@ -2275,4 +2275,7 @@
     <string name="radial_menu_weapon">Weapon %1$d</string>
     <string name="console_back_hint">B  Back</string>
     <string name="container_config_console_controls_hint">L1/R1  Categories   ·   A  Select   ·   B  Back</string>
+    <string name="installer_select_executable_title">Choose the game executable for %1$s</string>
+    <string name="installer_completion_failed_title">Could not finish installing %1$s</string>
+    <string name="installer_completed_message">%1$s is ready to play</string>
 </resources>

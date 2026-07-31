@@ -48,9 +48,9 @@ fun SettingsDialogSectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 2.dp),
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 14.dp, top = 14.dp, bottom = 4.dp),
     )
 }
 
@@ -90,10 +90,9 @@ fun GestureBlock(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = PluviaBackground,
-        border = androidx.compose.foundation.BorderStroke(1.dp, PluviaBorder.copy(alpha = 0.55f)),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         tonalElevation = 0.dp,
         shadowElevation = 0.dp,
     ) {

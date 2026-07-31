@@ -85,7 +85,7 @@ fun LibraryQuickActionsPanel(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.58f))
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f))
                     .clickable(onClick = onDismiss),
             )
         }
@@ -107,10 +107,9 @@ fun LibraryQuickActionsPanel(
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Text(
-                        text = stringResource(R.string.quick_menu_title),
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.SemiBold,
+                    ConsolePanelHeader(
+                        title = stringResource(R.string.quick_menu_title),
+                        onBack = onDismiss,
                     )
                     focusedItem?.let { item ->
                         Text(

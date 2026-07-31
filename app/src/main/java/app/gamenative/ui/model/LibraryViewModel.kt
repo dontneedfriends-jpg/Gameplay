@@ -45,9 +45,11 @@ import app.gamenative.ui.enums.LibraryTab.Companion.previous
 import app.gamenative.ui.enums.SortOption
 import app.gamenative.ui.util.SnackbarManager
 import app.gamenative.utils.CustomGameScanner
+import app.gamenative.utils.ContainerUtils
 import app.gamenative.localgames.LocalGameImporter
 import app.gamenative.localgames.InstallationSessionStore
 import app.gamenative.localgames.InstallationState
+import app.gamenative.localgames.InstalledExecutableScanner
 import app.gamenative.localgames.LocalInstallerImporter
 import app.gamenative.utils.DeviceGameStatsCache
 import app.gamenative.utils.GpuGameStatsCache
@@ -134,6 +136,7 @@ class LibraryViewModel @Inject constructor(
 
     @Volatile private var librarySnapshot: LibrarySnapshot? = null
     private val librarySnapshotVersion = AtomicLong(0)
+    private val filterRequestGeneration = AtomicLong(0)
     private val librarySnapshotMutex = Mutex()
 
     @Volatile private var steamCollections: List<SteamCollection>? = null
@@ -557,7 +560,14 @@ class LibraryViewModel @Inject constructor(
                     val appId = requireNotNull(session.appId) {
                         "Installation session has no container app id"
                     }
-                    store.save(session.transitionTo(InstallationState.INSTALLER_RUNNING))
+                    val container = ContainerUtils.getContainer(context, appId)
+                    val baseline = InstalledExecutableScanner.findCandidates(
+                        File(container.rootDir, ".wine/drive_c"),
+                    )
+                    store.save(
+                        session.copy(baselineExecutablePaths = baseline)
+                            .transitionTo(InstallationState.INSTALLER_RUNNING),
+                    )
                     appId
                 }
             }
@@ -614,6 +624,7 @@ class LibraryViewModel @Inject constructor(
 
     private fun onFilterApps(paginationPage: Int = 0): Job {
         Timber.tag("LibraryViewModel").d("onFilterApps - appList.size: ${appList.size}, isFirstLoad: $isFirstLoad")
+        val requestGeneration = filterRequestGeneration.incrementAndGet()
         return viewModelScope.launch(Dispatchers.IO) {
             val currentState = _state.value
             val currentFilter = AppFilter.getAppType(currentState.appInfoSortType)
@@ -732,7 +743,7 @@ class LibraryViewModel @Inject constructor(
                 item.appId to siblings
             }
 
-            val steamOwnerTypeFiltered: List<SteamApp> = appList
+            val steamOwnerTypeSearchFiltered: List<SteamApp> = appList
                 .asSequence()
                 .filter { item ->
                     SteamService.familyMembers.ifEmpty {
@@ -765,21 +776,28 @@ class LibraryViewModel @Inject constructor(
                         true
                     }
                 }
-                .filter { item ->
-                    val installedOnly = currentState.currentTab.installedOnly ||
-                        currentState.appInfoSortType.contains(AppFilter.INSTALLED)
-                    if (installedOnly) {
-                        downloadDirectorySet.contains(SteamService.getAppDirName(item))
-                    } else {
-                        true
-                    }
-                }
                 .toList()
+
+            val explicitInstalledOnly = currentState.appInfoSortType.contains(AppFilter.INSTALLED)
+            val stableSteamOwnerTypeFiltered = if (explicitInstalledOnly) {
+                steamOwnerTypeSearchFiltered.filter { item ->
+                    downloadDirectorySet.contains(SteamService.getAppDirName(item))
+                }
+            } else {
+                steamOwnerTypeSearchFiltered
+            }
+            val steamOwnerTypeFiltered = if (currentState.currentTab.installedOnly) {
+                stableSteamOwnerTypeFiltered.filter { item ->
+                    downloadDirectorySet.contains(SteamService.getAppDirName(item))
+                }
+            } else {
+                stableSteamOwnerTypeFiltered
+            }
 
             // Per-collection counts: computed from the owner/type/search-filtered set (independent of the
             // current collection selection) so each collection shows how many games it would contribute.
             val steamCollectionCounts: Map<String, Int> = steamCollections?.associate { collection ->
-                collection.id to steamOwnerTypeFiltered.count { it.id in collection.appIds }
+                collection.id to stableSteamOwnerTypeFiltered.count { it.id in collection.appIds }
             } ?: emptyMap()
 
             // Apply the Steam collection filter — union/OR, fail-open (see SteamCollectionFilter).
@@ -797,6 +815,13 @@ class LibraryViewModel @Inject constructor(
                     }
                 )
 
+            val stableSteamFilteredBeforeCompatibility: List<SteamApp> =
+                if (allowedSteamAppIds == null) {
+                    stableSteamOwnerTypeFiltered
+                } else {
+                    stableSteamOwnerTypeFiltered.filter { it.id in allowedSteamAppIds }
+                }
+
             // Filter Steam apps first (no pagination yet)
             // Note: Don't sort individual lists - we'll sort the combined list for consistent ordering
             val filteredSteamApps: List<SteamApp> = steamFilteredBeforeCompatibility
@@ -809,6 +834,11 @@ class LibraryViewModel @Inject constructor(
                     }.thenBy { it.name.lowercase() },
                 )
                 .toList()
+
+            val stableSteamCount = stableSteamFilteredBeforeCompatibility.count { item ->
+                passesCompatibleFilter(item.name) &&
+                    passesStatsFilters(currentState, GameSource.STEAM, item.name)
+            }
 
             // Map Steam apps to UI items
             data class LibraryEntry(val item: LibraryItem, val isInstalled: Boolean, val lastPlayed: Long = 0L)
@@ -1001,6 +1031,11 @@ class LibraryViewModel @Inject constructor(
                     )
                 }
 
+            if (filterRequestGeneration.get() != requestGeneration) {
+                Timber.tag("LibraryViewModel").d("Discarding stale library filter generation $requestGeneration")
+                return@launch
+            }
+
             // Calculate installed counts
             val gogInstalledCount = filteredGOGGames.count { it.isInstalled }
             val epicInstalledCount = filteredEpicGames.count { it.isInstalled }
@@ -1009,13 +1044,13 @@ class LibraryViewModel @Inject constructor(
             // This needs to happen before filtering by source, so we save the total counts
             if (currentState.searchQuery.isEmpty()) {
                 PrefManager.customGamesCount = customGameItems.size
-                PrefManager.steamGamesCount = steamFilteredBeforeCompatibility.size
+                PrefManager.steamGamesCount = stableSteamFilteredBeforeCompatibility.size
                 PrefManager.gogGamesCount = filteredGOGGames.size
                 PrefManager.gogInstalledGamesCount = gogInstalledCount
                 PrefManager.epicGamesCount = filteredEpicGames.size
                 PrefManager.epicInstalledGamesCount = epicInstalledCount
                 PrefManager.amazonInstalledGamesCount = amazonInstalledCount
-                Timber.tag("LibraryViewModel").d("Saved counts - Custom: ${customGameItems.size}, Steam: ${steamFilteredBeforeCompatibility.size}, GOG: ${filteredGOGGames.size}, GOG installed: $gogInstalledCount, Epic: ${filteredEpicGames.size}, Epic installed: $epicInstalledCount, Amazon installed: $amazonInstalledCount")
+                Timber.tag("LibraryViewModel").d("Saved counts - Custom: ${customGameItems.size}, Steam: ${stableSteamFilteredBeforeCompatibility.size}, GOG: ${filteredGOGGames.size}, GOG installed: $gogInstalledCount, Epic: ${filteredEpicGames.size}, Epic installed: $epicInstalledCount, Amazon installed: $amazonInstalledCount")
             }
 
             // Compute effective source filters based on current tab
@@ -1136,12 +1171,12 @@ class LibraryViewModel @Inject constructor(
                     isLoading = false, // Loading complete
                     // Per-source counts for tab badges
                     // Use user prefs + auth state only (not current tab) so badges stay stable across tab switches
-                    allCount = (if (currentState.showSteamInLibrary) steamEntries.size else 0) +
+                    allCount = (if (currentState.showSteamInLibrary) stableSteamCount else 0) +
                         (if (currentState.showCustomGamesInLibrary) customEntries.size else 0) +
                         (if (currentState.showGOGInLibrary && GOGService.hasStoredCredentials(context)) gogEntries.size else 0) +
                         (if (currentState.showEpicInLibrary && EpicService.hasStoredCredentials(context)) epicEntries.size else 0) +
                         (if (currentState.showAmazonInLibrary && AmazonService.hasStoredCredentials(context)) amazonEntries.size else 0),
-                    steamCount = if (currentState.showSteamInLibrary) steamEntries.size else 0,
+                    steamCount = if (currentState.showSteamInLibrary) stableSteamCount else 0,
                     gogCount = if (currentState.showGOGInLibrary && GOGService.hasStoredCredentials(context)) gogEntries.size else 0,
                     epicCount = if (currentState.showEpicInLibrary && EpicService.hasStoredCredentials(context)) epicEntries.size else 0,
                     amazonCount = if (currentState.showAmazonInLibrary && AmazonService.hasStoredCredentials(context)) amazonEntries.size else 0,

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -36,7 +37,6 @@ import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -61,7 +61,6 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -119,13 +118,13 @@ fun GameOptionsPanel(
 
     AnimatedVisibility(
         visible = isOpen,
-        enter = fadeIn(),
-        exit = fadeOut(),
+        enter = fadeIn(tween(140)),
+        exit = fadeOut(tween(110)),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f))
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f))
                 .selectable(
                     selected = false,
                     interactionSource = remember { MutableInteractionSource() },
@@ -139,15 +138,12 @@ fun GameOptionsPanel(
         visible = isOpen,
         enter = slideInHorizontally(
             initialOffsetX = { it },
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMedium,
-            ),
-        ) + fadeIn(),
+            animationSpec = tween(180),
+        ) + fadeIn(tween(140)),
         exit = slideOutHorizontally(
             targetOffsetX = { it },
-            animationSpec = spring(stiffness = Spring.StiffnessHigh),
-        ) + fadeOut(),
+            animationSpec = tween(140),
+        ) + fadeOut(tween(110)),
         modifier = modifier
             .fillMaxHeight()
             .widthIn(max = 1120.dp)
@@ -185,24 +181,13 @@ fun GameOptionsPanel(
                 OptionCategory.HELP_INFO to stringResource(R.string.game_options_help_info),
             )
 
-            Row(
+            ConsolePanelHeader(
+                title = stringResource(R.string.game_options_title),
+                onBack = onDismiss,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 64.dp)
                     .padding(start = 12.dp, end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-                }
-                Text(
-                    text = stringResource(R.string.game_options_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
+            )
 
             Row(modifier = Modifier.fillMaxSize()) {
                 ConsoleCategoryRail(

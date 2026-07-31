@@ -18,8 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import app.gamenative.R
 import app.gamenative.data.TouchGestureConfig
 import app.gamenative.data.TouchGestureConfig.Companion.ACTION_LEFT_CLICK
@@ -71,42 +69,18 @@ fun TouchGestureSettingsDialog(
 ) {
     var config by remember { mutableStateOf(gestureConfig) }
 
-    Dialog(
+    ConsoleSettingsPage(
+        visible = true,
+        title = stringResource(R.string.gesture_settings_title),
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = false,
-        ),
+        actions = {
+            IconButton(onClick = { onSave(config) }) {
+                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
+            }
+        },
     ) {
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = PluviaBackground,
-            topBar = {
-                CenterAlignedTopAppBar(
-                    title = {
-                        Text(
-                            text = stringResource(R.string.gesture_settings_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { onSave(config) }) {
-                            Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
-                        }
-                    },
-                )
-            },
-        ) { padding ->
             Column(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
             ) {
@@ -401,7 +375,6 @@ fun TouchGestureSettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
-        }
     }
 }
 
