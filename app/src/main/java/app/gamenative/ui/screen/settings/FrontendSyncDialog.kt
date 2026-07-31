@@ -3,7 +3,10 @@ package app.gamenative.ui.screen.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FolderOpen
@@ -29,6 +32,7 @@ import app.gamenative.R
 import app.gamenative.data.GameSource
 import app.gamenative.sync.FrontendSyncManager
 import app.gamenative.ui.components.rememberCustomGameFolderPicker
+import app.gamenative.ui.component.dialog.ConsoleSettingsPage
 
 /**
  * Dialog for configuring per-source export directories used by frontend launchers such as ES-DE.
@@ -46,23 +50,11 @@ fun FrontendSyncDialog(onDismiss: () -> Unit) {
     // Buffered changes: source → (newPath, deleteOldFiles). Applied only on OK.
     val pendingChanges = remember { mutableStateMapOf<GameSource, Pair<String, Boolean>>() }
 
-    AlertDialog(
+    ConsoleSettingsPage(
+        visible = true,
+        title = stringResource(R.string.frontend_sync_dialog_title),
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.frontend_sync_dialog_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                sources.forEach { (source, label) ->
-                    FrontendSyncSourceRow(
-                        source = source,
-                        label = label,
-                        onChangeQueued = { newPath, deleteOld ->
-                            pendingChanges[source] = newPath to deleteOld
-                        },
-                    )
-                }
-            }
-        },
-        confirmButton = {
+        actions = {
             TextButton(onClick = {
                 pendingChanges.forEach { (source, change) ->
                     FrontendSyncManager.changeDirectory(source, change.first, change.second)
@@ -75,12 +67,24 @@ fun FrontendSyncDialog(onDismiss: () -> Unit) {
                 Text(stringResource(android.R.string.ok))
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(android.R.string.cancel))
+    ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                sources.forEach { (source, label) ->
+                    FrontendSyncSourceRow(
+                        source = source,
+                        label = label,
+                        onChangeQueued = { newPath, deleteOld ->
+                            pendingChanges[source] = newPath to deleteOld
+                        },
+                    )
+                }
             }
-        },
-    )
+    }
 }
 
 /**

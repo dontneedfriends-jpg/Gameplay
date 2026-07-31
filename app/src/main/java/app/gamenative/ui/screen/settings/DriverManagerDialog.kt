@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -259,14 +259,14 @@ fun DriverManagerDialog(open: Boolean, onDismiss: () -> Unit) {
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = stringResource(R.string.driver_manager), style = MaterialTheme.typography.titleLarge) },
-        text = {
+    ConsoleManagerDialog(
+        open = open,
+        title = stringResource(R.string.driver_manager),
+        onDismiss = onDismiss,
+    ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 450.dp)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
@@ -507,17 +507,7 @@ fun DriverManagerDialog(open: Boolean, onDismiss: () -> Unit) {
                     }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(
-                    text = "Close",
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        },
-    )
+    }
 }
 
 private fun handlePickedUri(context: Context, uri: Uri): String {

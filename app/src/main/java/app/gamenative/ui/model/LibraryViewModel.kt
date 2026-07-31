@@ -23,6 +23,7 @@ import app.gamenative.events.AndroidEvent
 import app.gamenative.data.GOGGame
 import app.gamenative.data.EpicGame
 import app.gamenative.data.AmazonGame
+import app.gamenative.data.AppInfo
 import app.gamenative.db.dao.LibraryPlayHistoryDao
 import app.gamenative.db.dao.SteamAppDao
 import app.gamenative.db.dao.GOGGameDao
@@ -60,6 +61,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.EnumSet
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.min
@@ -75,6 +77,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
@@ -98,6 +102,7 @@ class LibraryViewModel @Inject constructor(
     var listState: LazyGridState by mutableStateOf(LazyGridState(0, 0))
 
     private val onInstallStatusChanged: (AndroidEvent.LibraryInstallStatusChanged) -> Unit = {
+        invalidateLibrarySnapshot()
         onFilterApps(paginationCurrentPage)
     }
 
@@ -118,6 +123,18 @@ class LibraryViewModel @Inject constructor(
     private var amazonGameList: List<AmazonGame> = emptyList()
     @Volatile private var crossStoreItemsById: Map<String, List<LibraryItem>> = emptyMap()
     private var playHistoryByAppId: Map<String, Long> = emptyMap()
+
+    /** Disk and Steam database data shared by all tabs. */
+    private data class LibrarySnapshot(
+        val version: Long,
+        val downloadDirectorySet: Set<String>,
+        val installedAppsById: Map<Int, AppInfo>,
+        val licensedDepotMap: Map<Int, Set<Int>>,
+    )
+
+    @Volatile private var librarySnapshot: LibrarySnapshot? = null
+    private val librarySnapshotVersion = AtomicLong(0)
+    private val librarySnapshotMutex = Mutex()
 
     @Volatile private var steamCollections: List<SteamCollection>? = null
 
@@ -187,6 +204,7 @@ class LibraryViewModel @Inject constructor(
                     // Check if the list has actually changed before triggering a re-filter
                     if (appList != apps) {
                         appList = apps
+                        invalidateLibrarySnapshot()
                         onFilterApps(paginationCurrentPage)
                     }
                 }
@@ -333,8 +351,9 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun onTabChanged(tab: LibraryTab) {
+        if (_state.value.currentTab == tab) return
         _state.update { it.copy(currentTab = tab) }
-        onFilterApps(0) // Reset to first page and refresh
+        onFilterApps(0)
     }
 
     fun onNextTab() {
@@ -417,6 +436,7 @@ class LibraryViewModel @Inject constructor(
     fun onRefresh() {
         viewModelScope.launch {
             _state.update { it.copy(isRefreshing = true) }
+            invalidateLibrarySnapshot()
 
             // Clear compatibility cache on manual refresh to get fresh data
             GameCompatibilityCache.clear()
@@ -587,17 +607,39 @@ class LibraryViewModel @Inject constructor(
     fun resolveCrossStoreSibling(appId: String, targetSource: GameSource): LibraryItem? =
         crossStoreItemsById[appId]?.firstOrNull { it.gameSource == targetSource }
 
+    private fun invalidateLibrarySnapshot() {
+        librarySnapshotVersion.incrementAndGet()
+        librarySnapshot = null
+    }
+
     private fun onFilterApps(paginationPage: Int = 0): Job {
         Timber.tag("LibraryViewModel").d("onFilterApps - appList.size: ${appList.size}, isFirstLoad: $isFirstLoad")
         return viewModelScope.launch(Dispatchers.IO) {
-            _state.update { it.copy(isLoading = true) }
-
             val currentState = _state.value
             val currentFilter = AppFilter.getAppType(currentState.appInfoSortType)
 
-            // Fetch download directory apps once on IO thread and cache as a HashSet for O(1) lookups
-            val downloadDirectoryApps = DownloadService.getDownloadDirectoryApps() + SteamService.getImportedAppDirs()
-            val downloadDirectorySet = downloadDirectoryApps.toHashSet()
+            val currentVersion = librarySnapshotVersion.get()
+            val snapshot = librarySnapshot?.takeIf { it.version == currentVersion }
+                ?: librarySnapshotMutex.withLock {
+                    val lockedVersion = librarySnapshotVersion.get()
+                    librarySnapshot?.takeIf { it.version == lockedVersion } ?: run {
+                        val installedApps = SteamService.getAllInstalledApps().orEmpty()
+                        LibrarySnapshot(
+                            version = lockedVersion,
+                            downloadDirectorySet = (
+                                DownloadService.getDownloadDirectoryApps() + SteamService.getImportedAppDirs()
+                            ).toHashSet(),
+                            installedAppsById = installedApps.associateBy { it.id },
+                            licensedDepotMap = SteamService.buildLicensedDepotMap(appList),
+                        ).also { freshSnapshot ->
+                            // Avoid publishing data assembled while the Steam DAO emitted a newer list.
+                            if (librarySnapshotVersion.get() == lockedVersion) {
+                                librarySnapshot = freshSnapshot
+                            }
+                        }
+                    }
+                }
+            val downloadDirectorySet = snapshot.downloadDirectorySet
 
             fun passesCompatibleFilter(gameName: String): Boolean {
                 if (!currentState.appInfoSortType.contains(AppFilter.COMPATIBLE)) {
@@ -773,7 +815,7 @@ class LibraryViewModel @Inject constructor(
 
             fun lastPlayedFor(appId: String): Long = playHistoryByAppId[appId] ?: 0L
 
-            val licensedDepotMap = SteamService.buildLicensedDepotMap(filteredSteamApps)
+            val licensedDepotMap = snapshot.licensedDepotMap
 
             // Added this to avoid duplicate from custom imported steam game
             val steamEntriesAppIds = mutableSetOf<String>()
@@ -781,7 +823,7 @@ class LibraryViewModel @Inject constructor(
             val steamEntries: List<LibraryEntry> = filteredSteamApps.map { item ->
                 val isInstalled = downloadDirectorySet.contains(SteamService.getAppDirName(item))
                 val installedBranch = if (isInstalled) {
-                    SteamService.getInstalledApp(item.id)?.branch ?: "public"
+                    snapshot.installedAppsById[item.id]?.branch ?: "public"
                 } else {
                     "public"
                 }

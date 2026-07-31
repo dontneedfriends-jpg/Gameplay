@@ -35,6 +35,7 @@ fun <T> ConsoleCategoryRail(
     footer: String,
     modifier: Modifier = Modifier,
     requestInitialFocus: Boolean = false,
+    compact: Boolean = false,
 ) {
     val initialFocusRequester = remember { FocusRequester() }
     LaunchedEffect(requestInitialFocus, items) {
@@ -44,8 +45,11 @@ fun <T> ConsoleCategoryRail(
         modifier = modifier
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 14.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(
+                horizontal = if (compact) 10.dp else 14.dp,
+                vertical = if (compact) 10.dp else 16.dp,
+            ),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 2.dp else 4.dp),
     ) {
         items.forEach { item ->
             val interactionSource = remember(item) { MutableInteractionSource() }
@@ -71,7 +75,10 @@ fun <T> ConsoleCategoryRail(
                         indication = null,
                         onClick = { onSelected(item) },
                     )
-                    .padding(horizontal = 16.dp, vertical = 13.dp),
+                    .padding(
+                        horizontal = if (compact) 12.dp else 16.dp,
+                        vertical = if (compact) 8.dp else 13.dp,
+                    ),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = when {
@@ -86,7 +93,10 @@ fun <T> ConsoleCategoryRail(
             text = footer,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier = Modifier.padding(
+                horizontal = 8.dp,
+                vertical = if (compact) 2.dp else 6.dp,
+            ),
         )
     }
 }

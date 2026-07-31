@@ -104,6 +104,7 @@ import app.gamenative.ui.screen.auth.EpicOAuthActivity
 import app.gamenative.ui.screen.auth.GOGOAuthActivity
 import app.gamenative.ui.screen.library.components.SystemMenu
 import app.gamenative.ui.screen.library.components.ConsoleImportPanel
+import app.gamenative.ui.screen.library.components.LibraryQuickActionsPanel
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.util.PlatformAuthUiHelpers
 import app.gamenative.ui.util.PlatformLogoutCallbacks
@@ -348,8 +349,11 @@ private fun LibraryScreenContent(
     var pendingCarouselFocusRequest by remember { mutableStateOf(false) }
 
     var isSystemMenuOpen by remember { mutableStateOf(false) }
+    var isQuickActionsOpen by remember { mutableStateOf(false) }
+    var pendingQuickPrimaryAppId by remember { mutableStateOf<String?>(null) }
     // Track previous overlay states to detect when they close
     var wasSystemMenuOpen by remember { mutableStateOf(false) }
+    var wasQuickActionsOpen by remember { mutableStateOf(false) }
     var wasOptionsPanelOpen by remember { mutableStateOf(false) }
     // Keep a stable reference to the selected item so detail view doesn't disappear during list refresh/pagination.
     var selectedLibraryItem by remember { mutableStateOf<LibraryItem?>(null) }
@@ -470,6 +474,14 @@ private fun LibraryScreenContent(
             SnackbarManager.show(message)
         }
     }
+
+    val focusedLibraryItem = state.appInfoList.getOrNull(
+        if (currentPaneType == PaneType.CAROUSEL) {
+            carouselFocusTargetListIndex.coerceIn(0, getContentLastIndex())
+        } else {
+            gridFocusTargetListIndex.coerceIn(0, getContentLastIndex())
+        },
+    )
 
     val installerPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -601,11 +613,12 @@ private fun LibraryScreenContent(
         state.appInfoList.size,
         selectedAppId,
         isSystemMenuOpen,
+        isQuickActionsOpen,
         state.isOptionsPanelOpen,
         state.isSearching,
     ) {
         if (pendingGridFocusRequest && isListFocusable()) {
-            if (selectedAppId == null && !isSystemMenuOpen && !state.isOptionsPanelOpen && !state.isSearching) {
+            if (selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching) {
                 var retries = 0
                 while (pendingGridFocusRequest && retries < 8) {
                     try {
@@ -627,11 +640,12 @@ private fun LibraryScreenContent(
         state.appInfoList.size,
         selectedAppId,
         isSystemMenuOpen,
+        isQuickActionsOpen,
         state.isOptionsPanelOpen,
         state.isSearching,
     ) {
         if (pendingCarouselFocusRequest && isListFocusable()) {
-            if (selectedAppId == null && !isSystemMenuOpen && !state.isOptionsPanelOpen && !state.isSearching) {
+            if (selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching) {
                 val targetIndex = currentCarouselFocusTargetIndex()
                 if (carouselListState.layoutInfo.visibleItemsInfo.none { it.index == targetIndex }) {
                     carouselListState.scrollToItem(targetIndex)
@@ -655,6 +669,7 @@ private fun LibraryScreenContent(
         state.appInfoList.size,
         selectedAppId,
         isSystemMenuOpen,
+        isQuickActionsOpen,
         state.isOptionsPanelOpen,
         state.isSearching,
     ) {
@@ -662,10 +677,10 @@ private fun LibraryScreenContent(
         val listBecameNonEmpty = previousAppCount == 0 && currentCount > 0
         val listBecameEmpty = previousAppCount > 0 && currentCount == 0
 
-        if (listBecameNonEmpty && selectedAppId == null && !isSystemMenuOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
+        if (listBecameNonEmpty && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
             requestContentFocusOrDefer()
         }
-        if (listBecameEmpty && selectedAppId == null && !isSystemMenuOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
+        if (listBecameEmpty && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
             // Empty tabs can drop focused children; re-anchor focus at the root so bumper nav keeps working.
             requestRootFocusSafe()
         }
@@ -674,11 +689,12 @@ private fun LibraryScreenContent(
     }
 
     // Restore focus when System Menu or Options Panel closes
-    LaunchedEffect(isSystemMenuOpen, state.isOptionsPanelOpen) {
+    LaunchedEffect(isSystemMenuOpen, isQuickActionsOpen, state.isOptionsPanelOpen) {
         val systemMenuJustClosed = wasSystemMenuOpen && !isSystemMenuOpen
+        val quickActionsJustClosed = wasQuickActionsOpen && !isQuickActionsOpen
         val optionsPanelJustClosed = wasOptionsPanelOpen && !state.isOptionsPanelOpen
 
-        if ((systemMenuJustClosed || optionsPanelJustClosed) && !state.isSearching) {
+        if ((systemMenuJustClosed || quickActionsJustClosed || optionsPanelJustClosed) && !state.isSearching) {
             // Give a brief moment for the overlay to animate out
             kotlinx.coroutines.delay(50)
             // Restore focus to the active content layout
@@ -692,6 +708,7 @@ private fun LibraryScreenContent(
 
         // Update previous state trackers
         wasSystemMenuOpen = isSystemMenuOpen
+        wasQuickActionsOpen = isQuickActionsOpen
         wasOptionsPanelOpen = state.isOptionsPanelOpen
     }
 
@@ -700,8 +717,9 @@ private fun LibraryScreenContent(
     // Helper functions defined in composable scope to capture latest state on each recomposition.
     val canBootstrapContentFocus: () -> Boolean = {
         val now = SystemClock.uptimeMillis()
-        selectedAppId == null &&
+            selectedAppId == null &&
             !isSystemMenuOpen &&
+            !isQuickActionsOpen &&
             !state.isOptionsPanelOpen &&
             !state.isSearching &&
             isListFocusable() &&
@@ -711,8 +729,9 @@ private fun LibraryScreenContent(
             (now - lastBootstrapAtMs) > 250L
     }
     val canNavigateTabsWithoutFocus: () -> Boolean = {
-        selectedAppId == null &&
+            selectedAppId == null &&
             !isSystemMenuOpen &&
+            !isQuickActionsOpen &&
             !state.isOptionsPanelOpen &&
             !state.isSearching &&
             !rootHasFocus
@@ -825,6 +844,7 @@ private fun LibraryScreenContent(
                     val canBootstrapContentFocus = selectedAppId == null &&
                         !state.isOptionsPanelOpen &&
                         !isSystemMenuOpen &&
+                        !isQuickActionsOpen &&
                         !state.isSearching &&
                         isListFocusable() &&
                         controllerBootstrapNeeded &&
@@ -853,7 +873,7 @@ private fun LibraryScreenContent(
 
                         // L1 button - previous tab
                         KeyEvent.KEYCODE_BUTTON_L1 -> {
-                            if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen) {
+                            if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen && !isQuickActionsOpen) {
                                 if (canBootstrapContentFocus) {
                                     requestContentFocusOrDefer()
                                 }
@@ -866,7 +886,7 @@ private fun LibraryScreenContent(
 
                         // R1 button - next tab
                         KeyEvent.KEYCODE_BUTTON_R1 -> {
-                            if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen) {
+                            if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen && !isQuickActionsOpen) {
                                 if (canBootstrapContentFocus) {
                                     requestContentFocusOrDefer()
                                 }
@@ -879,7 +899,7 @@ private fun LibraryScreenContent(
 
                         // SELECT button - toggle options panel (library filters/sort)
                         KeyEvent.KEYCODE_BUTTON_SELECT -> {
-                            if (selectedAppId == null && !isSystemMenuOpen) {
+                            if (selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen) {
                                 onOptionsPanelToggle(!state.isOptionsPanelOpen)
                                 true
                             } else {
@@ -891,7 +911,7 @@ private fun LibraryScreenContent(
                         KeyEvent.KEYCODE_BUTTON_START,
                         KeyEvent.KEYCODE_MENU,
                         -> {
-                            if (selectedAppId == null && !state.isOptionsPanelOpen) {
+                            if (selectedAppId == null && !state.isOptionsPanelOpen && !isQuickActionsOpen) {
                                 isSystemMenuOpen = !isSystemMenuOpen
                                 true
                             } else {
@@ -901,7 +921,7 @@ private fun LibraryScreenContent(
 
                         // Y button - toggle search
                         KeyEvent.KEYCODE_BUTTON_Y -> {
-                            if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen) {
+                            if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen && !isQuickActionsOpen) {
                                 onIsSearching(!state.isSearching)
                                 true
                             } else {
@@ -911,7 +931,7 @@ private fun LibraryScreenContent(
 
                         // X button - add custom game
                         KeyEvent.KEYCODE_BUTTON_X -> {
-                            if (selectedAppId == null && !state.isSearching && !state.isOptionsPanelOpen && !isSystemMenuOpen) {
+                            if (selectedAppId == null && !state.isSearching && !state.isOptionsPanelOpen && !isSystemMenuOpen && !isQuickActionsOpen) {
                                 onAddCustomGameClick()
                                 true
                             } else {
@@ -919,13 +939,16 @@ private fun LibraryScreenContent(
                             }
                         }
 
-                        // B button - contextual back / open system menu
+                        // B button - close the active layer or open contextual quick actions.
                         KeyEvent.KEYCODE_BUTTON_B -> {
                             if (selectedAppId != null) {
                                 // Let LibraryAppScreen handle its own B-button
                                 false
                             } else if (isSystemMenuOpen) {
                                 isSystemMenuOpen = false
+                                true
+                            } else if (isQuickActionsOpen) {
+                                isQuickActionsOpen = false
                                 true
                             } else if (state.isOptionsPanelOpen) {
                                 onOptionsPanelToggle(false)
@@ -935,8 +958,8 @@ private fun LibraryScreenContent(
                                 onSearchQuery("")
                                 true
                             } else {
-                                // Root library view: open system menu
-                                isSystemMenuOpen = true
+                                // Root library view: open contextual quick actions.
+                                isQuickActionsOpen = true
                                 true
                             }
                         }
@@ -1018,6 +1041,7 @@ private fun LibraryScreenContent(
                             currentLayout = currentPaneType,
                             firstGridItemFocusRequester = gridFirstItemFocusRequester,
                             focusTargetListIndex = gridFocusTargetListIndex,
+                            onFocusedIndexChanged = { gridFocusTargetListIndex = it },
                             onPageChange = onPageChange,
                             onNavigate = { appId ->
                                 selectedAppId = appId
@@ -1056,6 +1080,11 @@ private fun LibraryScreenContent(
                     LibraryTabBar(
                         currentTab = state.currentTab,
                         tabs = visibleTabs,
+                        currentView = currentPaneType,
+                        onViewChanged = { newPaneType ->
+                            PrefManager.libraryLayout = newPaneType
+                            currentPaneType = newPaneType
+                        },
                         tabCounts = mapOf(
                             LibraryTab.ALL to state.allCount,
                             LibraryTab.STEAM to state.steamCount,
@@ -1121,11 +1150,13 @@ private fun LibraryScreenContent(
                         }
                     }
                 },
+                runPrimaryActionOnOpen = pendingQuickPrimaryAppId == selectedLibraryItem?.appId,
+                onPrimaryActionConsumed = { pendingQuickPrimaryAppId = null },
             )
         }
 
         // Bottom action bar
-        if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen) {
+        if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen && !isQuickActionsOpen) {
             val libraryActions = if (state.isSearching) {
                 listOf(
                     LibraryActions.select,
@@ -1154,7 +1185,7 @@ private fun LibraryScreenContent(
                     GamepadAction(
                         button = GamepadButton.B,
                         labelResId = R.string.menu,
-                        onClick = { isSystemMenuOpen = true },
+                        onClick = { isQuickActionsOpen = true },
                     ),
                     GamepadAction(
                         button = GamepadButton.Y,
@@ -1185,11 +1216,6 @@ private fun LibraryScreenContent(
                 onFilterChanged = onFilterChanged,
                 currentSortOption = state.currentSortOption,
                 onSortOptionChanged = onSortOptionChanged,
-                currentView = currentPaneType,
-                onViewChanged = { newPaneType ->
-                    PrefManager.libraryLayout = newPaneType
-                    currentPaneType = newPaneType
-                },
                 steamCollections = state.steamCollections,
                 selectedSteamCollectionIds = state.selectedSteamCollectionIds,
                 steamCollectionCounts = state.steamCollectionCounts,
@@ -1246,6 +1272,39 @@ private fun LibraryScreenContent(
                         scope = lifecycleScope,
                         callbacks = PlatformLogoutCallbacks(),
                     )
+                },
+            )
+
+            LibraryQuickActionsPanel(
+                isOpen = isQuickActionsOpen,
+                focusedItem = focusedLibraryItem,
+                onDismiss = { isQuickActionsOpen = false },
+                onPrimaryAction = { item ->
+                    isQuickActionsOpen = false
+                    if (item.isInstalled || item.gameSource == GameSource.CUSTOM_GAME) {
+                        onClickPlay(item.appId, false)
+                    } else {
+                        pendingQuickPrimaryAppId = item.appId
+                        selectedAppId = item.appId
+                        selectedLibraryItem = item
+                    }
+                },
+                onDetails = { item ->
+                    isQuickActionsOpen = false
+                    selectedAppId = item.appId
+                    selectedLibraryItem = item
+                },
+                onLibraryOptions = {
+                    isQuickActionsOpen = false
+                    onOptionsPanelToggle(true)
+                },
+                onSearch = {
+                    isQuickActionsOpen = false
+                    onIsSearching(true)
+                },
+                onAddGame = {
+                    isQuickActionsOpen = false
+                    onAddCustomGameClick()
                 },
             )
         }

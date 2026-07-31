@@ -27,8 +27,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.PhotoAlbum
+import androidx.compose.material.icons.filled.PhotoSizeSelectActual
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.ViewCarousel
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -57,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import app.gamenative.R
 import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.enums.LibraryTab
+import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.util.WindowWidthClass
 import app.gamenative.ui.util.rememberWindowWidthClass
@@ -70,6 +75,8 @@ fun LibraryTabBar(
     currentTab: LibraryTab,
     tabs: List<LibraryTab>,
     tabCounts: Map<LibraryTab, Int>,
+    currentView: PaneType,
+    onViewChanged: (PaneType) -> Unit,
     onTabSelected: (LibraryTab) -> Unit,
     onOptionsClick: () -> Unit,
     onSearchClick: () -> Unit,
@@ -87,6 +94,8 @@ fun LibraryTabBar(
             currentTab = currentTab,
             tabs = tabs,
             tabCounts = tabCounts,
+            currentView = currentView,
+            onViewChanged = onViewChanged,
             onTabSelected = onTabSelected,
             onOptionsClick = onOptionsClick,
             onSearchClick = onSearchClick,
@@ -102,6 +111,8 @@ fun LibraryTabBar(
             currentTab = currentTab,
             tabs = tabs,
             tabCounts = tabCounts,
+            currentView = currentView,
+            onViewChanged = onViewChanged,
             onTabSelected = onTabSelected,
             onOptionsClick = onOptionsClick,
             onSearchClick = onSearchClick,
@@ -124,6 +135,8 @@ private fun CompactLibraryTabBar(
     currentTab: LibraryTab,
     tabs: List<LibraryTab>,
     tabCounts: Map<LibraryTab, Int>,
+    currentView: PaneType,
+    onViewChanged: (PaneType) -> Unit,
     onTabSelected: (LibraryTab) -> Unit,
     onOptionsClick: () -> Unit,
     onSearchClick: () -> Unit,
@@ -258,6 +271,11 @@ private fun CompactLibraryTabBar(
             }
 
             CompactIconButton(
+                icon = currentView.libraryViewIcon(),
+                contentDescription = stringResource(R.string.library_layout_title),
+                onClick = { onViewChanged(currentView.nextLibraryView()) },
+            )
+            CompactIconButton(
                 icon = Icons.Default.Search,
                 contentDescription = stringResource(R.string.search),
                 onClick = onSearchClick,
@@ -288,11 +306,12 @@ private fun CompactIconButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(10.dp)
 
     Box(
         modifier = modifier
             .size(36.dp)
-            .clip(CircleShape)
+            .clip(shape)
             .background(
                 if (isFocused) {
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
@@ -300,7 +319,7 @@ private fun CompactIconButton(
                     MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 },
             )
-            .focusRing(interactionSource, CircleShape, width = 2.dp)
+            .focusRing(interactionSource, shape, width = 2.dp)
             .selectable(
                 selected = false,
                 interactionSource = interactionSource,
@@ -322,6 +341,20 @@ private fun CompactIconButton(
     }
 }
 
+private fun PaneType.nextLibraryView(): PaneType = when (this) {
+    PaneType.LIST -> PaneType.GRID_CAPSULE
+    PaneType.GRID_CAPSULE -> PaneType.GRID_HERO
+    PaneType.GRID_HERO -> PaneType.CAROUSEL
+    PaneType.CAROUSEL, PaneType.UNDECIDED -> PaneType.LIST
+}
+
+private fun PaneType.libraryViewIcon(): ImageVector = when (this) {
+    PaneType.LIST, PaneType.UNDECIDED -> Icons.AutoMirrored.Filled.List
+    PaneType.GRID_CAPSULE -> Icons.Default.PhotoAlbum
+    PaneType.GRID_HERO -> Icons.Default.PhotoSizeSelectActual
+    PaneType.CAROUSEL -> Icons.Default.ViewCarousel
+}
+
 /**
  * Expanded tab bar for wide screens (landscape phone, tablet).
  */
@@ -330,6 +363,8 @@ private fun ExpandedLibraryTabBar(
     currentTab: LibraryTab,
     tabs: List<LibraryTab>,
     tabCounts: Map<LibraryTab, Int>,
+    currentView: PaneType,
+    onViewChanged: (PaneType) -> Unit,
     onTabSelected: (LibraryTab) -> Unit,
     onOptionsClick: () -> Unit,
     onSearchClick: () -> Unit,
@@ -443,6 +478,12 @@ private fun ExpandedLibraryTabBar(
                     }
                 }
             }
+
+            IconActionButton(
+                icon = currentView.libraryViewIcon(),
+                contentDescription = stringResource(R.string.library_layout_title),
+                onClick = { onViewChanged(currentView.nextLibraryView()) },
+            )
 
             IconActionButton(
                 icon = Icons.Default.Search,
@@ -629,6 +670,8 @@ private fun Preview_LibraryTabBar() {
                     LibraryTab.EPIC to 4,
                     LibraryTab.LOCAL to 3,
                 ),
+                currentView = PaneType.GRID_HERO,
+                onViewChanged = {},
                 onTabSelected = {},
                 onOptionsClick = {},
                 onSearchClick = {},
@@ -659,6 +702,8 @@ private fun Preview_LibraryTabBar_Steam() {
                     LibraryTab.EPIC to 4,
                     LibraryTab.LOCAL to 3,
                 ),
+                currentView = PaneType.GRID_HERO,
+                onViewChanged = {},
                 onTabSelected = {},
                 onOptionsClick = {},
                 onSearchClick = {},

@@ -15,16 +15,18 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AltRoute
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -57,30 +60,35 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
+import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.data.AppMenuOption
 import app.gamenative.ui.enums.AppOptionMenuType
-import app.gamenative.ui.util.adaptivePanelWidth
 
 @Composable
 fun GameOptionsPanel(
@@ -90,9 +98,17 @@ fun GameOptionsPanel(
     modifier: Modifier = Modifier,
 ) {
     val firstItemFocusRequester = remember { FocusRequester() }
+    val groupedOptions = remember(options) { groupOptions(options) }
+    val availableCategories = remember(groupedOptions) {
+        groupedOptions.filterValues { it.isNotEmpty() }.keys.toList()
+    }
+    var selectedCategory by remember(availableCategories) {
+        mutableStateOf(availableCategories.firstOrNull() ?: OptionCategory.QUICK_ACTIONS)
+    }
 
-    LaunchedEffect(isOpen) {
-        if (isOpen) {
+    LaunchedEffect(isOpen, selectedCategory) {
+        if (isOpen && groupedOptions[selectedCategory].orEmpty().isNotEmpty()) {
+            kotlinx.coroutines.delay(80)
             try {
                 firstItemFocusRequester.requestFocus()
             } catch (_: Exception) {
@@ -134,36 +150,33 @@ fun GameOptionsPanel(
         ) + fadeOut(),
         modifier = modifier
             .fillMaxHeight()
-            .width(adaptivePanelWidth(360.dp)),
+            .widthIn(max = 1120.dp)
+            .fillMaxWidth(0.92f),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                            MaterialTheme.colorScheme.surface,
-                        ),
-                    ),
-                )
-                .padding(vertical = 24.dp)
-                .verticalScroll(rememberScrollState())
-                .focusGroup(),
+                .background(MaterialTheme.colorScheme.surface)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown || availableCategories.isEmpty()) {
+                        return@onPreviewKeyEvent false
+                    }
+                    val currentIndex = availableCategories.indexOf(selectedCategory).coerceAtLeast(0)
+                    when (event.key) {
+                        Key.ButtonR1, Key.ButtonR2 -> {
+                            selectedCategory = availableCategories[(currentIndex + 1) % availableCategories.size]
+                            true
+                        }
+                        Key.ButtonL1, Key.ButtonL2 -> {
+                            selectedCategory = availableCategories[
+                                (currentIndex - 1 + availableCategories.size) % availableCategories.size
+                            ]
+                            true
+                        }
+                        else -> false
+                    }
+                },
         ) {
-            Text(
-                text = stringResource(R.string.game_options_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            val groupedOptionsByCategory = groupOptions(options)
-
-            // Map category keys to localized strings
             val categoryLabels = mapOf(
                 OptionCategory.QUICK_ACTIONS to stringResource(R.string.game_options_quick_actions),
                 OptionCategory.GAME_MANAGEMENT to stringResource(R.string.game_options_game_management),
@@ -172,20 +185,61 @@ fun GameOptionsPanel(
                 OptionCategory.HELP_INFO to stringResource(R.string.game_options_help_info),
             )
 
-            var isFirstItem = true
-            groupedOptionsByCategory.forEach { (category, categoryOptions) ->
-                if (categoryOptions.isNotEmpty()) {
-                    OptionSection(
-                        title = categoryLabels[category] ?: category.name,
-                        options = categoryOptions,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .padding(start = 12.dp, end = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
+                }
+                Text(
+                    text = stringResource(R.string.game_options_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+
+            Row(modifier = Modifier.fillMaxSize()) {
+                ConsoleCategoryRail(
+                    items = availableCategories,
+                    selectedItem = selectedCategory,
+                    label = { categoryLabels[it] ?: it.name },
+                    onSelected = { selectedCategory = it },
+                    footer = "L1 / R1",
+                    requestInitialFocus = false,
+                    compact = true,
+                    modifier = Modifier
+                        .width(210.dp)
+                        .fillMaxHeight(),
+                )
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 18.dp),
+                ) {
+                    Text(
+                        text = categoryLabels[selectedCategory] ?: selectedCategory.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                    OptionGrid(
+                        options = groupedOptions[selectedCategory].orEmpty(),
                         onOptionClick = { option ->
                             option.onClick()
                             onDismiss()
                         },
-                        firstItemFocusRequester = if (isFirstItem) firstItemFocusRequester else null,
+                        firstItemFocusRequester = firstItemFocusRequester,
+                        modifier = Modifier.weight(1f),
                     )
-                    isFirstItem = false
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -201,33 +255,49 @@ private enum class OptionCategory {
 }
 
 @Composable
-private fun OptionSection(
-    title: String,
+private fun OptionGrid(
     options: List<AppMenuOption>,
     onOptionClick: (AppMenuOption) -> Unit,
-    firstItemFocusRequester: FocusRequester? = null,
+    firstItemFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-        )
-
-        options.forEachIndexed { index, option ->
-            OptionItem(
-                option = option,
-                onClick = { onOptionClick(option) },
-                focusRequester = if (index == 0) firstItemFocusRequester else null,
-            )
+    val scrollState = rememberScrollState()
+    LaunchedEffect(options) {
+        scrollState.scrollTo(0)
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val columnCount = when {
+            maxWidth >= 720.dp -> 3
+            maxWidth >= 420.dp -> 2
+            else -> 1
         }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            options.chunked(columnCount).forEachIndexed { rowIndex, rowOptions ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    rowOptions.forEachIndexed { columnIndex, option ->
+                        val itemIndex = rowIndex * columnCount + columnIndex
+                        OptionItem(
+                            option = option,
+                            onClick = { onOptionClick(option) },
+                            focusRequester = if (itemIndex == 0) firstItemFocusRequester else null,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    repeat(columnCount - rowOptions.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -236,6 +306,7 @@ private fun OptionItem(
     option: AppMenuOption,
     onClick: () -> Unit,
     focusRequester: FocusRequester? = null,
+    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -255,24 +326,23 @@ private fun OptionItem(
         option.optionType == AppOptionMenuType.ResetDrm
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
+            .heightIn(min = 66.dp)
             .scale(scale)
-            .padding(horizontal = 16.dp, vertical = 2.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(
                 if (isFocused) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    MaterialTheme.colorScheme.primaryContainer
                 } else {
-                    Color.Transparent
+                    MaterialTheme.colorScheme.surfaceContainerLow
                 },
             )
             .then(
                 if (isFocused) {
                     Modifier.border(
                         1.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-                        RoundedCornerShape(12.dp),
+                        MaterialTheme.colorScheme.primary,
+                        RoundedCornerShape(10.dp),
                     )
                 } else {
                     Modifier
@@ -291,9 +361,9 @@ private fun OptionItem(
                 indication = null,
                 onClick = onClick,
             )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Icon(
             imageVector = icon,
@@ -303,12 +373,12 @@ private fun OptionItem(
                 isFocused -> MaterialTheme.colorScheme.primary
                 else -> MaterialTheme.colorScheme.onSurfaceVariant
             },
-            modifier = Modifier.size(24.dp),
+            modifier = Modifier.size(22.dp),
         )
 
         Text(
             text = stringResource(option.optionType.title),
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (isFocused) FontWeight.Medium else FontWeight.Normal,
             color = when {
                 isDestructive -> MaterialTheme.colorScheme.error

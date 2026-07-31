@@ -1156,6 +1156,8 @@ abstract class BaseAppScreen {
         onPlayWithDiagnostics: () -> Unit,
         onBack: () -> Unit,
         onSourceClick: (GameSource) -> Unit = {},
+        runPrimaryActionOnOpen: Boolean = false,
+        onPrimaryActionConsumed: () -> Unit = {},
     ) {
         val context = LocalContext.current
         val displayInfoBase = getGameDisplayInfo(context, libraryItem)
@@ -1490,6 +1492,25 @@ abstract class BaseAppScreen {
 
         val launchActivity = context as? android.app.Activity
         var showReadiness by remember { mutableStateOf(false) }
+        val performPrimaryAction: () -> Unit = {
+            if (app.gamenative.launch.LaunchReadiness.pending) {
+                showReadiness = true
+            } else {
+                onDownloadInstallClick(context, libraryItem, onClickPlay)
+                uiScope.launch {
+                    delay(100)
+                    performStateRefresh(true)
+                }
+            }
+        }
+
+        LaunchedEffect(runPrimaryActionOnOpen, libraryItem.appId) {
+            if (runPrimaryActionOnOpen) {
+                delay(120)
+                performPrimaryAction()
+                onPrimaryActionConsumed()
+            }
+        }
 
         // Render the common UI
         app.gamenative.ui.screen.library.AppScreenContent(
@@ -1502,17 +1523,7 @@ abstract class BaseAppScreen {
             hasLeftoverInstall = hasLeftoverInstallState,
             isUpdatePending = isUpdatePendingState,
             downloadInfo = downloadInfo,
-            onDownloadInstallClick = {
-                if (app.gamenative.launch.LaunchReadiness.pending) {
-                    showReadiness = true
-                } else {
-                    onDownloadInstallClick(context, libraryItem, onClickPlay)
-                    uiScope.launch {
-                        delay(100)
-                        performStateRefresh(true)
-                    }
-                }
-            },
+            onDownloadInstallClick = performPrimaryAction,
             onPauseResumeClick = {
                 isDownloadingState = !isDownloadingState
                 onPauseResumeClick(context, libraryItem)

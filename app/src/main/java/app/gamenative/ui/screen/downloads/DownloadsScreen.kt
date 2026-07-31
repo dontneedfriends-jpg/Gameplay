@@ -83,6 +83,7 @@ import app.gamenative.R
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.ui.component.dialog.MessageDialog
+import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.data.DownloadItemState
 import app.gamenative.ui.data.DownloadItemStatus
 import app.gamenative.ui.data.DownloadsState
@@ -216,12 +217,17 @@ fun HomeDownloadsScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 if (!isPortrait) {
+                    val sidebarWidth = if (LocalConfiguration.current.screenWidthDp >= 1000) {
+                        220.dp
+                    } else {
+                        184.dp
+                    }
                     DownloadsSidebar(
                         sections = sections,
                         selectedSection = selectedSection,
                         onSectionSelected = { selectedSectionIndex = it.ordinal },
                         modifier = Modifier
-                            .width(96.dp)
+                            .width(sidebarWidth)
                             .fillMaxHeight(),
                     )
                 }
@@ -323,17 +329,21 @@ private fun DownloadsSidebar(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(24.dp),
-        color = PluviaTheme.colors.surfacePanel.copy(alpha = 0.88f),
-        tonalElevation = 1.dp,
-        shadowElevation = 8.dp,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.96f),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f),
+        ),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp)
+                .padding(horizontal = 10.dp, vertical = 12.dp)
                 .focusGroup(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             sections.forEach { section ->
                 DownloadsSidebarItem(
@@ -437,36 +447,25 @@ private fun DownloadsSidebarItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val accentColor = PluviaTheme.colors.accentPurple
-    val isHighlighted = selected || isFocused
+    val accentColor = MaterialTheme.colorScheme.primary
+    val itemShape = RoundedCornerShape(12.dp)
+    val containerColor = when {
+        isFocused -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+        selected -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
+        else -> Color.Transparent
+    }
+    val contentColor = when {
+        isFocused -> MaterialTheme.colorScheme.onPrimaryContainer
+        selected -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .then(
-                if (isHighlighted) {
-                    Modifier.background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                accentColor.copy(alpha = if (isFocused) 0.18f else 0.12f),
-                                accentColor.copy(alpha = 0.05f),
-                            ),
-                        ),
-                    )
-                } else {
-                    Modifier.background(Color.Transparent)
-                }
-            )
-            .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = when {
-                    isFocused -> accentColor.copy(alpha = 0.65f)
-                    selected -> accentColor.copy(alpha = 0.32f)
-                    else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-                },
-                shape = RoundedCornerShape(18.dp),
-            )
+            .clip(itemShape)
+            .background(containerColor)
+            .focusRing(interactionSource, itemShape, width = 2.dp)
             .focusRequester(focusRequester)
             .selectable(
                 selected = selected,
@@ -474,18 +473,29 @@ private fun DownloadsSidebarItem(
                 indication = null,
                 onClick = onClick,
             )
-            .padding(vertical = 18.dp),
-        contentAlignment = Alignment.Center,
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(
             modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
+                .width(3.dp)
+                .height(24.dp)
+                .clip(RoundedCornerShape(2.dp))
                 .background(
-                    when {
-                        isFocused -> accentColor.copy(alpha = 0.22f)
-                        selected -> accentColor.copy(alpha = 0.14f)
-                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    if (selected) accentColor else Color.Transparent,
+                ),
+        )
+
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(
+                    if (selected || isFocused) {
+                        contentColor.copy(alpha = 0.10f)
+                    } else {
+                        Color.Transparent
                     },
                 ),
             contentAlignment = Alignment.Center,
@@ -493,13 +503,20 @@ private fun DownloadsSidebarItem(
             Icon(
                 imageVector = section.icon,
                 contentDescription = stringResource(section.titleResId),
-                tint = when {
-                    isHighlighted -> accentColor
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(22.dp),
+                tint = contentColor,
+                modifier = Modifier.size(20.dp),
             )
         }
+
+        Text(
+            text = stringResource(section.titleResId),
+            style = MaterialTheme.typography.bodyLarge,
+            color = contentColor,
+            fontWeight = if (selected || isFocused) FontWeight.SemiBold else FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

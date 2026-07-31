@@ -3,21 +3,28 @@ package app.gamenative.ui.component.dialog
 import android.os.Build
 import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -28,7 +35,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +48,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +61,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -72,6 +82,7 @@ import app.gamenative.api.canonicalCommunityGpu
 import app.gamenative.api.communityConfigMatchType
 import app.gamenative.api.communityIdentityKey
 import app.gamenative.api.sortCommunityRuns
+import app.gamenative.ui.component.focusRing
 import app.gamenative.utils.BestConfigService
 import com.winlator.core.GPUInformation
 import java.time.OffsetDateTime
@@ -81,6 +92,7 @@ import java.time.format.FormatStyle
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -126,6 +138,14 @@ fun CommunityConfigsDialog(
     var lookupKey by remember(gameName) { mutableIntStateOf(0) }
     var configRefreshKey by remember(gameName) { mutableIntStateOf(0) }
     var requestGeneration by remember(gameName) { mutableIntStateOf(0) }
+    val firstConfigFocusRequester = remember(gameName) { FocusRequester() }
+
+    LaunchedEffect(loading, runs.firstOrNull()?.communityIdentityKey()) {
+        if (!loading && runs.isNotEmpty()) {
+            delay(80)
+            runCatching { firstConfigFocusRequester.requestFocus() }
+        }
+    }
 
     LaunchedEffect(visible, gameName, lookupKey) {
         val generation = ++requestGeneration
@@ -311,16 +331,29 @@ fun CommunityConfigsDialog(
         ),
     ) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .displayCutoutPadding(),
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text(stringResource(R.string.community_config_title)) },
-                    navigationIcon = {
-                        IconButton(onClick = onDismissRequest) {
-                            Icon(Icons.Default.Close, stringResource(R.string.community_config_close))
-                        }
-                    },
-                    actions = {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 0.dp,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.community_config_title),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                        )
                         IconButton(
                             onClick = {
                                 service.clearConfigCache()
@@ -330,8 +363,11 @@ fun CommunityConfigsDialog(
                         ) {
                             Icon(Icons.Default.Refresh, stringResource(R.string.community_config_refresh))
                         }
-                    },
-                )
+                        IconButton(onClick = onDismissRequest) {
+                            Icon(Icons.Default.Close, stringResource(R.string.community_config_close))
+                        }
+                    }
+                }
             },
         ) { paddingValues ->
             Column(
@@ -390,16 +426,24 @@ fun CommunityConfigsDialog(
                             onLoadMore = ::loadMore,
                             modifier = Modifier.align(Alignment.Center),
                         )
-                        else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                            items(
+                        else -> LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            itemsIndexed(
                                 items = runs,
-                                key = { it.communityIdentityKey() },
-                            ) { run ->
+                                key = { _, run -> run.communityIdentityKey() },
+                            ) { index, run ->
                                 CommunityConfigListItem(
                                     run = run,
                                     onClick = { selectedRun = run },
+                                    modifier = if (index == 0) {
+                                        Modifier.focusRequester(firstConfigFocusRequester)
+                                    } else {
+                                        Modifier
+                                    },
                                 )
-                                HorizontalDivider()
                             }
                             if (errorMessage != null) {
                                 item(key = "pagination-error") {
@@ -607,7 +651,11 @@ private fun CommunityHardwareControl(
 private fun CommunityConfigListItem(
     run: CommunityConfigRun,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val itemShape = RoundedCornerShape(12.dp)
     val performance = buildList {
         add(stringResource(R.string.community_config_rating_value, run.rating))
         run.averageFps?.let {
@@ -620,8 +668,23 @@ private fun CommunityConfigListItem(
         .joinToString(" | ")
 
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(itemShape)
+            .focusRing(interactionSource, itemShape, width = 2.dp)
+            .selectable(
+                selected = isFocused,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        colors = ListItemDefaults.colors(
+            containerColor = if (isFocused) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f)
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        ),
         leadingContent = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(

@@ -126,12 +126,19 @@ private fun FrontendSyncResyncButton() {
 }
 
 /** Settings group covering interface preferences: theme, downloads, frontend sync, language, and icons. */
+enum class InterfaceSettingsSection {
+    APPEARANCE,
+    LIBRARY,
+    DOWNLOADS,
+}
+
 @Composable
 fun SettingsGroupInterface(
     appTheme: AppTheme,
     paletteStyle: PaletteStyle,
     onAppTheme: (AppTheme) -> Unit,
     onPaletteStyle: (PaletteStyle) -> Unit,
+    section: InterfaceSettingsSection = InterfaceSettingsSection.APPEARANCE,
 ) {
     val context = LocalContext.current
 
@@ -251,7 +258,7 @@ fun SettingsGroupInterface(
         }
     }
 
-    SettingsGroup(modifier = Modifier.background(Color.Transparent)) {
+    if (section == InterfaceSettingsSection.APPEARANCE) SettingsGroup(modifier = Modifier.background(Color.Transparent)) {
         SettingsSwitch(
             colors = settingsTileColorsAlt(),
             title = { Text(text = stringResource(R.string.settings_achievement_show_notification)) },
@@ -408,7 +415,7 @@ fun SettingsGroupInterface(
     }
 
     // Custom Game Settings
-    SettingsGroup(
+    if (section == InterfaceSettingsSection.LIBRARY) SettingsGroup(
         modifier = Modifier.background(Color.Transparent),
         title = { Text(text = stringResource(R.string.settings_interface_custom_games)) },
     ) {
@@ -429,7 +436,7 @@ fun SettingsGroupInterface(
     // to avoid duplication.
 
     // Downloads settings
-    SettingsGroup(
+    if (section == InterfaceSettingsSection.DOWNLOADS) SettingsGroup(
         modifier = Modifier.background(Color.Transparent),
         title = { Text(text = stringResource(R.string.settings_downloads_title)) },
     ) {

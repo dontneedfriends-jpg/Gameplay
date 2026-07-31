@@ -4,13 +4,12 @@ import android.content.res.Configuration
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -20,30 +19,27 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.PhotoAlbum
-import androidx.compose.material.icons.filled.PhotoSizeSelectActual
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SportsEsports
 import androidx.compose.material.icons.rounded.Star
@@ -76,15 +72,12 @@ import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.data.SteamCollection
-import app.gamenative.ui.component.GameStatsKey
 import app.gamenative.ui.component.OptionListItem
 import app.gamenative.ui.component.OptionRadioItem
 import app.gamenative.ui.component.OptionSectionHeader
 import app.gamenative.ui.enums.AppFilter
-import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.enums.SortOption
 import app.gamenative.ui.theme.PluviaTheme
-import app.gamenative.ui.util.adaptivePanelWidth
 import java.util.EnumSet
 
 @Composable
@@ -95,8 +88,6 @@ fun LibraryOptionsPanel(
     onFilterChanged: (AppFilter) -> Unit,
     currentSortOption: SortOption,
     onSortOptionChanged: (SortOption) -> Unit,
-    currentView: PaneType,
-    onViewChanged: (PaneType) -> Unit,
     steamCollections: List<SteamCollection>?,
     selectedSteamCollectionIds: Set<String>,
     steamCollectionCounts: Map<String, Int>,
@@ -133,29 +124,29 @@ fun LibraryOptionsPanel(
 
         AnimatedVisibility(
             visible = isOpen,
-            enter = slideInHorizontally(
-                initialOffsetX = { fullWidth -> -fullWidth },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
+            enter = fadeIn(tween(160)) + scaleIn(
+                initialScale = 0.97f,
+                animationSpec = tween(180),
             ),
-            exit = slideOutHorizontally(
-                targetOffsetX = { fullWidth -> -fullWidth },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
-            )
+            exit = fadeOut(tween(120)) + scaleOut(
+                targetScale = 0.98f,
+                animationSpec = tween(140),
+            ),
+            modifier = Modifier.align(Alignment.Center),
         ) {
             Surface(
                 modifier = Modifier
-                    .width(adaptivePanelWidth(300.dp))
-                    .fillMaxHeight(),
-                shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 2.dp,
-                shadowElevation = 24.dp,
+                    .fillMaxWidth(0.90f)
+                    .widthIn(max = 720.dp)
+                    .fillMaxHeight(0.86f),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                tonalElevation = 0.dp,
+                shadowElevation = 8.dp,
+                border = BorderStroke(
+                    1.dp,
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f),
+                ),
             ) {
                 Column(
                     modifier = Modifier
@@ -185,10 +176,7 @@ fun LibraryOptionsPanel(
                         }
                     }
 
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f))
 
                     Column(
                         modifier = Modifier
@@ -196,10 +184,6 @@ fun LibraryOptionsPanel(
                             .verticalScroll(rememberScrollState())
                             .padding(vertical = 12.dp)
                     ) {
-                        GameStatsKey(modifier = Modifier.padding(horizontal = 8.dp))
-
-                        Spacer(modifier = Modifier.height(20.dp))
-
                         OptionSectionHeader(text = stringResource(R.string.options_sort_by))
                         Column(
                             modifier = Modifier
@@ -284,46 +268,9 @@ fun LibraryOptionsPanel(
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        OptionSectionHeader(text = stringResource(R.string.library_layout_title))
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .focusGroup()
-                                .padding(horizontal = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            OptionRadioItem(
-                                text = stringResource(R.string.library_layout_list),
-                                selected = currentView == PaneType.LIST,
-                                onClick = { onViewChanged(PaneType.LIST) },
-                                icon = Icons.AutoMirrored.Filled.List,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OptionRadioItem(
-                                text = stringResource(R.string.library_layout_capsule),
-                                selected = currentView == PaneType.GRID_CAPSULE,
-                                onClick = { onViewChanged(PaneType.GRID_CAPSULE) },
-                                icon = Icons.Default.PhotoAlbum,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OptionRadioItem(
-                                text = stringResource(R.string.library_layout_hero),
-                                selected = currentView == PaneType.GRID_HERO,
-                                onClick = { onViewChanged(PaneType.GRID_HERO) },
-                                icon = Icons.Default.PhotoSizeSelectActual,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            OptionRadioItem(
-                                text = stringResource(R.string.library_layout_carousel),
-                                selected = currentView == PaneType.CAROUSEL,
-                                onClick = { onViewChanged(PaneType.CAROUSEL) },
-                                icon = Icons.Default.ViewCarousel,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
                         // Steam collections — local view filter, shown only when Steam is connected.
-                        if (isSteamConnected) {
+                        val availableCollections = steamCollections.orEmpty()
+                        if (isSteamConnected && availableCollections.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(20.dp))
                             var collectionsExpanded by rememberSaveable {
                                 mutableStateOf(selectedSteamCollectionIds.isNotEmpty())
@@ -483,8 +430,6 @@ private fun Preview_LibraryOptionsPanel() {
                     onFilterChanged = { },
                     currentSortOption = SortOption.INSTALLED_FIRST,
                     onSortOptionChanged = { },
-                    currentView = PaneType.GRID_HERO,
-                    onViewChanged = { },
                     steamCollections = listOf(
                         SteamCollection(id = "fav", name = "Favorites", appIds = setOf(440, 570)),
                         SteamCollection(id = "rpg", name = "RPGs", appIds = setOf(292030)),

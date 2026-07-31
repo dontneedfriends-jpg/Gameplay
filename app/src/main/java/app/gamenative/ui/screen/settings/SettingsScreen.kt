@@ -1,7 +1,6 @@
 package app.gamenative.ui.screen.settings
 
 import android.content.res.Configuration
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -17,43 +16,62 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.enums.AppTheme
 import app.gamenative.ui.component.focusRing
+import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.theme.PluviaTheme
 import com.materialkolor.PaletteStyle
+
+private enum class SettingsCategory(val titleRes: Int, val icon: ImageVector) {
+    EMULATION(R.string.settings_emulation_title, Icons.Default.Gamepad),
+    APPEARANCE(R.string.settings_interface_title, Icons.Default.Palette),
+    LIBRARY(R.string.settings_interface_custom_games, Icons.Default.LibraryBooks),
+    DOWNLOADS(R.string.settings_downloads_title, Icons.Default.Download),
+    INFO(R.string.settings_info_title, Icons.Default.Info),
+    DEBUG(R.string.settings_debug_title, Icons.Default.BugReport),
+}
 
 @Composable
 fun SettingsScreen(
@@ -81,6 +99,13 @@ private fun SettingsScreenContent(
     onBack: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
+    val categories = remember { SettingsCategory.entries.toList() }
+    var selectedCategory by rememberSaveable { mutableStateOf(SettingsCategory.EMULATION) }
+    val categoryRailWidth = if (LocalConfiguration.current.screenWidthDp < 600) 156.dp else 228.dp
+
+    LaunchedEffect(selectedCategory) {
+        scrollState.scrollTo(0)
+    }
 
     Box(
         modifier = Modifier
@@ -98,58 +123,91 @@ private fun SettingsScreenContent(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             )
 
-            // Scrollable content
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val currentIndex = categories.indexOf(selectedCategory)
+                        when (event.key) {
+                            Key.ButtonR1, Key.ButtonR2 -> {
+                                selectedCategory = categories[(currentIndex + 1) % categories.size]
+                                true
+                            }
+                            Key.ButtonL1, Key.ButtonL2 -> {
+                                selectedCategory = categories[(currentIndex - 1 + categories.size) % categories.size]
+                                true
+                            }
+                            else -> false
+                        }
+                    },
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
+                ConsoleCategoryRail(
+                    items = categories,
+                    selectedItem = selectedCategory,
+                    label = { stringResource(it.titleRes) },
+                    onSelected = { selectedCategory = it },
+                    footer = stringResource(R.string.container_config_console_controls_hint),
+                    requestInitialFocus = true,
+                    modifier = Modifier.width(categoryRailWidth),
+                )
 
-                // Emulation section
-                SettingsSection(
-                    title = stringResource(R.string.settings_emulation_title),
-                    icon = Icons.Default.Gamepad,
-                iconTint = MaterialTheme.colorScheme.primary,
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(start = 22.dp, end = 22.dp, bottom = 32.dp),
                 ) {
-                    SettingsGroupEmulation()
-                }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp, bottom = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            imageVector = selectedCategory.icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Text(
+                            text = stringResource(selectedCategory.titleRes),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                // Interface section
-                SettingsSection(
-                    title = stringResource(R.string.settings_interface_title),
-                    icon = Icons.Default.Palette,
-                iconTint = MaterialTheme.colorScheme.primary,
-                ) {
-                    SettingsGroupInterface(
-                        appTheme = appTheme,
-                        paletteStyle = paletteStyle,
-                        onAppTheme = onAppTheme,
-                        onPaletteStyle = onPaletteStyle,
-                    )
+                    when (selectedCategory) {
+                        SettingsCategory.EMULATION -> SettingsGroupEmulation()
+                        SettingsCategory.APPEARANCE -> SettingsGroupInterface(
+                            appTheme = appTheme,
+                            paletteStyle = paletteStyle,
+                            onAppTheme = onAppTheme,
+                            onPaletteStyle = onPaletteStyle,
+                            section = InterfaceSettingsSection.APPEARANCE,
+                        )
+                        SettingsCategory.LIBRARY -> SettingsGroupInterface(
+                            appTheme = appTheme,
+                            paletteStyle = paletteStyle,
+                            onAppTheme = onAppTheme,
+                            onPaletteStyle = onPaletteStyle,
+                            section = InterfaceSettingsSection.LIBRARY,
+                        )
+                        SettingsCategory.DOWNLOADS -> SettingsGroupInterface(
+                            appTheme = appTheme,
+                            paletteStyle = paletteStyle,
+                            onAppTheme = onAppTheme,
+                            onPaletteStyle = onPaletteStyle,
+                            section = InterfaceSettingsSection.DOWNLOADS,
+                        )
+                        SettingsCategory.INFO -> SettingsGroupInfo()
+                        SettingsCategory.DEBUG -> SettingsGroupDebug()
+                    }
                 }
-
-                // Info section
-                SettingsSection(
-                    title = stringResource(R.string.settings_info_title),
-                    icon = Icons.Default.Info,
-                iconTint = MaterialTheme.colorScheme.primary,
-                ) {
-                    SettingsGroupInfo()
-                }
-
-                // Debug section
-                SettingsSection(
-                    title = stringResource(R.string.settings_debug_title),
-                    icon = Icons.Default.BugReport,
-                iconTint = MaterialTheme.colorScheme.primary,
-                ) {
-                    SettingsGroupDebug()
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -192,11 +250,12 @@ private fun BackButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(10.dp)
 
     Box(
         modifier = modifier
             .size(44.dp)
-            .clip(CircleShape)
+            .clip(shape)
             .background(
                 if (isFocused) {
                     MaterialTheme.colorScheme.primaryContainer
@@ -204,7 +263,7 @@ private fun BackButton(
                     PluviaTheme.colors.surfaceElevated
                 },
             )
-            .focusRing(interactionSource, CircleShape, width = 2.dp)
+            .focusRing(interactionSource, shape, width = 2.dp)
             .selectable(
                 selected = isFocused,
                 interactionSource = interactionSource,
@@ -219,68 +278,6 @@ private fun BackButton(
             tint = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(24.dp),
         )
-    }
-}
-
-@Composable
-private fun SettingsSection(
-    title: String,
-    icon: ImageVector,
-    iconTint: Color,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        color = PluviaTheme.colors.surfacePanel,
-        border = BorderStroke(1.dp, PluviaTheme.colors.borderDefault.copy(alpha = 0.55f)),
-        tonalElevation = 0.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-        ) {
-            // Section header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(iconTint.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.3.sp,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                color = PluviaTheme.colors.borderDefault.copy(alpha = 0.2f),
-            )
-
-            // Section content
-            content()
-        }
     }
 }
 

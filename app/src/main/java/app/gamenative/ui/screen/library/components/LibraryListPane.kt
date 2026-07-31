@@ -118,6 +118,7 @@ internal fun LibraryListPane(
     currentLayout: PaneType,
     firstGridItemFocusRequester: FocusRequester? = null,
     focusTargetListIndex: Int? = null,
+    onFocusedIndexChanged: (Int) -> Unit = {},
     onPageChange: (Int) -> Unit,
     onNavigate: (String) -> Unit,
     onRefresh: () -> Unit,
@@ -293,7 +294,10 @@ internal fun LibraryListPane(
                                         appInfo = item,
                                         onClick = { onNavigate(item.appId) },
                                         paneType = currentLayout,
-                                        onFocus = { targetOfScroll = item.index },
+                                        onFocus = {
+                                            targetOfScroll = item.index
+                                            onFocusedIndexChanged(listIndex)
+                                        },
                                         imageRefreshCounter = state.imageRefreshCounter,
                                         compatibilityStatus = state.compatibilityMap[item.name],
                                         gameStats = state.statsFor(item),

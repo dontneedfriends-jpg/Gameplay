@@ -376,9 +376,9 @@ private fun InfoCard(
 
     Surface(
         modifier = cardModifier,
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 2.dp,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shadowElevation = 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(if (isCompact) 14.dp else 18.dp),
@@ -434,8 +434,8 @@ private fun HltbInfoBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .clickable(enabled = canOpenHltb) {
                 try {
                     context.startActivity(
@@ -518,6 +518,8 @@ fun AppScreen(
     onPlayWithDiagnostics: () -> Unit,
     onBack: () -> Unit,
     onSourceClick: (GameSource) -> Unit = {},
+    runPrimaryActionOnOpen: Boolean = false,
+    onPrimaryActionConsumed: () -> Unit = {},
 ) {
     // Get the appropriate screen model based on game source
     val screenModel = remember(libraryItem.gameSource) {
@@ -538,6 +540,8 @@ fun AppScreen(
         onPlayWithDiagnostics = onPlayWithDiagnostics,
         onBack = onBack,
         onSourceClick = onSourceClick,
+        runPrimaryActionOnOpen = runPrimaryActionOnOpen,
+        onPrimaryActionConsumed = onPrimaryActionConsumed,
     )
 }
 
@@ -775,8 +779,8 @@ private fun GameHeroFallback() {
             .background(
                 Brush.verticalGradient(
                     listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
+                        MaterialTheme.colorScheme.background,
                     ),
                 ),
             ),
@@ -815,6 +819,7 @@ internal fun AppScreenContent(
     // reactive — recomposes when network state changes
     val runtime = remember { AppScreenRuntimeState() }
     val network = rememberAppScreenNetworkState(downloadInfo)
+    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
 
     LaunchedEffect(displayInfo.appId) {
         runtime.scrollState.animateScrollTo(0)
@@ -845,6 +850,7 @@ internal fun AppScreenContent(
         Box(
             modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -888,7 +894,8 @@ internal fun AppScreenContent(
             // Hero Section (Parallax)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .heightIn(min = if (isPortrait) 390.dp else 440.dp),
             ) {
                 GameHeroBackdrop(
                     displayInfo = displayInfo,
@@ -918,12 +925,21 @@ internal fun AppScreenContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 128.dp, start = 20.dp, end = 20.dp, bottom = 16.dp),
+                        .padding(
+                            top = if (isPortrait) 152.dp else 184.dp,
+                            start = if (isPortrait) 20.dp else 48.dp,
+                            end = if (isPortrait) 20.dp else 48.dp,
+                            bottom = 24.dp,
+                        ),
                 ) {
                     // Game title
                     Text(
                         text = displayInfo.name,
-                        style = MaterialTheme.typography.headlineMedium.copy(
+                        style = (if (isPortrait) {
+                            MaterialTheme.typography.headlineLarge
+                        } else {
+                            MaterialTheme.typography.displaySmall
+                        }).copy(
                             fontWeight = FontWeight.Bold,
                             shadow = Shadow(
                                 color = Color.Black.copy(alpha = 0.6f),
@@ -934,6 +950,7 @@ internal fun AppScreenContent(
                         color = Color.White,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 840.dp),
                     )
 
                     // Developer and year
@@ -945,20 +962,22 @@ internal fun AppScreenContent(
                         }
                     }
                     Text(
-                        text = "${displayInfo.developer} • $releaseYear",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.85f),
+                        text = listOf(displayInfo.developer, releaseYear)
+                            .filter { it.isNotBlank() }
+                            .joinToString(" • "),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.78f),
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // Integrated action bar - overlaid on hero
-                    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
                     Column(
                         modifier = Modifier
+                            .widthIn(max = 820.dp)
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.Black.copy(alpha = 0.5f))
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.Black.copy(alpha = 0.42f))
                             .padding(12.dp),
                     ) {
                     Row(
@@ -1090,9 +1109,15 @@ internal fun AppScreenContent(
             // Content section below hero with solid background
             Column(
                 modifier = Modifier
+                    .widthIn(max = 1180.dp)
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background)
-                    .padding(20.dp),
+                    .align(Alignment.CenterHorizontally)
+                    .padding(
+                        start = if (isPortrait) 20.dp else 48.dp,
+                        end = if (isPortrait) 20.dp else 48.dp,
+                        top = 26.dp,
+                        bottom = 96.dp,
+                    ),
             ) {
                 // Update available banner
                 if (isUpdatePending) {

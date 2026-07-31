@@ -1,23 +1,26 @@
 package app.gamenative.ui.component.dialog
 
 import android.content.res.Configuration
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessMedium
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,13 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
-import app.gamenative.R
 import app.gamenative.enums.AppTheme
+import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.theme.PluviaTheme
 
 @Composable
@@ -51,31 +53,56 @@ fun SingleChoiceDialog(
         return
     }
 
-    AlertDialog(
+    ConsoleSettingsPage(
+        visible = openDialog,
+        title = title,
         onDismissRequest = onDismiss,
-        icon = {
+        actions = {
             icon?.let {
-                Icon(imageVector = it, contentDescription = iconDescription)
+                Icon(
+                    imageVector = it,
+                    contentDescription = iconDescription,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 12.dp),
+                )
             }
         },
-        title = { Text(text = title) },
-        text = {
-            Column(modifier = Modifier.selectableGroup().verticalScroll(rememberScrollState())) {
+    ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .selectableGroup()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 items.forEachIndexed { index, entry ->
+                    val selected = index == currentItem
+                    val interactionSource = remember(index) { MutableInteractionSource() }
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .heightIn(min = 60.dp)
+                            .background(
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerLow
+                                },
+                                shape = RoundedCornerShape(10.dp),
+                            )
+                            .focusRing(interactionSource, RoundedCornerShape(10.dp), width = 2.dp)
                             .selectable(
-                                selected = index == currentItem,
+                                selected = selected,
                                 onClick = { onSelected(index) },
                                 role = Role.RadioButton,
+                                interactionSource = interactionSource,
+                                indication = null,
                             )
                             .padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
-                            selected = index == currentItem,
+                            selected = selected,
                             onClick = null,
                         )
                         Text(
@@ -86,14 +113,7 @@ fun SingleChoiceDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = onDismiss,
-                content = { Text(text = stringResource(R.string.close)) },
-            )
-        },
-    )
+    }
 }
 
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL)
