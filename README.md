@@ -1,120 +1,178 @@
-<div align="center">
-
 # Gameplay
 
-**Play the PC games you already own — from Steam, Epic and GOG — on your Android device, with cloud saves.**
+Gameplay is an open-source Android gaming shell for installing, organizing, configuring, and running legally owned Windows games directly on ARM64 phones and handhelds.
 
-<a href="https://trendshift.io/repositories/14497" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14497" alt="utkarshdalal%2FGameplay | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+It combines a controller-first console interface with isolated Wine/Proton containers. Games can come from a connected storefront or from files on the device: Gameplay treats local executables and installers as first-class library content rather than requiring every title to belong to Steam.
 
-<a href="https://www.star-history.com/utkarshdalal/gamenative">
- <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=utkarshdalal/GameNative&theme=dark" />
-  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=utkarshdalal/GameNative" />
-  <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=utkarshdalal/GameNative" />
- </picture>
-</a>
+Gameplay is a modified fork of [GameNative](https://github.com/utkarshdalal/GameNative). It remains licensed under GPL-3.0, preserves upstream attribution, and develops a separate product direction focused on a unified console shell, local installation workflows, extensive theming, and equal support for touch and physical controllers.
 
-[![GitHub Release](https://img.shields.io/github/v/release/utkarshdalal/GameNative?style=flat-square&logo=github&label=latest)](https://github.com/utkarshdalal/GameNative/releases/latest)
-[![GitHub stars](https://img.shields.io/github/stars/utkarshdalal/GameNative?style=flat-square&logo=github&color=ffd700)](https://github.com/utkarshdalal/GameNative/stargazers)
-[![Discord](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Fv9%2Finvites%2F2hKv4VfZfE%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&style=flat-square&logo=discord&logoColor=white&label=discord&color=5865F2&suffix=%20members)](https://discord.gg/2hKv4VfZfE)
-[![License](https://img.shields.io/badge/license-GPL%203.0-blue?style=flat-square)](https://github.com/utkarshdalal/GameNative/blob/master/LICENSE)
-[![Ko-fi](https://img.shields.io/badge/ko--fi-support-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/gamenative)
+> Gameplay is under active development. Compatibility varies by device, GPU driver, Android version, CPU architecture, Windows runtime, graphics translation layer, and the game itself. It is not a cloud-streaming service and does not include games, licenses, product keys, or DRM circumvention.
 
-[**Download**](https://downloads.gamenative.app/releases/1.1.1/gamenative-v1.1.1.apk) · [**Discord**](https://discord.gg/2hKv4VfZfE) · [**Support on Ko-fi**](https://ko-fi.com/gamenative)
+## What Gameplay is building
 
-<video src="https://github.com/user-attachments/assets/95b5397b-908a-44ef-a10a-dac7723580b0" autoplay loop muted playsinline width="100%"></video>
+The goal is a complete Android console environment for Windows games—not a collection of disconnected emulator dialogs.
 
-</div>
+- A unified library for Steam, GOG, Epic, Amazon, imported games, and locally installed titles.
+- A landscape shell designed for handheld consoles and controller navigation.
+- Direct import of Windows executables, MSI packages, and EXE installers from Android storage.
+- Automatic creation of a dedicated container when an installer is selected.
+- Post-install executable discovery so an installed game can be added to the library and launched again.
+- Reusable runtime caches so Wine/Proton components are not downloaded separately for every container.
+- Per-game configuration for Wine/Proton, DXVK/VKD3D, GPU drivers, CPU translation, environment variables, display, and controls.
+- Touch controls and physical Xbox-compatible and DualSense/PS5-compatible controllers as equal input methods.
+- A semantic theme system with built-in themes, full-screen editing, import/export, validation, and recovery.
 
----
+The detailed implementation state and acceptance criteria live in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
 
-Gameplay is a modified fork of [utkarshdalal/GameNative](https://github.com/utkarshdalal/GameNative). It preserves the original GPL-3.0 license and copyright notices; see [NOTICE](NOTICE) and [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+## Current capabilities
 
-Gameplay lets you run the PC games in your Steam, Epic and GOG libraries directly on Android — no streaming required. Your saves sync to the cloud, so you can stop on your PC and keep going on your phone.
+### Games and installation
 
-It's still early. Not every game runs yet, and some need tweaking to play well, but the community is constantly finding and sharing configs that work — and these get applied automatically. You can see if anyone has tried running your game successfully at https://gamenative.app/compatibility.
+- Import local Windows executables into the library.
+- Select an installer, create its container, run the installation, and continue into the normal Gameplay launch flow.
+- Reopen installed games without repeating the installer process.
+- Reuse cached runtime payloads across containers.
+- Configure each title independently without changing the defaults for the rest of the library.
+- View important runtime choices—graphics driver, Wine/Proton, and DXVK/VKD3D—close to the game configuration surface.
 
-## What you get
+ISO and other disc images are not currently treated as executables. They require a dedicated mounted-media workflow and remain planned work.
 
-- Play games you actually own on Steam, Epic, GOG and Amazon
-- Cloud saves that carry over between your PC and your phone
-- Automatically applied known configs, so many games just work out of the box with no tweaking required
-- Controller and touch support, with a custom control editor and on-screen HUD
-- Steam DLC, workshop and branch support
-- Active support over Discord if you need help getting a game running
+### Storefronts and library
 
-## Demo
+- Connect to Steam using the inherited GameNative integration.
+- Retain installed library data and session state while navigating instead of reconnecting on every tab change.
+- Hide storefront navigation when its service is not authenticated.
+- Use installed games as the primary home library instead of a recommendations feed.
+- Display Steam achievements in Gameplay's console-oriented game screen.
+- Preserve GOG, Epic, and Amazon library support from the upstream codebase.
+- Sort, filter, search, and select views through controller-friendly library options.
 
-[TechDweeb](https://www.youtube.com/@TechDweeb) walks through setting up Gameplay on an Android handheld in a couple of minutes:
+### Console interface
 
-<div align="center">
+- Full-screen landscape navigation inspired by dedicated handhelds and living-room consoles without copying their visual identity.
+- Separate system-menu and context-action behavior.
+- Quick actions for play/install, details, search, library options, and adding games.
+- Category-based application, container, and per-game settings.
+- Full-screen nested settings instead of deep stacks of mobile dialogs.
+- Restrained surfaces, low-saturation themes, predictable focus, and narrow-landscape layouts.
 
-<a href="https://youtu.be/QqIChmAu2_A?si=Ha6xzTQXZA2H8HUN&t=53" target="_blank"><img src="https://github.com/user-attachments/assets/6957e3a1-34ac-41f5-b558-0f1868dbf3d4" alt="Youtube Video" /></a>
+### Themes
 
-</div>
+Gameplay themes are semantic documents rather than simple accent colors. A theme may redefine surfaces, text roles, focus states, status colors, shape, density, and related presentation tokens while retaining a safe recovery path.
 
-## How to use
+Included profiles cover dark, OLED, light, forest, copper, wine, and arctic directions. Custom themes can be created in the application or imported from a file. The versioned format is documented in [docs/THEMES.md](docs/THEMES.md).
 
-1. Download the latest release [here](https://downloads.gamenative.app/releases//gamenative-v.apk)
-2. Install the APK on your Android device
-3. Log in to your Steam account
-4. Install your game
-5. Hit play and enjoy
+## Compatibility scope
 
-## Support
+Gameplay targets Windows software that can run through the bundled Wine/Proton-compatible stack and Android-native translation components.
 
-The fastest way to get help is the [Discord server](https://discord.gg/2hKv4VfZfE) — we're 35k+ strong and someone's usually around.
+- Modern 32-bit and 64-bit Windows games are supported when the selected runtime and hardware permit it.
+- Vulkan-capable hardware is strongly recommended for modern DirectX games.
+- Older DirectDraw/Direct3D titles may need game-specific graphics and Wine settings.
+- Win16 support depends on the chosen Wine path and game architecture; it is not universal.
+- DOS games need a future DOSBox-style integration and are not currently a promised compatibility target.
+- Anti-cheat, kernel drivers, unusual DRM, launchers, codecs, and device-specific GPU issues may prevent a game from running.
 
-Please **don't** open issues on GitHub; they're closed automatically. Bring it to Discord instead.
+There is no meaningful single “supported up to year X” cutoff. A demanding old title may fail while a newer title works well. Compatibility should be evaluated per game, runtime, driver, and device.
 
-If you'd like to chip in, you can support the project on [Ko-fi](https://ko-fi.com/gamenative).
+## Requirements
+
+- ARM64 Android device.
+- Android 10 or newer for the recommended `modern` build (`minSdk 29`, `targetSdk 36`).
+- Android 8 or newer for the compatibility-oriented `legacy` build (`minSdk 26`, `targetSdk 28`).
+- Sufficient free storage for the Windows runtime, container, installer, extracted files, and game data.
+- Vulkan support for DXVK/VKD3D-based games.
+- Legally obtained game files and any licenses required by their publishers.
+
+The XR flavors are experimental and are not the primary Gameplay target.
+
+## Building from source
+
+Use a current Android Studio installation with its bundled JDK. Clone submodules when obtaining a fresh checkout:
+
+```sh
+git clone --recurse-submodules https://github.com/dontneedfriends-jpg/Gameplay.git
+cd Gameplay
+```
+
+### Windows
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+.\gradlew.bat :app:assembleModernDebug --no-daemon
+```
+
+### Linux and macOS
+
+```sh
+./gradlew :app:assembleModernDebug --no-daemon
+```
+
+The resulting APK is written to:
+
+```text
+app/build/outputs/apk/modern/debug/app-modern-debug.apk
+```
+
+Other available flavors include `legacy`, `legacyXr`, `modern`, and `modernXr`. Gameplay development primarily validates `modernDebug`.
+
+### Optional artwork integration
+
+Automatic artwork lookup for imported games can use a SteamGridDB API key placed in `local.properties`:
+
+```properties
+STEAMGRIDDB_API_KEY=your_api_key_here
+```
+
+Never commit `local.properties`, API keys, signing credentials, keystores, or generated APKs.
+
+## Repository layout
+
+- `app/` — Android application, Jetpack Compose interface, storefront integrations, game library, and container orchestration.
+- `ubuntufs/` — filesystem/runtime packaging module.
+- `app/src/main/assets/` — manifests and bundled runtime-support assets.
+- `docs/THEMES.md` — versioned Gameplay theme format and authoring notes.
+- `DEVELOPMENT_PLAN.md` — completed work, active priorities, planned work, and definitions of done.
+- `PRODUCT.md` — product principles and design constraints.
+- `NOTICE` — Gameplay fork attribution and naming information.
+- `THIRD_PARTY_NOTICES` — component licenses, notices, and source information.
+- `ROADMAP.md` — retained upstream GameNative roadmap; Gameplay-specific progress is tracked separately.
+
+The Kotlin namespace and Android application ID remain `app.gamenative`. This is an internal compatibility identifier used by existing data, migrations, JNI bindings, and native components; it is not the displayed product name.
+
+## Development expectations
+
+Gameplay is controller-first but not controller-only. Changes should preserve touch behavior and existing user data while moving ordinary navigation toward the shared console shell.
+
+For interface changes, verify:
+
+- narrow landscape screens;
+- D-pad and analog focus traversal;
+- Xbox A/B and PlayStation Cross/Circle semantics;
+- Back behavior and focus restoration;
+- touch targets, scrolling, empty states, and long localized strings.
+
+For runtime changes, verify both a storefront title and a locally imported executable or installer where applicable. Container and database changes must preserve existing installations.
+
+Before submitting code, build at least the primary variant:
+
+```sh
+./gradlew :app:assembleModernDebug --no-daemon
+```
+
+New bundled binaries must include their applicable license, notice, and reproducible source or source-offer information. Do not remove upstream copyright statements.
 
 ## Contributing
 
-Want to help out? Message us to get into the **#development** channel on [Discord](https://discord.gg/2hKv4VfZfE), or open a thread there. Things we're currently looking for help with live on our [Trello board](https://trello.com/b/vGRkFoAM/open-source-board).
+Issues and focused pull requests are welcome. Describe the device, Android version, SoC/GPU, selected driver, Wine/Proton version, graphics layer, and the exact stage that fails when reporting compatibility problems. Do not attach copyrighted games, credentials, authentication tokens, or private logs.
 
-### Building
+Large interface changes should follow [PRODUCT.md](PRODUCT.md) and update [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) when they complete or materially change a tracked requirement.
 
-Most of the time you don't need this — if you just want to play, grab the release above. This is for contributors.
+## License, attribution, and trademarks
 
-1. Build it like any normal Android Studio project. Ask on Discord if you get stuck.
-2. **SteamGridDB API key (optional):** to pull game artwork for custom games, add your key to `local.properties`:
-   ```properties
-   STEAMGRIDDB_API_KEY=your_api_key_here
-   ```
-   You can get one from your [SteamGridDB preferences](https://www.steamgriddb.com/profile/preferences). Without it everything still works — it just won't fetch images.
+Gameplay is distributed under the [GNU General Public License version 3](LICENSE). If you distribute a modified APK or other binary, you must satisfy the GPL-3.0 requirements, including providing the corresponding source under the same license.
 
-## Analytics & privacy
+GameNative and its contributors retain copyright in their original work. Gameplay's fork attribution is recorded in [NOTICE](NOTICE), and licenses or source information for bundled components are recorded in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) and beside relevant assets.
 
-Gameplay uses [PostHog](https://posthog.com) for anonymous analytics. No personal information is ever collected — no names, emails, IPs or device identifiers.
-
-**Always collected**, to improve game compatibility:
-- Game launch, close and exit events (game name, store, session length, average FPS, container config)
-- Game install, cancel and uninstall events
-
-This is how we figure out which games work, how well they run, and which configs to apply automatically for the next person. It can't identify you.
-
-**Optional**, and switchable under *Settings → Info → Usage Analytics*:
-- Feature usage (on-screen keyboard, controller, HUD, control editor)
-- Login success/failure events
-- Recommendation interactions
-- App lifecycle events (foreground/background)
-- Cloud sync events
-
-The full [Privacy Policy](PrivacyPolicy/README.md) has the details.
-
-## Supporters
-
-Thanks to our [Ko-fi sponsors](https://ko-fi.com/gamenative) and [GitHub sponsors](https://github.com/sponsors/utkarshdalal?preview=true), including [CodeRabbit](https://coderabbit.link/gnative).
-
-[![Star History Chart](https://api.star-history.com/svg?repos=utkarshdalal/GameNative&type=Date&theme=dark)](https://www.star-history.com/#utkarshdalal/GameNative&Date)
-
-## License
-
-Gameplay is free software distributed under [GNU GPL version 3](LICENSE). The corresponding source for a distributed build must be provided under the same license.
-
-See [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) for attributions, copyleft source offers, and notices about third-party and proprietary components bundled with the app.
-
----
-
-**Disclaimer:** This software is meant for playing games that you legally own. Don't use it for piracy or anything else illegal. The maintainer takes no responsibility for misuse.
+Gameplay is not affiliated with or endorsed by Valve, Microsoft, Sony, Epic Games, GOG, Amazon, CodeWeavers, or the Wine project. Steam, Xbox, PlayStation, Windows, and other names and marks belong to their respective owners.

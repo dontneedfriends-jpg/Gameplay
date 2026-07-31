@@ -6,6 +6,20 @@ This document is the working implementation plan for Gameplay, the GPL-3.0 fork 
 
 Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs device verification.
 
+## Completed in the current development cycle
+
+- [x] Replaced the remaining GameNative-branded boot/loading presentation with the Gameplay console visual system.
+- [x] Expanded the semantic theme engine with editable, importable, exportable, validated themes and additional built-in profiles.
+- [x] Reorganized application settings and promoted nested settings to full-screen console pages.
+- [x] Added a compact per-game runtime summary for the selected graphics driver, Wine/Proton, and DXVK/VKD3D configuration.
+- [x] Added Steam achievements to the game screen using Gameplay's controller-oriented presentation.
+- [x] Made Downloads the primary downloads screen and Storage its secondary section.
+- [x] Added the WFM runtime-support payload and installer integration from the requested upstream work.
+- [x] Ported upstream PR #1721 as an adapted performance set: debounced license processing, transactional license caching, batched Room queries and updates, database indexes, PICS timeout/retry handling, and reduced library recomputation.
+- [x] Preserved Gameplay-specific Steam session caching, installed-library counts, achievements, and user-owned license priority while porting upstream performance changes.
+- [x] Rebuilt and verified `modernDebug` after the integrated runtime, library, theme, settings, and UI changes.
+- [x] Replaced the repository README with Gameplay-specific product, capability, compatibility, build, contribution, and GPL compliance documentation.
+
 ## 1. Product direction and constraints
 
 - [x] Rename the user-facing application from GameNative to Gameplay.
@@ -76,9 +90,9 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 - [x] Support built-in theme selection.
 - [x] Support importing themes from files.
 - [x] Expose broad theme editing instead of limiting users to an accent-color picker.
-- [ ] Document a stable semantic theme schema with versioning and migration.
-- [ ] Validate imported themes for required tokens, readable contrast, and recoverability.
-- [ ] Provide export, duplicate, rename, preview, and reset-to-safe-theme actions.
+- [x] Document a stable semantic theme schema with versioning and a defined migration boundary.
+- [x] Validate imported themes for required tokens, readable contrast, file size, and recoverability.
+- [ ] Provide theme duplication (rename, visual editing, live preview, export, and reset-to-safe-theme are complete).
 - [ ] Add high-contrast and reduced-motion built-in themes.
 
 ## 7. Controller and input parity
@@ -101,10 +115,10 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 
 ## 9. Imported upstream work
 
-- [x] Review and port the requested upstream pull requests: #1651, #1730, #1759, #1760, #1776, #1709, and #1782.
+- [x] Review and port the requested upstream pull requests: #1651, #1695, #1709, #1721, #1730, #1759, #1760, #1776, #1782, and #1784.
 - [x] Adapt imported changes to Gameplay instead of applying them blindly.
 - [x] Address compilation, state-management, and integration issues discovered during the ports.
-- [ ] Record each upstream PR mapping and resulting Gameplay commit in a dedicated provenance table.
+- [-] Record each upstream PR mapping and resulting Gameplay commit in a dedicated provenance table; requested PR numbers are now recorded here, while per-commit mappings remain to be added.
 - [ ] Recheck open upstream changes before release candidates and cherry-pick only compatible fixes.
 
 ## 10. Stability, testing, and release engineering
@@ -125,7 +139,7 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 3. Convert complex controller/touch configuration screens into category-based layouts.
 4. Complete focus restoration, controller hints, and narrow-landscape audits.
 5. Harden installer/runtime-cache progress, error recovery, and device tests.
-6. Finish theme schema validation, export, and safe recovery.
+6. Add theme duplication and the remaining accessibility-oriented built-in themes.
 7. Add automated regressions and prepare a GPL-compliant Gameplay release process.
 
 ## Definition of done for a converted console screen
