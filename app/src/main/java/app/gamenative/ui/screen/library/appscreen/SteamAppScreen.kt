@@ -88,6 +88,7 @@ import app.gamenative.ui.util.SnackbarManager
 import app.gamenative.ui.util.SteamSaveTransfer
 import app.gamenative.utils.ContainerUtils.getContainer
 import app.gamenative.utils.CustomGameScanner
+import app.gamenative.utils.GameImageUtils
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.json.JSONObject
@@ -264,18 +265,52 @@ class SteamAppScreen : BaseAppScreen() {
             }
         }
 
-        // Get hero image URL
-        val heroImageUrl = remember(appInfo.id) {
-            appInfo.getHeroUrl()
+        // Observe custom media changes to refresh images reactively
+        val mediaVersion by app.gamenative.utils.CustomMediaUtils.mediaVersionFlow.collectAsState(initial = 0)
+
+        // Image URLs with priority: custom media -> SteamGridDB -> Steam CDN
+        val heroImageUrl = remember(mediaVersion, appInfo.id) {
+            GameImageUtils.getGameImage(
+                libraryItem = libraryItem,
+                imageType = "grid_hero",
+                steamUrl = appInfo.getHeroUrl(),
+            )
         }
 
-        // Get icon URL
-        val iconUrl = remember(appInfo.id) {
-            if (appInfo.clientIconHash.isNotEmpty()) {
-                appInfo.clientIconUrl
-            } else{
-                appInfo.iconUrl
-            }
+        val iconUrl = remember(mediaVersion, appInfo.id) {
+            GameImageUtils.getGameImage(
+                libraryItem = libraryItem,
+                imageType = "icon",
+                steamUrl = if (appInfo.clientIconHash.isNotEmpty()) {
+                    appInfo.clientIconUrl
+                } else {
+                    appInfo.iconUrl
+                },
+            )
+        }
+
+        val logoUrl = remember(mediaVersion, appInfo.id) {
+            GameImageUtils.getGameImage(
+                libraryItem = libraryItem,
+                imageType = "logo",
+                steamUrl = appInfo.getLogoUrl(),
+            )
+        }
+
+        val capsuleUrl = remember(mediaVersion, appInfo.id) {
+            GameImageUtils.getGameImage(
+                libraryItem = libraryItem,
+                imageType = "grid_capsule",
+                steamUrl = appInfo.getCapsuleUrl(),
+            )
+        }
+
+        val headerUrl = remember(mediaVersion, appInfo.id) {
+            GameImageUtils.getGameImage(
+                libraryItem = libraryItem,
+                imageType = "header",
+                steamUrl = appInfo.getHeaderImageUrl(),
+            )
         }
 
         // Get install location
@@ -363,6 +398,9 @@ class SteamAppScreen : BaseAppScreen() {
             playtimeText = playtimeText,
             compatibilityMessage = compatibilityMessage,
             compatibilityColor = compatibilityColor,
+            logoUrl = logoUrl,
+            capsuleUrl = capsuleUrl,
+            headerUrl = headerUrl,
         )
     }
 

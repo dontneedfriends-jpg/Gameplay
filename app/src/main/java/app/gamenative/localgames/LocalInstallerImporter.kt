@@ -24,6 +24,7 @@ object LocalInstallerImporter {
 
     sealed interface ImportResult {
         data class Ready(val session: InstallationSession) : ImportResult
+        data class ReadyPortable(val folderName: String) : ImportResult
         data class Rejected(val reason: String) : ImportResult
         data class Failed(
             val reason: String,
@@ -39,7 +40,11 @@ object LocalInstallerImporter {
             val installerType = when {
                 sourceName.endsWith(".exe", ignoreCase = true) -> InstallerType.EXE
                 sourceName.endsWith(".msi", ignoreCase = true) -> InstallerType.MSI
-                else -> return@withContext ImportResult.Rejected("Choose a Windows EXE or MSI installer")
+                sourceName.endsWith(".iso", ignoreCase = true) -> {
+                    // Disc images follow the mounted-media workflow, not the executable one.
+                    return@withContext LocalDiscImageImporter.importDiscImage(context, sourceUri, sourceName)
+                }
+                else -> return@withContext ImportResult.Rejected("Choose a Windows EXE or MSI installer, or an ISO disc image")
             }
 
             val destinationFolder = createDestinationFolder(sourceName)
@@ -60,91 +65,118 @@ object LocalInstallerImporter {
                 return@withContext ImportResult.Failed("GameNative could not copy the installer", error)
             }
 
-            val inspection = runCatching {
-                FileInputStream(destinationInstaller).use(WindowsExecutableInspector::inspect)
-            }.getOrElse { error ->
-                destinationFolder.deleteRecursively()
-                return@withContext ImportResult.Failed("GameNative could not inspect the installer", error)
-            }
-            val rejection = validateInstaller(installerType, inspection)
-            if (rejection != null) {
-                destinationFolder.deleteRecursively()
-                return@withContext ImportResult.Rejected(rejection)
-            }
-
-            val now = System.currentTimeMillis()
-            val store = InstallationSessionStore(context)
-            var session = InstallationSession(
-                id = UUID.randomUUID().toString(),
-                title = destinationFolder.name.removeSuffix(" setup"),
-                sourceUri = sourceUri.toString(),
+            stageInstallerSession(
+                context = context,
+                sourceUriString = sourceUri.toString(),
                 sourceName = sourceName,
-                installerType = installerType,
-                managedInstallerPath = destinationInstaller.absolutePath,
+                destinationFolder = destinationFolder,
+                installerFile = destinationInstaller,
                 installerRelativePath = installerName,
-                state = InstallationState.SOURCE_STAGED,
-                createdAt = now,
-                updatedAt = now,
+                installerType = installerType,
+                cleanupOnFailure = true,
             )
-
-            try {
-                store.save(session)
-                session = session.transitionTo(InstallationState.CONTAINER_CREATING)
-                store.save(session)
-
-                val folderPath = destinationFolder.canonicalPath
-                if (folderPath !in PrefManager.customGameManualFolders) {
-                    PrefManager.customGameManualFolders = PrefManager.customGameManualFolders + folderPath
-                }
-                CustomGameScanner.invalidateCache()
-
-                val libraryItem = CustomGameScanner.createLibraryItemFromFolder(
-                    folderPath = folderPath,
-                    allowSteamAssociation = false,
-                ) ?: throw IOException("Could not register installer workspace as a local game")
-                CustomGameScanner.invalidateCache()
-
-                val container = ContainerUtils.getOrCreateContainer(context, libraryItem.appId)
-                val launchMode = when (installerType) {
-                    InstallerType.EXE -> LocalContainerLaunch.MODE_INSTALLER_EXE_A
-                    InstallerType.MSI -> LocalContainerLaunch.MODE_INSTALLER_MSI_A
-                }
-                container.executablePath = installerName
-                container.putExtra(LocalContainerLaunch.EXTRA_MODE, launchMode)
-                container.putExtra(LocalContainerLaunch.EXTRA_TARGET, installerName)
-                container.putExtra(LocalContainerLaunch.EXTRA_INSTALLATION_SESSION_ID, session.id)
-                container.saveData()
-
-                session = session.copy(
-                    appId = libraryItem.appId,
-                    containerId = container.id,
-                ).transitionTo(InstallationState.READY_TO_LAUNCH)
-                store.save(session)
-                ImportResult.Ready(session)
-            } catch (error: Exception) {
-                val failed = runCatching {
-                    session.transitionTo(
-                        next = InstallationState.FAILED,
-                        error = error.message ?: "Container preparation failed",
-                    )
-                }.getOrElse {
-                    session.copy(
-                        state = InstallationState.FAILED,
-                        previousState = session.state,
-                        updatedAt = System.currentTimeMillis(),
-                        lastError = error.message,
-                    )
-                }
-                runCatching { store.save(failed) }
-                ImportResult.Failed(
-                    reason = "GameNative could not prepare the installer container",
-                    cause = error,
-                    session = failed,
-                )
-            }
         }
 
-    private suspend fun copySource(context: Context, sourceUri: Uri, destination: File) {
+    /**
+     * Shared post-staging flow: inspects the installer, creates the installation
+     * session, and prepares the dedicated container in installer launch mode.
+     * Used by both direct EXE/MSI imports and disc-image extraction.
+     */
+    internal suspend fun stageInstallerSession(
+        context: Context,
+        sourceUriString: String,
+        sourceName: String,
+        destinationFolder: File,
+        installerFile: File,
+        installerRelativePath: String,
+        installerType: InstallerType,
+        cleanupOnFailure: Boolean,
+    ): ImportResult {
+        val inspection = runCatching {
+            FileInputStream(installerFile).use(WindowsExecutableInspector::inspect)
+        }.getOrElse { error ->
+            if (cleanupOnFailure) destinationFolder.deleteRecursively()
+            return ImportResult.Failed("GameNative could not inspect the installer", error)
+        }
+        val rejection = validateInstaller(installerType, inspection)
+        if (rejection != null) {
+            if (cleanupOnFailure) destinationFolder.deleteRecursively()
+            return ImportResult.Rejected(rejection)
+        }
+
+        val store = InstallationSessionStore(context)
+        val now = System.currentTimeMillis()
+        var session = InstallationSession(
+            id = UUID.randomUUID().toString(),
+            title = destinationFolder.name.removeSuffix(" setup").removeSuffix(" disc"),
+            sourceUri = sourceUriString,
+            sourceName = sourceName,
+            installerType = installerType,
+            managedInstallerPath = installerFile.absolutePath,
+            installerRelativePath = installerRelativePath,
+            state = InstallationState.SOURCE_STAGED,
+            createdAt = now,
+            updatedAt = now,
+        )
+
+        try {
+            store.save(session)
+            session = session.transitionTo(InstallationState.CONTAINER_CREATING)
+            store.save(session)
+
+            val folderPath = destinationFolder.canonicalPath
+            if (folderPath !in PrefManager.customGameManualFolders) {
+                PrefManager.customGameManualFolders = PrefManager.customGameManualFolders + folderPath
+            }
+            CustomGameScanner.invalidateCache()
+
+            val libraryItem = CustomGameScanner.createLibraryItemFromFolder(
+                folderPath = folderPath,
+                allowSteamAssociation = false,
+            ) ?: throw IOException("Could not register installer workspace as a local game")
+            CustomGameScanner.invalidateCache()
+
+            val container = ContainerUtils.getOrCreateContainer(context, libraryItem.appId)
+            val launchMode = when (installerType) {
+                InstallerType.EXE -> LocalContainerLaunch.MODE_INSTALLER_EXE_A
+                InstallerType.MSI -> LocalContainerLaunch.MODE_INSTALLER_MSI_A
+            }
+            container.executablePath = installerRelativePath
+            container.putExtra(LocalContainerLaunch.EXTRA_MODE, launchMode)
+            container.putExtra(LocalContainerLaunch.EXTRA_TARGET, installerRelativePath)
+            container.putExtra(LocalContainerLaunch.EXTRA_INSTALLATION_SESSION_ID, session.id)
+            container.saveData()
+
+            session = session.copy(
+                appId = libraryItem.appId,
+                containerId = container.id,
+            ).transitionTo(InstallationState.READY_TO_LAUNCH)
+            store.save(session)
+            return ImportResult.Ready(session)
+        } catch (error: Exception) {
+            val failed = runCatching {
+                session.transitionTo(
+                    next = InstallationState.FAILED,
+                    error = error.message ?: "Container preparation failed",
+                )
+            }.getOrElse {
+                session.copy(
+                    state = InstallationState.FAILED,
+                    previousState = session.state,
+                    updatedAt = System.currentTimeMillis(),
+                    lastError = error.message,
+                )
+            }
+            runCatching { store.save(failed) }
+            return ImportResult.Failed(
+                reason = "GameNative could not prepare the installer container",
+                cause = error,
+                session = failed,
+            )
+        }
+    }
+
+    internal suspend fun copySource(context: Context, sourceUri: Uri, destination: File) {
         context.contentResolver.openInputStream(sourceUri)?.use { input ->
             FileOutputStream(destination).use { output ->
                 val buffer = ByteArray(COPY_BUFFER_SIZE)
@@ -194,15 +226,15 @@ object LocalInstallerImporter {
             ?: uri.lastPathSegment?.substringAfterLast('/')?.trim()?.takeIf(String::isNotBlank)
     }
 
-    private fun createDestinationFolder(sourceName: String): File? {
+    internal fun createDestinationFolder(sourceName: String, suffix: String = " setup"): File? {
         val root = File(CustomGameScanner.defaultRootPath)
         val rawBase = sourceName.substringBeforeLast('.')
             .replace(Regex("(?i)^(setup|install|installer)[._ -]*"), "")
             .ifBlank { "New game" }
         val base = sanitizeFolderName(rawBase)
         for (index in 1..100) {
-            val suffix = if (index == 1) " setup" else " setup ($index)"
-            val candidate = File(root, base + suffix)
+            val candidateSuffix = if (index == 1) suffix else "$suffix ($index)"
+            val candidate = File(root, base + candidateSuffix)
             if (!candidate.exists() && candidate.mkdirs()) return candidate
         }
         return null

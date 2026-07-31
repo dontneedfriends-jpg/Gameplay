@@ -12,6 +12,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -36,6 +37,7 @@ import app.gamenative.mods.NexusModManager
 import app.gamenative.ui.component.dialog.CommunityConfigsDialog
 import app.gamenative.ui.component.dialog.ContainerConfigDialog
 import app.gamenative.ui.component.dialog.LoadingDialog
+import app.gamenative.ui.component.dialog.LoadingToast
 import app.gamenative.ui.component.dialog.NexusModsDialog
 import app.gamenative.ui.data.AppMenuOption
 import app.gamenative.ui.data.Achievement
@@ -62,6 +64,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -161,6 +165,29 @@ abstract class BaseAppScreen {
         private val manageModsRequests = mutableStateMapOf<String, Boolean>()
         private val communityConfigRequests = mutableStateMapOf<String, Boolean>()
         private val knownConfigInstallStates = mutableStateMapOf<Int, KnownConfigInstallState>()
+
+        // Track which appId is currently fetching images (for LoadingToast)
+        private val fetchingImagesAppId = MutableStateFlow<String?>(null)
+        val fetchingImagesFlow: StateFlow<String?> = fetchingImagesAppId
+
+        // Track done message for the currently fetching app
+        private val fetchingImagesDoneMessage = MutableStateFlow<Pair<String?, String?>?>(null)
+        val fetchingImagesDoneMessageFlow: StateFlow<Pair<String?, String?>?> = fetchingImagesDoneMessage
+
+        fun isFetchingImages(appId: String): Boolean {
+            return fetchingImagesAppId.value == appId
+        }
+
+        fun setFetchingImages(appId: String?, isFetching: Boolean) {
+            fetchingImagesAppId.value = if (isFetching) appId else null
+            if (!isFetching) {
+                fetchingImagesDoneMessage.value = null
+            }
+        }
+
+        fun setFetchingImagesDone(appId: String?, doneMessage: String?) {
+            fetchingImagesDoneMessage.value = Pair(appId, doneMessage)
+        }
 
         fun showInstallDialog(appId: String, state: app.gamenative.ui.component.dialog.state.MessageDialogState) {
             installDialogStates[appId] = state
@@ -1598,6 +1625,21 @@ abstract class BaseAppScreen {
             }
         }
 
+        // Toast-style loading indicator while fetching images
+        val fetchingAppId by BaseAppScreen.fetchingImagesFlow.collectAsState()
+        val fetchingDone by BaseAppScreen.fetchingImagesDoneMessageFlow.collectAsState()
+        val isFetchingImages = fetchingAppId == libraryItem.appId
+        val imagesDoneMessage = if (fetchingDone?.first == libraryItem.appId) fetchingDone?.second else null
+        LoadingToast(
+            visible = isFetchingImages || imagesDoneMessage != null,
+            message = stringResource(R.string.base_app_images_fetching),
+            doneMessage = imagesDoneMessage,
+            onDismiss = {
+                BaseAppScreen.setFetchingImages(libraryItem.appId, false)
+                BaseAppScreen.setFetchingImagesDone(libraryItem.appId, null)
+            },
+        )
+
         // Show container config dialog if needed
         if (showConfigDialog) {
             ContainerConfigDialog(
@@ -1610,6 +1652,13 @@ abstract class BaseAppScreen {
                     containerDataLoaded = true
                     showConfigDialog = false
                 },
+                mediaHeroUrl = displayInfo.heroImageUrl,
+                mediaLogoUrl = displayInfo.logoUrl,
+                mediaCapsuleUrl = displayInfo.capsuleUrl,
+                mediaHeaderUrl = displayInfo.headerUrl,
+                mediaIconUrl = displayInfo.iconUrl,
+                gameId = displayInfo.gameId.takeIf { it != 0 },
+                appId = libraryItem.appId,
             )
         }
 

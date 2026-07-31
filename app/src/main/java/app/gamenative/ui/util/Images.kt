@@ -2,7 +2,10 @@ package app.gamenative.ui.util
 
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,6 +14,7 @@ import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -45,7 +49,14 @@ internal fun ListItemImage(
             contentDescription = contentDescription,
         ),
         loading = {
-            CircularProgressIndicator()
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.sizeIn(maxWidth = 64.dp, maxHeight = 64.dp),
+                )
+            }
         },
         failure = {
             onFailure()
@@ -72,7 +83,14 @@ internal fun SteamIconImage(
             contentDescription = contentDescription,
         ),
         loading = {
-            CircularProgressIndicator()
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.sizeIn(maxWidth = 64.dp, maxHeight = 64.dp),
+                )
+            }
         },
         failure = {
             Icon(Icons.Default.AccountCircle, null)
@@ -90,7 +108,14 @@ fun EmoticonImage(
         modifier = Modifier.size(size),
         imageModel = image,
         loading = {
-            CircularProgressIndicator()
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.sizeIn(maxWidth = 64.dp, maxHeight = 64.dp),
+                )
+            }
         },
         failure = {
             Icon(Icons.Filled.QuestionMark, null)

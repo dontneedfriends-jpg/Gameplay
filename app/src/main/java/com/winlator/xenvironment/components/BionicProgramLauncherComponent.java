@@ -189,18 +189,14 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
 
         final int MAX_PLAYERS = 4;
 
-        // Get the number of enabled players directly from ControllerManager.
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            String memPath;
-            if (i == 0) {
-                // Player 1 uses the original, non-numbered path that is known to work.
-                memPath = "/data/data/app.gamenative/files/imagefs/tmp/gamepad.mem";
-            } else {
-                // Players 2, 3, 4 use a 1-based index.
-                memPath = "/data/data/app.gamenative/files/imagefs/tmp/gamepad" + i + ".mem";
-            }
+        Context context = environment.getContext();
 
-            File memFile = new File(memPath);
+        // Get the number of enabled players directly from ControllerManager.
+        File gamepadShmDir = new File(context.getFilesDir(), "gamepad_shm");
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            // Player 1 uses the original, non-numbered path that is known to work.
+            String memName = (i == 0) ? "gamepad.mem" : "gamepad" + i + ".mem";
+            File memFile = new File(gamepadShmDir, memName);
             memFile.getParentFile().mkdirs();
             try (RandomAccessFile raf = new RandomAccessFile(memFile, "rw")) {
                 raf.setLength(64);
@@ -208,7 +204,6 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
                 Log.e("EVSHIM_HOST", "Failed to create mem file for player index "+i, e);
             }
         }
-        Context context = environment.getContext();
         ImageFs imageFs = ImageFs.find(context);
         File rootDir = imageFs.getRootDir();
 
@@ -232,6 +227,11 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         EnvVars envVars = new EnvVars();
 
         // Use the ControllerManager's dynamic count for the environment variable
+        // Keep the guest evshim on the exact same shared-memory directory that
+        // WinHandler maps in the Android process. This must be added to this
+        // local EnvVars instance; the class field is not the process environment
+        // ultimately passed to the Bionic launcher.
+        envVars.put("EVSHIM_BASE_PATH", context.getFilesDir().getAbsolutePath());
         envVars.put("EVSHIM_MAX_PLAYERS", String.valueOf(MAX_PLAYERS));
         if (true) {
             envVars.put("EVSHIM_SHM_ID", 1);

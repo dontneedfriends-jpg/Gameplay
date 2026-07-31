@@ -38,6 +38,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -81,9 +82,13 @@ import app.gamenative.ui.component.GamepadAction
 import app.gamenative.ui.component.GamepadActionBar
 import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.LibraryActions
+import app.gamenative.ui.component.dialog.ContainerConfigDialog
+import app.gamenative.ui.component.dialog.LoadingDialog
 import app.gamenative.ui.components.rememberCustomGameFolderPicker
 import app.gamenative.ui.components.requestPermissionsForPath
 import app.gamenative.ui.data.LibraryState
+import app.gamenative.ui.data.Achievement
+import com.winlator.container.ContainerData
 import app.gamenative.ui.enums.AppFilter
 import app.gamenative.ui.enums.LibraryTab
 import app.gamenative.ui.enums.PaneType
@@ -111,10 +116,13 @@ import app.gamenative.ui.util.PlatformLogoutCallbacks
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.CustomGameScanner
 import app.gamenative.utils.PlatformOAuthHandlers
 import app.gamenative.utils.SteamUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.os.SystemClock
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -351,6 +359,10 @@ private fun LibraryScreenContent(
     var isSystemMenuOpen by remember { mutableStateOf(false) }
     var isQuickActionsOpen by remember { mutableStateOf(false) }
     var pendingQuickPrimaryAppId by remember { mutableStateOf<String?>(null) }
+    // Quick-action overlays: per-game container settings and achievements
+    var quickContainerEdit by remember { mutableStateOf<Pair<LibraryItem, ContainerData>?>(null) }
+    var quickAchievements by remember { mutableStateOf<Pair<LibraryItem, List<Achievement>>?>(null) }
+    var quickAchievementsLoading by remember { mutableStateOf<LibraryItem?>(null) }
     // Track previous overlay states to detect when they close
     var wasSystemMenuOpen by remember { mutableStateOf(false) }
     var wasQuickActionsOpen by remember { mutableStateOf(false) }
@@ -501,6 +513,9 @@ private fun LibraryScreenContent(
                 }
                 is LocalInstallerImporter.ImportResult.Rejected -> SnackbarManager.show(result.reason)
                 is LocalInstallerImporter.ImportResult.Failed -> SnackbarManager.show(result.reason)
+                is LocalInstallerImporter.ImportResult.ReadyPortable -> {
+                    SnackbarManager.show(context.getString(R.string.disc_image_portable_added, result.folderName))
+                }
             }
         }
     }
@@ -1294,6 +1309,32 @@ private fun LibraryScreenContent(
                     selectedAppId = item.appId
                     selectedLibraryItem = item
                 },
+                onContainerSettings = { item ->
+                    isQuickActionsOpen = false
+                    lifecycleScope.launch {
+                        val data = withContext(Dispatchers.IO) {
+                            ContainerUtils.toContainerData(
+                                ContainerUtils.getOrCreateContainer(context, item.appId),
+                            )
+                        }
+                        quickContainerEdit = item to data
+                    }
+                },
+                onAchievements = { item ->
+                    isQuickActionsOpen = false
+                    quickAchievementsLoading = item
+                    lifecycleScope.launch {
+                        val list = withContext(Dispatchers.IO) {
+                            runCatching { SteamService.fetchAchievementsForDisplay(item.gameId) }.getOrNull()
+                        }
+                        quickAchievementsLoading = null
+                        if (list.isNullOrEmpty()) {
+                            SnackbarManager.show(context.getString(R.string.quick_action_no_achievements))
+                        } else {
+                            quickAchievements = item to list
+                        }
+                    }
+                },
                 onLibraryOptions = {
                     isQuickActionsOpen = false
                     onOptionsPanelToggle(true)
@@ -1306,6 +1347,41 @@ private fun LibraryScreenContent(
                     isQuickActionsOpen = false
                     onAddCustomGameClick()
                 },
+            )
+        }
+
+        // Quick-action overlays: per-game container settings
+        quickContainerEdit?.let { (item, containerData) ->
+            ContainerConfigDialog(
+                title = "${item.name} Config",
+                initialConfig = containerData,
+                onDismissRequest = { quickContainerEdit = null },
+                onSave = { newData ->
+                    ContainerUtils.applyToContainer(context, item.appId, newData)
+                    quickContainerEdit = null
+                },
+            )
+        }
+
+        // Quick-action overlays: achievements browser
+        quickAchievements?.let { (item, achievements) ->
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background,
+            ) {
+                SteamAchievementsPage(
+                    gameName = item.name,
+                    achievements = achievements,
+                    onBack = { quickAchievements = null },
+                )
+            }
+        }
+
+        if (quickAchievementsLoading != null) {
+            LoadingDialog(
+                visible = true,
+                progress = -1f,
+                message = stringResource(R.string.main_loading),
             )
         }
 

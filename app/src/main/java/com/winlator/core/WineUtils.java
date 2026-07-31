@@ -38,6 +38,25 @@ public abstract class WineUtils {
 
         // Auto-fix containers missing D: and E: drives
         String currentDrives = container.getDrives();
+        // Migrate storage drive paths baked in under a previous application id
+        // (e.g. containers created while the package was still app.gamenative).
+        String legacyStorageSuffix = "/storage";
+        String currentStorageDrive = "E:/data/data/" + app.gamenative.BuildConfig.APPLICATION_ID + "/storage";
+        for (String[] drive : Container.drivesIterator(currentDrives)) {
+            String drivePath = drive[1];
+            if (drivePath.endsWith(legacyStorageSuffix) &&
+                    drivePath.startsWith("/data/data/") &&
+                    !drivePath.startsWith("/data/data/" + app.gamenative.BuildConfig.APPLICATION_ID + "/")) {
+                String updatedDrives = currentDrives.replace(drive[0] + ":" + drivePath, currentStorageDrive);
+                if (!updatedDrives.equals(currentDrives)) {
+                    Log.i("WineUtils", "Migrating storage drive path from " + drivePath + " to current application id");
+                    currentDrives = updatedDrives;
+                    container.setDrives(currentDrives);
+                    container.saveData();
+                }
+                break;
+            }
+        }
         if (!currentDrives.contains("D:") || !currentDrives.contains("E:")) {
             Log.d("WineUtils", "Container missing D: or E: drives, adding them...");
             String missingDrives = "";
@@ -45,7 +64,7 @@ public abstract class WineUtils {
                 missingDrives += "D:" + android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
             }
             if (!currentDrives.contains("E:")) {
-                missingDrives += "E:/data/data/app.gamenative/storage";
+                missingDrives += "E:/data/data/" + app.gamenative.BuildConfig.APPLICATION_ID + "/storage";
             }
             String updatedDrives = missingDrives + currentDrives;
             container.setDrives(updatedDrives);
@@ -57,7 +76,7 @@ public abstract class WineUtils {
         for (String[] drive : container.drivesIterator()) {
             File linkTarget = new File(drive[1]);
             String path = linkTarget.getAbsolutePath();
-            if (!linkTarget.isDirectory() && path.endsWith("/app.gamenative/storage")) {
+            if (!linkTarget.isDirectory() && path.endsWith("/" + app.gamenative.BuildConfig.APPLICATION_ID + "/storage")) {
                 linkTarget.mkdirs();
                 FileUtils.chmod(linkTarget, 0771);
             }

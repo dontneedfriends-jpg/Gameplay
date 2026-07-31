@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -65,6 +66,7 @@ import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.util.ListItemImage
 import app.gamenative.utils.CustomGameScanner
+import app.gamenative.utils.CustomMediaUtils
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
 import java.io.File
@@ -138,19 +140,20 @@ internal fun GridViewCard(
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 // Game image (primary + optional fallback for Steam header/hero)
+                val mediaVersion by CustomMediaUtils.mediaVersionFlow.collectAsState(initial = 0)
                 val imageUrls = if (appInfo.gameSource == GameSource.CUSTOM_GAME) {
                     produceState(
                         initialValue = GridImageUrls("", ""),
                         key1 = appInfo.appId,
                         key2 = paneType,
-                        key3 = imageRefreshCounter,
+                        key3 = "$imageRefreshCounter|$mediaVersion",
                     ) {
                         value = withContext(Dispatchers.IO) {
                             getGridImageUrl(context, appInfo, paneType)
                         }
                     }.value
                 } else {
-                    remember(appInfo.appId, paneType, imageRefreshCounter) {
+                    remember(appInfo.appId, paneType, imageRefreshCounter, mediaVersion) {
                         getGridImageUrl(context, appInfo, paneType)
                     }
                 }
@@ -160,6 +163,7 @@ internal fun GridViewCard(
                     imageUrls.fallback,
                     appInfo.appId,
                     imageRefreshCounter,
+                    mediaVersion,
                 ) {
                     mutableStateOf(imageUrls.primary)
                 }
@@ -571,7 +575,18 @@ internal fun getGridImageUrl(
         return null
     }
 
-    return when (appInfo.gameSource) {
+    // Custom media (user-picked artwork) takes priority over every other source.
+    val customMediaUri = if (appInfo.gameId != 0) {
+        when (paneType) {
+            PaneType.GRID_CAPSULE -> CustomMediaUtils.getCustomCapsuleUri(appInfo.gameId)
+            PaneType.GRID_HERO -> CustomMediaUtils.getCustomHeroUri(appInfo.gameId)
+            else -> CustomMediaUtils.getCustomHeaderUri(appInfo.gameId)
+        }
+    } else {
+        null
+    }
+
+    val baseUrls = when (appInfo.gameSource) {
         GameSource.CUSTOM_GAME -> {
             val primary = when (paneType) {
                 PaneType.GRID_CAPSULE ->
@@ -635,5 +650,11 @@ internal fun getGridImageUrl(
                     fallback = appInfo.heroImageUrl,
                 )
         }
+    }
+
+    return if (customMediaUri != null) {
+        GridImageUrls(primary = customMediaUri.toString(), fallback = baseUrls.primary)
+    } else {
+        baseUrls
     }
 }

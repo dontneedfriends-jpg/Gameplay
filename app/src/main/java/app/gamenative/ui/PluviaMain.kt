@@ -655,12 +655,30 @@ fun PluviaMain(
                         } else {
                             "Confirm"
                         },
+                        actionBtnText = if (event.sessionId != null) {
+                            context.getString(R.string.installer_run_again)
+                        } else {
+                            null
+                        },
                         dismissBtnText = context.getString(R.string.ok),
                     )
                 }
 
                 is MainViewModel.MainUiEvent.InstallerCompleted -> {
                     SnackbarManager.show(context.getString(R.string.installer_completed_message, event.title))
+                }
+
+                is MainViewModel.MainUiEvent.RetryInstallerLaunch -> {
+                    preLaunchApp(
+                        context = context,
+                        appId = event.appId,
+                        skipCloudSync = true,
+                        setLoadingDialogVisible = viewModel::setLoadingDialogVisible,
+                        setLoadingProgress = viewModel::setLoadingDialogProgress,
+                        setLoadingMessage = viewModel::setLoadingDialogMessage,
+                        setMessageDialogState = setMessageDialogState,
+                        onSuccess = viewModel::launchApp,
+                    )
                 }
             }
         }
@@ -877,6 +895,13 @@ fun PluviaMain(
                 }
             } else {
                 null
+            }
+            if (failedSessionId != null) {
+                onActionClick = {
+                    setMessageDialogState(MessageDialogState(false))
+                    installerFailureSessionId = null
+                    viewModel.retryInstallerSession(context, failedSessionId)
+                }
             }
             onDismissClick = {
                 installerFailureSessionId = null

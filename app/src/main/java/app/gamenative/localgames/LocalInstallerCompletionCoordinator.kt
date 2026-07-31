@@ -138,6 +138,36 @@ object LocalInstallerCompletionCoordinator {
         Result.NeedsExecutableSelection(selecting)
     }
 
+    /**
+     * Recovery path for a failed installation: re-snapshots the executable
+     * baseline, marks the session as running again, and returns the app id so
+     * the caller can relaunch the installer in its existing container.
+     */
+    suspend fun retryInstaller(context: Context, sessionId: String): String = withContext(Dispatchers.IO) {
+        val store = InstallationSessionStore(context)
+        val session = requireNotNull(store.load(sessionId)) { "Installation session was not found" }
+        require(
+            session.state == InstallationState.FAILED ||
+                session.state == InstallationState.READY_TO_LAUNCH
+        ) { "Installation cannot be restarted in its current state" }
+        val appId = requireNotNull(session.appId) { "Installation session has no app id" }
+        val container = ContainerUtils.getContainer(context, appId)
+
+        val baseline = InstalledExecutableScanner.findCandidates(File(container.rootDir, ".wine/drive_c"))
+        val ready = if (session.state == InstallationState.FAILED) {
+            session.transitionTo(InstallationState.READY_TO_LAUNCH)
+        } else {
+            session
+        }
+        store.save(
+            ready.copy(
+                baselineExecutablePaths = baseline,
+                lastError = null,
+            ).transitionTo(InstallationState.INSTALLER_RUNNING),
+        )
+        appId
+    }
+
     private fun finalizeSelection(
         store: InstallationSessionStore,
         session: InstallationSession,

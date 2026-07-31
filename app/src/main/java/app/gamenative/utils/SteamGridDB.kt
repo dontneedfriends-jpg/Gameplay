@@ -566,5 +566,34 @@ object SteamGridDB {
         val capsulePath: String? = null, // Vertical grid for capsule view
         val releaseDate: Long? = null
     )
+
+    /**
+     * Finds a previously fetched SteamGridDB image of the given type in a folder.
+     * Matches files named `steamgriddb_<imageType>` with png/jpg/webp extensions;
+     * [excludePattern] skips files whose name contains the given substring.
+     * Returns a file:// URI string or null.
+     */
+    fun findSteamGridDBImage(folder: File, imageType: String, excludePattern: String? = null): String? {
+        if (!folder.exists() || !folder.isDirectory) return null
+        return folder.listFiles()?.firstOrNull { file ->
+            file.isFile &&
+                file.name.startsWith("steamgriddb_$imageType", ignoreCase = true) &&
+                (excludePattern == null || !file.name.contains(excludePattern, ignoreCase = true)) &&
+                (
+                    file.name.endsWith(".png", ignoreCase = true) ||
+                        file.name.endsWith(".jpg", ignoreCase = true) ||
+                        file.name.endsWith(".webp", ignoreCase = true)
+                    )
+        }?.let { android.net.Uri.fromFile(it).toString() }
+    }
+
+    /**
+     * Finds a previously fetched SteamGridDB image for the given app id by
+     * resolving the game's folder through [CustomGameScanner].
+     */
+    fun findSteamGridDBImageByAppId(appId: String, imageType: String, excludePattern: String? = null): String? {
+        val folderPath = CustomGameScanner.getFolderPathFromAppId(appId) ?: return null
+        return findSteamGridDBImage(File(folderPath), imageType, excludePattern)
+    }
 }
 

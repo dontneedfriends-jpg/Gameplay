@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,6 +31,8 @@ fun LibraryQuickActionsPanel(
     onDismiss: () -> Unit,
     onPrimaryAction: (LibraryItem) -> Unit,
     onDetails: (LibraryItem) -> Unit,
+    onContainerSettings: (LibraryItem) -> Unit,
+    onAchievements: (LibraryItem) -> Unit,
     onLibraryOptions: () -> Unit,
     onSearch: () -> Unit,
     onAddGame: () -> Unit,
@@ -68,6 +72,18 @@ fun LibraryQuickActionsPanel(
                 onClick = { onDetails(item) },
                 modifier = if (item.isRecommended) Modifier.focusRequester(firstItemFocusRequester) else Modifier,
             )
+            ConsoleMenuActionItem(
+                icon = Icons.Default.Settings,
+                label = stringResource(R.string.quick_action_container_settings),
+                onClick = { onContainerSettings(item) },
+            )
+            if (item.gameSource == GameSource.STEAM) {
+                ConsoleMenuActionItem(
+                    icon = Icons.Default.EmojiEvents,
+                    label = stringResource(R.string.achievements),
+                    onClick = { onAchievements(item) },
+                )
+            }
         }
 
         ConsoleMenuActionItem(

@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -116,10 +117,12 @@ internal fun ListViewCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // Game icon
+            val mediaVersion by app.gamenative.utils.CustomMediaUtils.mediaVersionFlow.collectAsState(initial = 0)
             val iconUrl by produceState(
                 initialValue = appInfo.clientIconUrl,
                 key1 = appInfo.appId,
                 key2 = appInfo.clientIconUrl,
+                key3 = mediaVersion,
             ) {
                 value = withContext(Dispatchers.IO) {
                     getListIconUrl(context, appInfo)
@@ -135,7 +138,7 @@ internal fun ListViewCard(
                 ListItemImage(
                     modifier = Modifier.fillMaxSize(),
                     imageModifier = Modifier.clip(RoundedCornerShape(10.dp)),
-                    image = { iconUrl },
+                    image = { app.gamenative.utils.bustCache(iconUrl, mediaVersion) },
                 )
             }
 
@@ -278,6 +281,10 @@ private fun InstallStatusBadge(
  */
 private fun getListIconUrl(context: Context, appInfo: LibraryItem): String {
     if (appInfo.isRecommended) return appInfo.iconHash
+    // Custom media (user-picked icon) takes priority over every other source.
+    if (appInfo.gameId != 0) {
+        app.gamenative.utils.CustomMediaUtils.getCustomIconUri(appInfo.gameId)?.let { return it.toString() }
+    }
     return if (appInfo.gameSource == GameSource.CUSTOM_GAME) {
         val path = CustomGameScanner.findIconFileForCustomGame(context, appInfo.appId)
         if (!path.isNullOrEmpty()) {

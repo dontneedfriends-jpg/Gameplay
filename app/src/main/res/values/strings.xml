@@ -721,6 +721,7 @@
     <string name="base_app_shortcut_created">Shortcut created</string>
     <string name="base_app_shortcut_failed">Failed to create shortcut: %s</string>
     <string name="base_app_images_fetched">Images fetched successfully</string>
+    <string name="base_app_images_fetching">Fetching images...</string>
     <string name="base_app_game_folder_not_found">Game folder not found</string>
     <string name="base_app_images_fetch_failed">Failed to fetch images: %s</string>
     <string name="base_app_exported">Exported</string>
@@ -1034,6 +1035,28 @@
     <string name="install_anyway">Install Anyway</string>
     <string name="remove_content">Remove content?</string>
     <string name="remove_content_confirmation">Are you sure you want to remove %1$s (%2$s)?</string>
+    <!-- Media management strings -->
+    <string name="media_logo_title">Logo</string>
+    <string name="media_logo_hint">Recommended: up to 600×200 PNG with transparency. Will be scaled to fit.</string>
+    <string name="media_icon_title">Icon (List view)</string>
+    <string name="media_icon_hint">Recommended: Square PNG with transparency. Will be center-cropped to fit.</string>
+    <string name="media_header_title">Header Image</string>
+    <string name="media_header_hint">Recommended: 920×430 JPG/PNG. Will be center-cropped to fit.</string>
+    <string name="media_grid_capsule_title">Capsule (Grid view)</string>
+    <string name="media_grid_capsule_hint">Recommended: 600×900 JPG/PNG. Will be center-cropped to fit.</string>
+    <string name="media_grid_hero_title">Hero (Grid view)</string>
+    <string name="media_grid_hero_hint">Recommended: 460×215 JPG/PNG. Will be center-cropped to fit.</string>
+    <string name="media_no_logo">No logo available</string>
+    <string name="media_no_icon">No icon available</string>
+    <string name="media_no_header">No header image available</string>
+    <string name="media_no_grid_capsule">No grid capsule image available</string>
+    <string name="media_no_grid_hero">No grid hero image available</string>
+    <string name="media_choose_media">Select an image to use instead.</string>
+    <string name="media_choose_image">Choose image</string>
+    <string name="media_remove_custom_image">Remove custom image</string>
+    <string name="media_updated">%1$s updated</string>
+    <string name="media_update_failed">Failed to update %1$s</string>
+    <string name="media_reverted">Reverted to default artwork</string>
 
     <!-- Settings -->
     <string name="settings_language">Language</string>
@@ -1329,6 +1352,7 @@
     <string name="container_config_tab_win_components">Win Components</string>
     <string name="container_config_tab_environment">Environment</string>
     <string name="container_config_tab_drives">Drives</string>
+    <string name="container_config_tab_media">Media</string>
     <string name="container_config_tab_advanced">Advanced</string>
     <string name="container_config_vkd3d_version">VKD3D Version</string>
     <string name="container_config_executable_path">Executable Path</string>
@@ -2387,5 +2411,10 @@
     <string name="installer_completion_failed_title">Could not finish installing %1$s</string>
     <string name="installer_completed_message">%1$s is ready to play</string>
     <string name="installer_browse_all_executables">Browse all executables</string>
+    <string name="installer_run_again">Run installer again</string>
+    <string name="installer_running_splash">Running installer — finish the setup in the Windows window</string>
+    <string name="disc_image_portable_added">%1$s was extracted and added to your library</string>
+    <string name="quick_action_container_settings">Container settings</string>
+    <string name="quick_action_no_achievements">No achievements available for this game</string>
     <string name="wfm_install_failed">Could not update the container file manager. Open Container was not started.</string>
 </resources>

@@ -324,6 +324,13 @@ fun ContainerConfigDialog(
     initialConfig: ContainerData = ContainerData(),
     onDismissRequest: () -> Unit,
     onSave: (ContainerData) -> Unit,
+    mediaHeroUrl: String? = null,
+    mediaLogoUrl: String? = null,
+    mediaCapsuleUrl: String? = null,
+    mediaHeaderUrl: String? = null,
+    mediaIconUrl: String? = null,
+    gameId: Int? = null,
+    appId: String? = null,
 ) {
     if (visible) {
         val context = LocalContext.current
@@ -1308,6 +1315,7 @@ fun ContainerConfigDialog(
                         stringResource(R.string.container_config_tab_win_components),
                         stringResource(R.string.container_config_tab_environment),
                         stringResource(R.string.container_config_tab_drives),
+                        stringResource(R.string.container_config_tab_media),
                         stringResource(R.string.container_config_tab_advanced)
                     )
 
@@ -1368,7 +1376,18 @@ fun ContainerConfigDialog(
                             if (selectedTab == 6) WinComponentsTabContent(state)
                             if (selectedTab == 7) EnvironmentTabContent(state)
                             if (selectedTab == 8) DrivesTabContent(state)
-                            if (selectedTab == 9) AdvancedTabContent(state)
+                            if (selectedTab == 9) {
+                                MediaTabContent(
+                                    gameId = gameId,
+                                    appId = appId,
+                                    mediaHeroUrl = mediaHeroUrl,
+                                    mediaLogoUrl = mediaLogoUrl,
+                                    mediaCapsuleUrl = mediaCapsuleUrl,
+                                    mediaHeaderUrl = mediaHeaderUrl,
+                                    mediaIconUrl = mediaIconUrl,
+                                )
+                            }
+                            if (selectedTab == 10) AdvancedTabContent(state)
                         }
                     }
                 }

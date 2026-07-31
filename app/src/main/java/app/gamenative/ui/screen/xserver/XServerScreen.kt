@@ -3869,6 +3869,8 @@ private fun setupXEnvironment(
         PluviaApp.events.emit(AndroidEvent.GuestProgramTerminated)
     }
 
+    val PRELAUNCH_STEP_TIMEOUT_MS = 4 * 60 * 1000L
+
     fun chainCommands(remaining: List<PreLaunchSetup.ChainedCommand>) {
         if (remaining.isEmpty()) {
             guestProgramLauncherComponent.setGuestExecutable(gameExecutable)
@@ -3876,8 +3878,13 @@ private fun setupXEnvironment(
             return
         }
         guestProgramLauncherComponent.setGuestExecutable(remaining.first().executable)
-        guestProgramLauncherComponent.setTerminationCallback { _ ->
-            remaining.first().onComplete()
+        val stepCompleted = java.util.concurrent.atomic.AtomicBoolean(false)
+        var stepWatchdog: java.util.Timer? = null
+        val advanceStep: (Boolean) -> Unit = advanceStep@{ markDone ->
+            if (!stepCompleted.compareAndSet(false, true)) return@advanceStep
+            stepWatchdog?.cancel()
+            stepWatchdog = null
+            if (markDone) remaining.first().onComplete()
             guestProgramLauncherComponent.setPreUnpack(null)
             try {
                 guestProgramLauncherComponent.execShellCommand("wineserver -k")
@@ -3893,6 +3900,34 @@ private fun setupXEnvironment(
             chainCommands(nextRemaining)
             guestProgramLauncherComponent.start()
         }
+        guestProgramLauncherComponent.setTerminationCallback { _ -> advanceStep(true) }
+
+        // Watchdog: a hung prerequisite installer (e.g. vcredist stuck at
+        // "Validating") must never stall the whole launch. Kill the common
+        // installer processes and continue the chain without marking the step
+        // done, so it is retried on the next launch.
+        stepWatchdog = java.util.Timer("prelaunch-step-watchdog", true)
+        stepWatchdog?.schedule(
+            object : java.util.TimerTask() {
+                override fun run() {
+                    if (stepCompleted.get()) return
+                    Timber.w(
+                        "Chained pre-launch command timed out after " +
+                            "${PRELAUNCH_STEP_TIMEOUT_MS / 1000}s; killing installer processes and continuing",
+                    )
+                    runCatching {
+                        guestProgramLauncherComponent.execShellCommand(
+                            "taskkill /F /IM msiexec.exe & taskkill /F /IM vc_redist.x86.exe" +
+                                " & taskkill /F /IM vc_redist.x64.exe & taskkill /F /IM vcredist_x86.exe" +
+                                " & taskkill /F /IM vcredist_x64.exe & taskkill /F /IM DXSETUP.exe" +
+                                " & taskkill /F /IM setup.exe",
+                        )
+                    }
+                    advanceStep(false)
+                }
+            },
+            PRELAUNCH_STEP_TIMEOUT_MS,
+        )
     }
 
     if (allChainedCommands.isNotEmpty()) {

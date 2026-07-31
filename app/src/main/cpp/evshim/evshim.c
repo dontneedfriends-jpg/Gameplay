@@ -81,9 +81,41 @@ static void build_gamepad_dir(char *out, size_t size)
 {
     const char *base = getenv("EVSHIM_BASE_PATH");
 
-    // fallback
+    char detected_base[PATH_MAX];
+    detected_base[0] = '\0';
+
+    /*
+     * The library is also loaded directly by the Android process, before the
+     * guest environment exists. Derive that process' package name instead of
+     * relying on the historical app.gamenative application id. Android exposes
+     * it as the first NUL-terminated value in /proc/self/cmdline.
+     */
     if (!base || !*base) {
-        base = "/data/data/app.gamenative/files";
+        FILE *cmdline = fopen("/proc/self/cmdline", "rb");
+        if (cmdline) {
+            char process_name[256] = {0};
+            size_t read = fread(process_name, 1, sizeof(process_name) - 1, cmdline);
+            fclose(cmdline);
+            if (read > 0) {
+                process_name[read] = '\0';
+                char *process_suffix = strchr(process_name, ':');
+                if (process_suffix) *process_suffix = '\0';
+                if (*process_name) {
+                    snprintf(
+                        detected_base,
+                        sizeof(detected_base),
+                        "/data/data/%s/files",
+                        process_name
+                    );
+                    base = detected_base;
+                }
+            }
+        }
+    }
+
+    /* Last-resort compatibility fallback for unusual process environments. */
+    if (!base || !*base) {
+        base = "/data/data/app.gameplay/files";
     }
 
     snprintf(out, size, "%s/gamepad_shm", base);

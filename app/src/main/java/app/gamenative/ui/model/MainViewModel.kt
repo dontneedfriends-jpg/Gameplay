@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gamenative.PluviaApp
 import app.gamenative.PrefManager
+import app.gamenative.R
 import app.gamenative.data.GameProcessInfo
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryPlayHistory
@@ -17,6 +18,7 @@ import app.gamenative.enums.LoginResult
 import app.gamenative.enums.PathType
 import app.gamenative.events.AndroidEvent
 import app.gamenative.events.SteamEvent
+import app.gamenative.localgames.LocalContainerLaunch
 import app.gamenative.localgames.LocalInstallerCompletionCoordinator
 import app.gamenative.localgames.InstallationSessionStore
 import app.gamenative.localgames.InstallationState
@@ -89,6 +91,7 @@ class MainViewModel @Inject constructor(
             val sessionId: String? = null,
         ) : MainUiEvent()
         data class InstallerCompleted(val title: String) : MainUiEvent()
+        data class RetryInstallerLaunch(val appId: String) : MainUiEvent()
         data object ServiceReady : MainUiEvent()
     }
 
@@ -573,6 +576,17 @@ class MainViewModel @Inject constructor(
 
             apiJob.await()
 
+            // Installer sessions get an explicit stage label on the boot splash.
+            runCatching {
+                val container = ContainerUtils.getContainer(context, appId)
+                val mode = container.getExtra(LocalContainerLaunch.EXTRA_MODE)
+                if (mode == LocalContainerLaunch.MODE_INSTALLER_EXE_A ||
+                    mode == LocalContainerLaunch.MODE_INSTALLER_MSI_A
+                ) {
+                    setBootingSplashText(context.getString(R.string.installer_running_splash))
+                }
+            }
+
             _uiEvent.send(MainUiEvent.LaunchApp)
         }
     }
@@ -716,6 +730,23 @@ class MainViewModel @Inject constructor(
                     MainUiEvent.InstallerCompletionFailed(
                         title = "Installation",
                         reason = error.message ?: "Could not scan the installed files",
+                    ),
+                )
+            }
+        }
+    }
+
+    fun retryInstallerSession(context: Context, sessionId: String) {
+        viewModelScope.launch {
+            runCatching {
+                LocalInstallerCompletionCoordinator.retryInstaller(context, sessionId)
+            }.onSuccess { appId ->
+                _uiEvent.send(MainUiEvent.RetryInstallerLaunch(appId))
+            }.onFailure { error ->
+                _uiEvent.send(
+                    MainUiEvent.InstallerCompletionFailed(
+                        title = "Installation",
+                        reason = error.message ?: "Could not restart the installer",
                     ),
                 )
             }

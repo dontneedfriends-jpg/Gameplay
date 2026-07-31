@@ -31,6 +31,22 @@ import org.json.JSONObject
 import timber.log.Timber
 
 object ContainerUtils {
+
+    // Container creation is not thread-safe: concurrent creation for the same id
+    // races the wine-prefix extraction (files vanish mid-chmod) and fails with
+    // "Failed to create container". Serialize creation per container id.
+    private val containerCreationLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    private inline fun <T> synchronizedContainerCreation(containerId: String, block: () -> T): T {
+        val lock = containerCreationLocks.getOrPut(containerId) { Any() }
+        return synchronized(lock) {
+            try {
+                block()
+            } finally {
+                containerCreationLocks.remove(containerId, lock)
+            }
+        }
+    }
     data class GpuInfo(
         val deviceId: Int,
         val vendorId: Int,
@@ -1010,7 +1026,14 @@ object ContainerUtils {
         val container = if (containerManager.hasContainer(appId)) {
             containerManager.getContainerById(appId)
         } else {
-            createNewContainer(context, appId, appId, containerManager)
+            synchronizedContainerCreation(appId) {
+                // Re-check inside the lock: a concurrent creator may have finished.
+                if (containerManager.hasContainer(appId)) {
+                    containerManager.getContainerById(appId)
+                } else {
+                    createNewContainer(context, appId, appId, containerManager)
+                }
+            }
         }
 
         // Ensure Custom Games have the A: drive mapped to the game folder
