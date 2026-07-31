@@ -16,20 +16,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -47,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
+import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.component.NoExtractOutlinedTextField
 import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
@@ -55,6 +54,11 @@ import com.winlator.inputcontrols.Binding
 import com.winlator.inputcontrols.ControlsProfile
 import com.winlator.inputcontrols.RadialMenu
 import kotlin.math.roundToInt
+
+private enum class RadialMenuSettingsCategory {
+    LAYOUT,
+    SLOTS,
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,65 +126,98 @@ fun RadialMenuSettingsContent(
         onSave()
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.radial_menu_settings_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = ::saveMenu) {
-                        Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
-                    }
-                },
-            )
+    var selectedCategory by remember { mutableStateOf(RadialMenuSettingsCategory.LAYOUT) }
+    val categories = RadialMenuSettingsCategory.entries
+
+    ConsoleSettingsPage(
+        visible = true,
+        title = stringResource(R.string.radial_menu_settings_title),
+        onDismissRequest = onDismiss,
+        actions = {
+            IconButton(onClick = ::saveMenu) {
+                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.save))
+            }
         },
-    ) { padding ->
-        Column(
+    ) {
+        Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    val index = categories.indexOf(selectedCategory).coerceAtLeast(0)
+                    when (event.key) {
+                        Key.ButtonR1, Key.ButtonR2 -> {
+                            selectedCategory = categories[(index + 1) % categories.size]
+                            true
+                        }
+                        Key.ButtonL1, Key.ButtonL2 -> {
+                            selectedCategory = categories[(index - 1 + categories.size) % categories.size]
+                            true
+                        }
+                        else -> false
+                    }
+                },
         ) {
-            SectionHeader(text = stringResource(R.string.radial_menu_slot_count))
-            SlotCountSetting(
-                slotCount = slotCount,
-                onSlotCountChange = ::updateSlotCount,
-            )
-
-            SectionHeader(text = stringResource(R.string.quick_presets))
-            PresetButtons(
-                onCommonPreset = {
-                    applyPreset(commonPreset)
+            ConsoleCategoryRail(
+                items = categories,
+                selectedItem = selectedCategory,
+                label = { category ->
+                    when (category) {
+                        RadialMenuSettingsCategory.LAYOUT -> stringResource(R.string.radial_menu_category_layout)
+                        RadialMenuSettingsCategory.SLOTS -> stringResource(R.string.radial_menu_slots)
+                    }
                 },
-                onWeaponsPreset = {
-                    applyPreset(weaponsPreset)
-                },
+                onSelected = { selectedCategory = it },
+                footer = stringResource(R.string.container_config_console_controls_hint),
+                requestInitialFocus = true,
+                compact = true,
+                modifier = Modifier.width(230.dp),
             )
-
-            SectionHeader(text = stringResource(R.string.radial_menu_slots))
-            for (index in 0 until slotCount) {
-                SlotSetting(
-                    index = index,
-                    label = labels[index],
-                    binding = bindings[index],
-                    onLabelChange = { labels[index] = it },
-                    onEditBinding = { bindingSlotToEdit = index },
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+            val scrollState = rememberScrollState()
+            LaunchedEffect(selectedCategory) {
+                scrollState.scrollTo(0)
             }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, bottom = 16.dp)
+                    .verticalScroll(scrollState),
+            ) {
+                when (selectedCategory) {
+                    RadialMenuSettingsCategory.LAYOUT -> {
+                        SectionHeader(text = stringResource(R.string.radial_menu_slot_count))
+                        SlotCountSetting(
+                            slotCount = slotCount,
+                            onSlotCountChange = ::updateSlotCount,
+                        )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                        SectionHeader(text = stringResource(R.string.quick_presets))
+                        PresetButtons(
+                            onCommonPreset = {
+                                applyPreset(commonPreset)
+                            },
+                            onWeaponsPreset = {
+                                applyPreset(weaponsPreset)
+                            },
+                        )
+                    }
+                    RadialMenuSettingsCategory.SLOTS -> {
+                        SectionHeader(text = stringResource(R.string.radial_menu_slots))
+                        for (index in 0 until slotCount) {
+                            SlotSetting(
+                                index = index,
+                                label = labels[index],
+                                binding = bindings[index],
+                                onLabelChange = { labels[index] = it },
+                                onEditBinding = { bindingSlotToEdit = index },
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 

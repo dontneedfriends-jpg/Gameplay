@@ -9,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -73,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.theme.motionSpec
 import app.gamenative.ui.util.ScreenEffectsConfig
 import app.gamenative.ui.util.adaptivePanelWidth
 import app.gamenative.ui.util.applyScreenEffectsConfig
@@ -217,6 +219,77 @@ private fun DisplayBrightnessRow(
     )
 }
 
+private enum class ScreenEffectsCategory {
+    SCALING,
+    COLOR,
+    SHADERS,
+}
+
+@Composable
+private fun ScreenEffectsCategoryStrip(
+    selectedCategory: ScreenEffectsCategory,
+    onSelect: (ScreenEffectsCategory) -> Unit,
+    modifier: Modifier = Modifier,
+    firstItemFocusRequester: FocusRequester? = null,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        ScreenEffectsCategory.entries.forEachIndexed { index, category ->
+            val interactionSource = remember { MutableInteractionSource() }
+            val focused by interactionSource.collectIsFocusedAsState()
+            val selected = category == selectedCategory
+            val shape = RoundedCornerShape(10.dp)
+            Box(
+                modifier = (if (index == 0 && firstItemFocusRequester != null) {
+                    Modifier.focusRequester(firstItemFocusRequester)
+                } else {
+                    Modifier
+                })
+                    .weight(1f)
+                    .focusRing(interactionSource, shape, width = 2.dp)
+                    .background(
+                        when {
+                            focused -> MaterialTheme.colorScheme.primaryContainer
+                            selected -> MaterialTheme.colorScheme.surfaceContainerHigh
+                            else -> Color.Transparent
+                        },
+                        shape,
+                    )
+                    .selectable(
+                        selected = selected,
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = { onSelect(category) },
+                    )
+                    .padding(horizontal = 10.dp, vertical = 9.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = stringResource(
+                        when (category) {
+                            ScreenEffectsCategory.SCALING -> R.string.screen_effects_scaling
+                            ScreenEffectsCategory.COLOR -> R.string.screen_effects_color_adjustments
+                            ScreenEffectsCategory.SHADERS -> R.string.screen_effects_shader_toggles
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (focused || selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = when {
+                        focused -> MaterialTheme.colorScheme.onPrimaryContainer
+                        selected -> MaterialTheme.colorScheme.onSurface
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun GLScreenEffectsTabContent(
     renderer: GLRenderer,
@@ -301,149 +374,167 @@ fun GLScreenEffectsTabContent(
         enableNTSC = false
     }
 
-    Column(
-        modifier = modifier
-            .verticalScroll(scrollState)
-            .focusGroup()
-            .padding(vertical = 12.dp),
-    ) {
-        DisplayBrightnessRow(focusRequester = firstItemFocusRequester)
+    var selectedCategory by remember { mutableStateOf(ScreenEffectsCategory.SCALING) }
 
-        Spacer(modifier = Modifier.height(20.dp))
+    LaunchedEffect(selectedCategory) {
+        scrollState.scrollTo(0)
+    }
 
-        ScreenEffectRadioRow(
-            title = stringResource(scalingModeLabelRes(ScreenEffectsConfig.SCALING_MODE_NONE)),
-            selected = scalingMode == ScreenEffectsConfig.SCALING_MODE_NONE,
-            onSelect = { scalingMode = ScreenEffectsConfig.SCALING_MODE_NONE },
+    Column(modifier = modifier) {
+        ScreenEffectsCategoryStrip(
+            selectedCategory = selectedCategory,
+            onSelect = { selectedCategory = it },
+            firstItemFocusRequester = firstItemFocusRequester,
+            modifier = Modifier.padding(top = 8.dp),
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_upscaling))
-        GL_UPSCALING_MODES.forEach { mode ->
-            ScreenEffectRadioRow(
-                title = stringResource(scalingModeLabelRes(mode)),
-                subtitle = stringResource(scalingModeDescRes(mode)),
-                selected = scalingMode == mode,
-                onSelect = { scalingMode = mode },
-            )
-        }
-
-        if (scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR ||
-            scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR_ASPECT
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .focusGroup()
+                .padding(vertical = 12.dp),
         ) {
-            ScreenEffectAdjustmentRow(
-                title = stringResource(R.string.screen_effects_fsr_sharpness),
-                valueText = stringResource(R.string.screen_effects_fsr_sharpness_value, fsrSharpnessLevel),
-                progress = normalizedProgress(
-                    fsrSharpnessLevel.toFloat(),
-                    ScreenEffectsConfig.FSR_MIN_LEVEL.toFloat(),
-                    ScreenEffectsConfig.FSR_MAX_LEVEL.toFloat(),
-                ),
-                onDecrease = {
-                    fsrSharpnessLevel = (fsrSharpnessLevel - 1).coerceAtLeast(ScreenEffectsConfig.FSR_MIN_LEVEL)
-                },
-                onIncrease = {
-                    fsrSharpnessLevel = (fsrSharpnessLevel + 1).coerceAtMost(ScreenEffectsConfig.FSR_MAX_LEVEL)
-                },
+            when (selectedCategory) {
+                ScreenEffectsCategory.SCALING -> {
+                    ScreenEffectRadioRow(
+                        title = stringResource(scalingModeLabelRes(ScreenEffectsConfig.SCALING_MODE_NONE)),
+                        selected = scalingMode == ScreenEffectsConfig.SCALING_MODE_NONE,
+                        onSelect = { scalingMode = ScreenEffectsConfig.SCALING_MODE_NONE },
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_upscaling))
+                    GL_UPSCALING_MODES.forEach { mode ->
+                        ScreenEffectRadioRow(
+                            title = stringResource(scalingModeLabelRes(mode)),
+                            subtitle = stringResource(scalingModeDescRes(mode)),
+                            selected = scalingMode == mode,
+                            onSelect = { scalingMode = mode },
+                        )
+                    }
+
+                    if (scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR ||
+                        scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR_ASPECT
+                    ) {
+                        ScreenEffectAdjustmentRow(
+                            title = stringResource(R.string.screen_effects_fsr_sharpness),
+                            valueText = stringResource(R.string.screen_effects_fsr_sharpness_value, fsrSharpnessLevel),
+                            progress = normalizedProgress(
+                                fsrSharpnessLevel.toFloat(),
+                                ScreenEffectsConfig.FSR_MIN_LEVEL.toFloat(),
+                                ScreenEffectsConfig.FSR_MAX_LEVEL.toFloat(),
+                            ),
+                            onDecrease = {
+                                fsrSharpnessLevel = (fsrSharpnessLevel - 1).coerceAtLeast(ScreenEffectsConfig.FSR_MIN_LEVEL)
+                            },
+                            onIncrease = {
+                                fsrSharpnessLevel = (fsrSharpnessLevel + 1).coerceAtMost(ScreenEffectsConfig.FSR_MAX_LEVEL)
+                            },
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_basic_scaling))
+                    GL_BASIC_MODES.forEach { mode ->
+                        ScreenEffectRadioRow(
+                            title = stringResource(scalingModeLabelRes(mode)),
+                            subtitle = stringResource(scalingModeDescRes(mode)),
+                            selected = scalingMode == mode,
+                            onSelect = { scalingMode = mode },
+                        )
+                    }
+                }
+                ScreenEffectsCategory.COLOR -> {
+                    DisplayBrightnessRow()
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_color_adjustments))
+
+                    ScreenEffectAdjustmentRow(
+                        title = stringResource(R.string.screen_effects_brightness),
+                        valueText = formatPercent(brightness),
+                        progress = normalizedProgress(brightness, -100f, 100f),
+                        onDecrease = {
+                            brightness = (brightness - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                        onIncrease = {
+                            brightness = (brightness + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                    )
+                    ScreenEffectAdjustmentRow(
+                        title = stringResource(R.string.screen_effects_contrast),
+                        valueText = formatPercent(contrast),
+                        progress = normalizedProgress(contrast, -100f, 100f),
+                        onDecrease = {
+                            contrast = (contrast - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                        onIncrease = {
+                            contrast = (contrast + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                    )
+                    ScreenEffectAdjustmentRow(
+                        title = stringResource(R.string.screen_effects_gamma),
+                        valueText = String.format("%.2fx", gamma),
+                        progress = normalizedProgress(gamma, 0.5f, 2.5f),
+                        onDecrease = {
+                            gamma = (gamma - SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
+                        },
+                        onIncrease = {
+                            gamma = (gamma + SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
+                        },
+                    )
+                }
+                ScreenEffectsCategory.SHADERS -> {
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_shader_toggles))
+
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_toon),
+                        subtitle = stringResource(R.string.screen_effects_toon_description),
+                        enabled = enableToon,
+                        onToggle = { enableToon = !enableToon },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_fxaa),
+                        subtitle = stringResource(R.string.screen_effects_fxaa_description),
+                        enabled = enableFXAA,
+                        onToggle = { enableFXAA = !enableFXAA },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_vivid),
+                        subtitle = stringResource(R.string.screen_effects_vivid_description),
+                        enabled = enableVivid,
+                        onToggle = { enableVivid = !enableVivid },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_crt),
+                        subtitle = stringResource(R.string.screen_effects_crt_description),
+                        enabled = enableCRT,
+                        onToggle = { enableCRT = !enableCRT },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_ntsc),
+                        subtitle = stringResource(R.string.screen_effects_ntsc_description),
+                        enabled = enableNTSC,
+                        onToggle = { enableNTSC = !enableNTSC },
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            AccentActionRow(
+                title = stringResource(R.string.screen_effects_reset),
+                icon = Icons.Default.RestartAlt,
+                accentColor = PluviaTheme.colors.accentPurple,
+                onClick = ::resetEffects,
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_basic_scaling))
-        GL_BASIC_MODES.forEach { mode ->
-            ScreenEffectRadioRow(
-                title = stringResource(scalingModeLabelRes(mode)),
-                subtitle = stringResource(scalingModeDescRes(mode)),
-                selected = scalingMode == mode,
-                onSelect = { scalingMode = mode },
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_color_adjustments))
-
-        ScreenEffectAdjustmentRow(
-            title = stringResource(R.string.screen_effects_brightness),
-            valueText = formatPercent(brightness),
-            progress = normalizedProgress(brightness, -100f, 100f),
-            onDecrease = {
-                brightness = (brightness - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-            onIncrease = {
-                brightness = (brightness + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-        )
-        ScreenEffectAdjustmentRow(
-            title = stringResource(R.string.screen_effects_contrast),
-            valueText = formatPercent(contrast),
-            progress = normalizedProgress(contrast, -100f, 100f),
-            onDecrease = {
-                contrast = (contrast - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-            onIncrease = {
-                contrast = (contrast + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-        )
-        ScreenEffectAdjustmentRow(
-            title = stringResource(R.string.screen_effects_gamma),
-            valueText = String.format("%.2fx", gamma),
-            progress = normalizedProgress(gamma, 0.5f, 2.5f),
-            onDecrease = {
-                gamma = (gamma - SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
-            },
-            onIncrease = {
-                gamma = (gamma + SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
-            },
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_shader_toggles))
-
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_toon),
-            subtitle = stringResource(R.string.screen_effects_toon_description),
-            enabled = enableToon,
-            onToggle = { enableToon = !enableToon },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_fxaa),
-            subtitle = stringResource(R.string.screen_effects_fxaa_description),
-            enabled = enableFXAA,
-            onToggle = { enableFXAA = !enableFXAA },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_vivid),
-            subtitle = stringResource(R.string.screen_effects_vivid_description),
-            enabled = enableVivid,
-            onToggle = { enableVivid = !enableVivid },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_crt),
-            subtitle = stringResource(R.string.screen_effects_crt_description),
-            enabled = enableCRT,
-            onToggle = { enableCRT = !enableCRT },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_ntsc),
-            subtitle = stringResource(R.string.screen_effects_ntsc_description),
-            enabled = enableNTSC,
-            onToggle = { enableNTSC = !enableNTSC },
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        AccentActionRow(
-            title = stringResource(R.string.screen_effects_reset),
-            icon = Icons.Default.RestartAlt,
-            accentColor = PluviaTheme.colors.accentPurple,
-            onClick = ::resetEffects,
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
@@ -539,150 +630,168 @@ fun ScreenEffectsTabContent(
         enableNTSC = false
     }
 
-    Column(
-        modifier = modifier
-            .verticalScroll(scrollState)
-            .focusGroup()
-            .padding(vertical = 12.dp),
-    ) {
-        DisplayBrightnessRow(focusRequester = firstItemFocusRequester)
+    var selectedCategory by remember { mutableStateOf(ScreenEffectsCategory.SCALING) }
 
-        Spacer(modifier = Modifier.height(20.dp))
+    LaunchedEffect(selectedCategory) {
+        scrollState.scrollTo(0)
+    }
 
-        ScreenEffectRadioRow(
-            title = stringResource(scalingModeLabelRes(ScreenEffectsConfig.SCALING_MODE_NONE)),
-            selected = scalingMode == ScreenEffectsConfig.SCALING_MODE_NONE,
-            onSelect = { scalingMode = ScreenEffectsConfig.SCALING_MODE_NONE },
+    Column(modifier = modifier) {
+        ScreenEffectsCategoryStrip(
+            selectedCategory = selectedCategory,
+            onSelect = { selectedCategory = it },
+            firstItemFocusRequester = firstItemFocusRequester,
+            modifier = Modifier.padding(top = 8.dp),
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_upscaling))
-        VULKAN_UPSCALING_MODES.forEach { mode ->
-            ScreenEffectRadioRow(
-                title = stringResource(scalingModeLabelRes(mode)),
-                subtitle = stringResource(scalingModeDescRes(mode)),
-                selected = scalingMode == mode,
-                onSelect = { scalingMode = mode },
-            )
-        }
-
-        if (scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR ||
-            scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR_ASPECT ||
-            scalingMode == ScreenEffectsConfig.SCALING_MODE_DLS
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(scrollState)
+                .focusGroup()
+                .padding(vertical = 12.dp),
         ) {
-            ScreenEffectAdjustmentRow(
-                title = stringResource(R.string.screen_effects_fsr_sharpness),
-                valueText = stringResource(R.string.screen_effects_fsr_sharpness_value, fsrSharpnessLevel),
-                progress = normalizedProgress(
-                    fsrSharpnessLevel.toFloat(),
-                    ScreenEffectsConfig.FSR_MIN_LEVEL.toFloat(),
-                    ScreenEffectsConfig.FSR_MAX_LEVEL.toFloat(),
-                ),
-                onDecrease = {
-                    fsrSharpnessLevel = (fsrSharpnessLevel - 1).coerceAtLeast(ScreenEffectsConfig.FSR_MIN_LEVEL)
-                },
-                onIncrease = {
-                    fsrSharpnessLevel = (fsrSharpnessLevel + 1).coerceAtMost(ScreenEffectsConfig.FSR_MAX_LEVEL)
-                },
+            when (selectedCategory) {
+                ScreenEffectsCategory.SCALING -> {
+                    ScreenEffectRadioRow(
+                        title = stringResource(scalingModeLabelRes(ScreenEffectsConfig.SCALING_MODE_NONE)),
+                        selected = scalingMode == ScreenEffectsConfig.SCALING_MODE_NONE,
+                        onSelect = { scalingMode = ScreenEffectsConfig.SCALING_MODE_NONE },
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_upscaling))
+                    VULKAN_UPSCALING_MODES.forEach { mode ->
+                        ScreenEffectRadioRow(
+                            title = stringResource(scalingModeLabelRes(mode)),
+                            subtitle = stringResource(scalingModeDescRes(mode)),
+                            selected = scalingMode == mode,
+                            onSelect = { scalingMode = mode },
+                        )
+                    }
+
+                    if (scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR ||
+                        scalingMode == ScreenEffectsConfig.SCALING_MODE_FSR_ASPECT ||
+                        scalingMode == ScreenEffectsConfig.SCALING_MODE_DLS
+                    ) {
+                        ScreenEffectAdjustmentRow(
+                            title = stringResource(R.string.screen_effects_fsr_sharpness),
+                            valueText = stringResource(R.string.screen_effects_fsr_sharpness_value, fsrSharpnessLevel),
+                            progress = normalizedProgress(
+                                fsrSharpnessLevel.toFloat(),
+                                ScreenEffectsConfig.FSR_MIN_LEVEL.toFloat(),
+                                ScreenEffectsConfig.FSR_MAX_LEVEL.toFloat(),
+                            ),
+                            onDecrease = {
+                                fsrSharpnessLevel = (fsrSharpnessLevel - 1).coerceAtLeast(ScreenEffectsConfig.FSR_MIN_LEVEL)
+                            },
+                            onIncrease = {
+                                fsrSharpnessLevel = (fsrSharpnessLevel + 1).coerceAtMost(ScreenEffectsConfig.FSR_MAX_LEVEL)
+                            },
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_basic_scaling))
+                    VULKAN_BASIC_MODES.forEach { mode ->
+                        ScreenEffectRadioRow(
+                            title = stringResource(scalingModeLabelRes(mode)),
+                            subtitle = stringResource(scalingModeDescRes(mode)),
+                            selected = scalingMode == mode,
+                            onSelect = { scalingMode = mode },
+                        )
+                    }
+                }
+                ScreenEffectsCategory.COLOR -> {
+                    DisplayBrightnessRow()
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_color_adjustments))
+
+                    ScreenEffectAdjustmentRow(
+                        title = stringResource(R.string.screen_effects_brightness),
+                        valueText = formatPercent(brightness),
+                        progress = normalizedProgress(brightness, -100f, 100f),
+                        onDecrease = {
+                            brightness = (brightness - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                        onIncrease = {
+                            brightness = (brightness + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                    )
+                    ScreenEffectAdjustmentRow(
+                        title = stringResource(R.string.screen_effects_contrast),
+                        valueText = formatPercent(contrast),
+                        progress = normalizedProgress(contrast, -100f, 100f),
+                        onDecrease = {
+                            contrast = (contrast - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                        onIncrease = {
+                            contrast = (contrast + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
+                        },
+                    )
+                    ScreenEffectAdjustmentRow(
+                        title = stringResource(R.string.screen_effects_gamma),
+                        valueText = String.format("%.2fx", gamma),
+                        progress = normalizedProgress(gamma, 0.5f, 2.5f),
+                        onDecrease = {
+                            gamma = (gamma - SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
+                        },
+                        onIncrease = {
+                            gamma = (gamma + SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
+                        },
+                    )
+                }
+                ScreenEffectsCategory.SHADERS -> {
+                    OptionSectionHeader(text = stringResource(R.string.screen_effects_shader_toggles))
+
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_toon),
+                        subtitle = stringResource(R.string.screen_effects_toon_description),
+                        enabled = enableToon,
+                        onToggle = { enableToon = !enableToon },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_fxaa),
+                        subtitle = stringResource(R.string.screen_effects_fxaa_description),
+                        enabled = enableFXAA,
+                        onToggle = { enableFXAA = !enableFXAA },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_vivid),
+                        subtitle = stringResource(R.string.screen_effects_vivid_description),
+                        enabled = enableVivid,
+                        onToggle = { enableVivid = !enableVivid },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_crt),
+                        subtitle = stringResource(R.string.screen_effects_crt_description),
+                        enabled = enableCRT,
+                        onToggle = { enableCRT = !enableCRT },
+                    )
+                    ScreenEffectToggleRow(
+                        title = stringResource(R.string.screen_effects_ntsc),
+                        subtitle = stringResource(R.string.screen_effects_ntsc_description),
+                        enabled = enableNTSC,
+                        onToggle = { enableNTSC = !enableNTSC },
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            AccentActionRow(
+                title = stringResource(R.string.screen_effects_reset),
+                icon = Icons.Default.RestartAlt,
+                accentColor = PluviaTheme.colors.accentPurple,
+                onClick = ::resetEffects,
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_basic_scaling))
-        VULKAN_BASIC_MODES.forEach { mode ->
-            ScreenEffectRadioRow(
-                title = stringResource(scalingModeLabelRes(mode)),
-                subtitle = stringResource(scalingModeDescRes(mode)),
-                selected = scalingMode == mode,
-                onSelect = { scalingMode = mode },
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_color_adjustments))
-
-        ScreenEffectAdjustmentRow(
-            title = stringResource(R.string.screen_effects_brightness),
-            valueText = formatPercent(brightness),
-            progress = normalizedProgress(brightness, -100f, 100f),
-            onDecrease = {
-                brightness = (brightness - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-            onIncrease = {
-                brightness = (brightness + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-        )
-        ScreenEffectAdjustmentRow(
-            title = stringResource(R.string.screen_effects_contrast),
-            valueText = formatPercent(contrast),
-            progress = normalizedProgress(contrast, -100f, 100f),
-            onDecrease = {
-                contrast = (contrast - SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-            onIncrease = {
-                contrast = (contrast + SCREEN_EFFECT_PERCENT_STEP).coerceIn(-100f, 100f)
-            },
-        )
-        ScreenEffectAdjustmentRow(
-            title = stringResource(R.string.screen_effects_gamma),
-            valueText = String.format("%.2fx", gamma),
-            progress = normalizedProgress(gamma, 0.5f, 2.5f),
-            onDecrease = {
-                gamma = (gamma - SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
-            },
-            onIncrease = {
-                gamma = (gamma + SCREEN_EFFECT_GAMMA_STEP).coerceIn(0.5f, 2.5f)
-            },
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        OptionSectionHeader(text = stringResource(R.string.screen_effects_shader_toggles))
-
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_toon),
-            subtitle = stringResource(R.string.screen_effects_toon_description),
-            enabled = enableToon,
-            onToggle = { enableToon = !enableToon },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_fxaa),
-            subtitle = stringResource(R.string.screen_effects_fxaa_description),
-            enabled = enableFXAA,
-            onToggle = { enableFXAA = !enableFXAA },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_vivid),
-            subtitle = stringResource(R.string.screen_effects_vivid_description),
-            enabled = enableVivid,
-            onToggle = { enableVivid = !enableVivid },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_crt),
-            subtitle = stringResource(R.string.screen_effects_crt_description),
-            enabled = enableCRT,
-            onToggle = { enableCRT = !enableCRT },
-        )
-        ScreenEffectToggleRow(
-            title = stringResource(R.string.screen_effects_ntsc),
-            subtitle = stringResource(R.string.screen_effects_ntsc_description),
-            enabled = enableNTSC,
-            onToggle = { enableNTSC = !enableNTSC },
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        AccentActionRow(
-            title = stringResource(R.string.screen_effects_reset),
-            icon = Icons.Default.RestartAlt,
-            accentColor = PluviaTheme.colors.accentPurple,
-            onClick = ::resetEffects,
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
     }
 }
 
@@ -790,15 +899,17 @@ fun ScreenEffectsPanel(
             visible = isVisible,
             enter = slideInHorizontally(
                 initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium,
+                animationSpec = motionSpec(
+                    spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
                 ),
-            ) + fadeIn(),
+            ) + fadeIn(motionSpec(tween(140))),
             exit = slideOutHorizontally(
                 targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = spring(stiffness = Spring.StiffnessHigh),
-            ) + fadeOut(),
+                animationSpec = motionSpec(spring(stiffness = Spring.StiffnessHigh)),
+            ) + fadeOut(motionSpec(tween(110))),
             modifier = Modifier.fillMaxHeight(),
         ) {
             Surface(

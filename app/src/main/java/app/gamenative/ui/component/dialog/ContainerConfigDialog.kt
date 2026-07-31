@@ -1300,6 +1300,7 @@ fun ContainerConfigDialog(
                     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
                     val tabs = listOf(
                         stringResource(R.string.container_config_tab_general),
+                        stringResource(R.string.container_config_tab_presets),
                         stringResource(R.string.container_config_tab_graphics),
                         stringResource(R.string.container_config_tab_emulation),
                         stringResource(R.string.container_config_tab_controller),
@@ -1359,14 +1360,15 @@ fun ContainerConfigDialog(
                                 .weight(1f),
                         ) {
                             if (selectedTab == 0) GeneralTabContent(state, nonzeroResolutionError, aspectResolutionError)
-                            if (selectedTab == 1) GraphicsTabContent(state, default)
-                            if (selectedTab == 2) EmulationTabContent(state)
-                            if (selectedTab == 3) ControllerTabContent(state, default)
-                            if (selectedTab == 4) WineTabContent(state)
-                            if (selectedTab == 5) WinComponentsTabContent(state)
-                            if (selectedTab == 6) EnvironmentTabContent(state)
-                            if (selectedTab == 7) DrivesTabContent(state)
-                            if (selectedTab == 8) AdvancedTabContent(state)
+                            if (selectedTab == 1) CompatPresetsTabContent(state)
+                            if (selectedTab == 2) GraphicsTabContent(state, default)
+                            if (selectedTab == 3) EmulationTabContent(state)
+                            if (selectedTab == 4) ControllerTabContent(state, default)
+                            if (selectedTab == 5) WineTabContent(state)
+                            if (selectedTab == 6) WinComponentsTabContent(state)
+                            if (selectedTab == 7) EnvironmentTabContent(state)
+                            if (selectedTab == 8) DrivesTabContent(state)
+                            if (selectedTab == 9) AdvancedTabContent(state)
                         }
                     }
                 }

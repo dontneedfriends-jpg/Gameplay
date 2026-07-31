@@ -35,6 +35,9 @@ import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.ui.icons.InputIcons
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.theme.motionSpec
+import app.gamenative.ui.util.ControllerFamily
+import app.gamenative.ui.util.rememberControllerFamily
 import app.gamenative.ui.util.shouldShowGamepadUI
 
 // Icons from https://kenney.nl/assets/input-prompts (CC0 License)
@@ -56,6 +59,29 @@ enum class GamepadButton(@field:DrawableRes val iconRes: Int) {
     DPAD_RIGHT(InputIcons.Xbox.dpadRight),
 }
 
+/** Resolves the glyph for the given controller family; defaults to the Xbox asset. */
+@DrawableRes
+fun GamepadButton.iconFor(family: ControllerFamily): Int = when (family) {
+    ControllerFamily.XBOX -> iconRes
+    ControllerFamily.PLAYSTATION -> when (this) {
+        GamepadButton.A -> InputIcons.PlayStation.cross
+        GamepadButton.B -> InputIcons.PlayStation.circle
+        GamepadButton.X -> InputIcons.PlayStation.square
+        GamepadButton.Y -> InputIcons.PlayStation.triangle
+        GamepadButton.LB -> InputIcons.PlayStation.l1
+        GamepadButton.RB -> InputIcons.PlayStation.r1
+        GamepadButton.LT -> InputIcons.PlayStation.l2
+        GamepadButton.RT -> InputIcons.PlayStation.r2
+        GamepadButton.START -> InputIcons.PlayStation.options
+        GamepadButton.SELECT -> InputIcons.PlayStation.share
+        GamepadButton.DPAD -> InputIcons.PlayStation.dpad
+        GamepadButton.DPAD_UP -> InputIcons.PlayStation.dpadUp
+        GamepadButton.DPAD_DOWN -> InputIcons.PlayStation.dpadDown
+        GamepadButton.DPAD_LEFT -> InputIcons.PlayStation.dpadLeft
+        GamepadButton.DPAD_RIGHT -> InputIcons.PlayStation.dpadRight
+    }
+}
+
 data class GamepadAction(
     val button: GamepadButton,
     @get:StringRes val labelResId: Int,
@@ -66,6 +92,7 @@ data class GamepadAction(
 private fun GamepadButtonHint(
     action: GamepadAction,
     swapFaceButtons: Boolean,
+    controllerFamily: ControllerFamily,
     modifier: Modifier = Modifier,
 ) {
     val clickableModifier = if (action.onClick != null) {
@@ -75,17 +102,18 @@ private fun GamepadButtonHint(
     }
 
     val label = stringResource(action.labelResId)
-    val iconRes = if (swapFaceButtons) {
+    val effectiveButton = if (swapFaceButtons) {
         when (action.button) {
-            GamepadButton.A -> GamepadButton.B.iconRes
-            GamepadButton.B -> GamepadButton.A.iconRes
-            GamepadButton.X -> GamepadButton.Y.iconRes
-            GamepadButton.Y -> GamepadButton.X.iconRes
-            else -> action.button.iconRes
+            GamepadButton.A -> GamepadButton.B
+            GamepadButton.B -> GamepadButton.A
+            GamepadButton.X -> GamepadButton.Y
+            GamepadButton.Y -> GamepadButton.X
+            else -> action.button
         }
     } else {
-        action.button.iconRes
+        action.button
     }
+    val iconRes = effectiveButton.iconFor(controllerFamily)
 
     Row(
         modifier = clickableModifier.padding(horizontal = 6.dp, vertical = 5.dp),
@@ -115,17 +143,18 @@ fun GamepadActionBar(
 ) {
     val showGamepadUI = shouldShowGamepadUI()
     val swapFaceButtons = PrefManager.swapFaceButtons
+    val controllerFamily = rememberControllerFamily()
 
     AnimatedVisibility(
         visible = visible && actions.isNotEmpty() && showGamepadUI,
         enter = slideInVertically(
             initialOffsetY = { it / 2 },
-            animationSpec = tween(durationMillis = 180),
-        ) + fadeIn(animationSpec = tween(durationMillis = 140)),
+            animationSpec = motionSpec(tween(durationMillis = 180)),
+        ) + fadeIn(animationSpec = motionSpec(tween(durationMillis = 140))),
         exit = slideOutVertically(
             targetOffsetY = { it / 2 },
-            animationSpec = tween(durationMillis = 150),
-        ) + fadeOut(animationSpec = tween(durationMillis = 120)),
+            animationSpec = motionSpec(tween(durationMillis = 150)),
+        ) + fadeOut(animationSpec = motionSpec(tween(durationMillis = 120))),
         modifier = modifier,
     ) {
         Box(
@@ -142,7 +171,11 @@ fun GamepadActionBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 actions.forEach { action ->
-                    GamepadButtonHint(action = action, swapFaceButtons = swapFaceButtons)
+                    GamepadButtonHint(
+                        action = action,
+                        swapFaceButtons = swapFaceButtons,
+                        controllerFamily = controllerFamily,
+                    )
                 }
             }
         }

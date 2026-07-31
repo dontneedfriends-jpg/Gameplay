@@ -1,17 +1,9 @@
 package app.gamenative.ui.screen.library.components
 
 import android.content.res.Configuration
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,7 +37,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,7 +58,6 @@ import app.gamenative.ui.component.OptionSectionHeader
 import app.gamenative.ui.enums.AppFilter
 import app.gamenative.ui.enums.SortOption
 import app.gamenative.ui.theme.PluviaTheme
-import app.gamenative.ui.util.adaptivePanelWidth
 import java.util.EnumSet
 
 @Composable
@@ -89,60 +78,22 @@ fun LibraryOptionsPanel(
     onClearSteamCollections: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val firstItemFocusRequester = remember { FocusRequester() }
+    ConsoleSidePanel(
+        isOpen = isOpen,
+        onDismiss = onDismiss,
+        modifier = modifier,
+    ) { firstItemFocusRequester ->
+        ConsolePanelHeader(
+            title = stringResource(R.string.options_panel_title),
+            onBack = onDismiss,
+        )
 
-    BackHandler(enabled = isOpen) {
-        onDismiss()
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        AnimatedVisibility(
-            visible = isOpen,
-            enter = fadeIn(animationSpec = tween(140)),
-            exit = fadeOut(animationSpec = tween(110)),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(top = 8.dp, bottom = 20.dp),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismiss
-                    )
-            )
-        }
-
-        AnimatedVisibility(
-            visible = isOpen,
-            enter = slideInHorizontally(tween(180)) { it },
-            exit = slideOutHorizontally(tween(140)) { it },
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            Surface(
-                modifier = Modifier
-                    .width(adaptivePanelWidth(460.dp))
-                    .fillMaxHeight(),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 28.dp, vertical = 20.dp),
-                ) {
-                    ConsolePanelHeader(
-                        title = stringResource(R.string.options_panel_title),
-                        onBack = onDismiss,
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(top = 8.dp, bottom = 20.dp),
-                    ) {
                         OptionSectionHeader(text = stringResource(R.string.options_sort_by))
                         Column(
                             modifier = Modifier
@@ -339,16 +290,6 @@ fun LibraryOptionsPanel(
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
-                    }
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(isOpen) {
-        if (isOpen) {
-            kotlinx.coroutines.delay(80)
-            runCatching { firstItemFocusRequester.requestFocus() }
         }
     }
 }

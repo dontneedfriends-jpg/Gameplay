@@ -46,6 +46,8 @@ import app.gamenative.ui.screen.library.components.ambient.AmbientModeConstants.
 import app.gamenative.ui.screen.library.components.ambient.AmbientModeConstants.SHIMMER_PERIOD_MS
 import app.gamenative.ui.screen.library.components.ambient.AmbientModeConstants.SHIMMER_WIDTH_FRACTION
 import app.gamenative.ui.theme.BrandGradient
+import app.gamenative.ui.theme.isReduceMotionEnabled
+import app.gamenative.ui.theme.motionSpec
 import app.gamenative.utils.ShakeDetector
 import kotlinx.coroutines.delay
 
@@ -122,35 +124,46 @@ internal fun AmbientDownloadOverlay(
     val targetAlpha = if (isIdle) 1f else 0f
     val ambientAlpha by animateFloatAsState(
         targetValue = targetAlpha,
-        animationSpec = tween(
-            durationMillis = if (targetAlpha == 1f) ENTER_DURATION_MS else EXIT_DURATION_MS,
-            easing = EaseInOutCubic,
+        animationSpec = motionSpec(
+            tween(
+                durationMillis = if (targetAlpha == 1f) ENTER_DURATION_MS else EXIT_DURATION_MS,
+                easing = EaseInOutCubic,
+            ),
         ),
         label = "ambientAlpha",
     )
 
     if (ambientAlpha > 0f) {
+        val reduceMotion = isReduceMotionEnabled()
         val infiniteTransition = rememberInfiniteTransition(label = "ambient")
 
-        val driftOffset by infiniteTransition.animateFloat(
-            initialValue = -DRIFT_AMPLITUDE_PX,
-            targetValue = DRIFT_AMPLITUDE_PX,
-            animationSpec = infiniteRepeatable(
-                animation = tween(DRIFT_PERIOD_MS, easing = EaseInOutSine),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "drift",
-        )
+        val driftOffset by if (reduceMotion) {
+            remember { mutableStateOf(0f) }
+        } else {
+            infiniteTransition.animateFloat(
+                initialValue = -DRIFT_AMPLITUDE_PX,
+                targetValue = DRIFT_AMPLITUDE_PX,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(DRIFT_PERIOD_MS, easing = EaseInOutSine),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "drift",
+            )
+        }
 
-        val shimmerPosition by infiniteTransition.animateFloat(
-            initialValue = -0.3f,
-            targetValue = 1.3f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(SHIMMER_PERIOD_MS, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart,
-            ),
-            label = "shimmer",
-        )
+        val shimmerPosition by if (reduceMotion) {
+            remember { mutableStateOf(-0.3f) }
+        } else {
+            infiniteTransition.animateFloat(
+                initialValue = -0.3f,
+                targetValue = 1.3f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(SHIMMER_PERIOD_MS, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+                label = "shimmer",
+            )
+        }
 
         val barHeightPx = with(LocalDensity.current) { BAR_HEIGHT_DP.dp.toPx() }
 

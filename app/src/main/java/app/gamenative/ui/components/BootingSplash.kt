@@ -48,6 +48,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.theme.isReduceMotionEnabled
+import app.gamenative.ui.theme.motionSpec
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
 import kotlin.random.Random
@@ -194,7 +196,7 @@ fun BootingSplash(
                 if (tips.isNotEmpty()) {
                     Crossfade(
                         targetState = tipIndex,
-                        animationSpec = tween(260, easing = EaseInOutCubic),
+                        animationSpec = motionSpec(tween(260, easing = EaseInOutCubic)),
                         label = "launchTip",
                     ) { index ->
                         Text(
@@ -219,16 +221,20 @@ private fun LaunchProgressBar(
 ) {
     val isIndeterminate = progress < 0f
     val phase = if (isIndeterminate) {
-        val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "launchProgress")
-        val value by transition.animateFloat(
-            initialValue = -0.32f,
-            targetValue = 1f,
-            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                animation = tween(1_350, easing = EaseInOutCubic),
-            ),
-            label = "launchProgressPhase",
-        )
-        value
+        if (isReduceMotionEnabled()) {
+            0.5f
+        } else {
+            val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "launchProgress")
+            val value by transition.animateFloat(
+                initialValue = -0.32f,
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                    animation = tween(1_350, easing = EaseInOutCubic),
+                ),
+                label = "launchProgressPhase",
+            )
+            value
+        }
     } else {
         progress.coerceIn(0f, 1f)
     }

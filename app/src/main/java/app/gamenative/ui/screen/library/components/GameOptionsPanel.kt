@@ -88,6 +88,7 @@ import app.gamenative.R
 import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.data.AppMenuOption
 import app.gamenative.ui.enums.AppOptionMenuType
+import app.gamenative.ui.theme.motionSpec
 
 @Composable
 fun GameOptionsPanel(
@@ -118,8 +119,8 @@ fun GameOptionsPanel(
 
     AnimatedVisibility(
         visible = isOpen,
-        enter = fadeIn(tween(140)),
-        exit = fadeOut(tween(110)),
+        enter = fadeIn(motionSpec(tween(140))),
+        exit = fadeOut(motionSpec(tween(110))),
     ) {
         Box(
             modifier = Modifier
@@ -138,12 +139,12 @@ fun GameOptionsPanel(
         visible = isOpen,
         enter = slideInHorizontally(
             initialOffsetX = { it },
-            animationSpec = tween(180),
-        ) + fadeIn(tween(140)),
+            animationSpec = motionSpec(tween(180)),
+        ) + fadeIn(motionSpec(tween(140))),
         exit = slideOutHorizontally(
             targetOffsetX = { it },
-            animationSpec = tween(140),
-        ) + fadeOut(tween(110)),
+            animationSpec = motionSpec(tween(140)),
+        ) + fadeOut(motionSpec(tween(110))),
         modifier = modifier
             .fillMaxHeight()
             .widthIn(max = 1120.dp)

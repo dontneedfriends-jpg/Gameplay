@@ -56,7 +56,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "app.gamenative"
+        applicationId = "app.gameplay"
 
         minSdk = 26
 
@@ -365,6 +365,9 @@ dependencies {
 
     // Support
     implementation(libs.androidx.core.ktx)
+
+    // Baseline Profiles - enables precompilation of critical code paths
+    implementation(libs.profileinstaller)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.apng)
     implementation(libs.datastore.preferences)

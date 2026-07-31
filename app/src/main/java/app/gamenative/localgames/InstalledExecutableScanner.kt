@@ -30,7 +30,16 @@ object InstalledExecutableScanner {
         "dotnet",
     )
 
-    fun findCandidates(driveC: File): List<String> {
+    fun findCandidates(driveC: File): List<String> = scan(driveC, applyNameFilter = true)
+
+    /**
+     * Recovery variant: every executable on drive C: without the
+     * uninstaller/updater name filtering, for manual selection when the
+     * filtered discovery finds nothing.
+     */
+    fun findAllExecutables(driveC: File): List<String> = scan(driveC, applyNameFilter = false)
+
+    private fun scan(driveC: File, applyNameFilter: Boolean): List<String> {
         if (!driveC.isDirectory) return emptyList()
 
         val roots = buildList {
@@ -43,7 +52,7 @@ object InstalledExecutableScanner {
                 root.walkTopDown()
                     .maxDepth(MAX_SCAN_DEPTH)
                     .onEnter { directory -> shouldEnterDirectory(driveC, directory) }
-                    .filter(::isCandidate)
+                    .filter { file -> isCandidate(file, applyNameFilter) }
             }
             .mapNotNull { executable ->
                 executable.relativeToOrNull(driveC)
@@ -62,8 +71,9 @@ object InstalledExecutableScanner {
         return firstSegment !in setOf("windows", "users", "programdata", "temp", "tmp", "\$recycle.bin")
     }
 
-    private fun isCandidate(file: File): Boolean {
+    private fun isCandidate(file: File, applyNameFilter: Boolean): Boolean {
         if (!file.isFile || !file.name.endsWith(".exe", ignoreCase = true)) return false
+        if (!applyNameFilter) return true
         val normalizedName = file.nameWithoutExtension.lowercase()
         return rejectedNameFragments.none(normalizedName::contains)
     }

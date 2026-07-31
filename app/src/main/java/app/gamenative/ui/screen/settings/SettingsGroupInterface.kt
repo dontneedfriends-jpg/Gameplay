@@ -538,6 +538,18 @@ fun SettingsGroupInterface(
                 showStatusBarRestartDialog = true
             },
         )
+
+        var reduceMotion by rememberSaveable { mutableStateOf(PrefManager.reduceMotion) }
+        SettingsSwitch(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_interface_reduce_motion_title)) },
+            subtitle = { Text(text = stringResource(R.string.settings_interface_reduce_motion_subtitle)) },
+            state = reduceMotion,
+            onCheckedChange = {
+                reduceMotion = it
+                PrefManager.reduceMotion = it
+            },
+        )
         }
 
         if (section == InterfaceSettingsSection.CONTROLS) {
@@ -660,7 +672,6 @@ fun SettingsGroupInterface(
     // Downloads settings
     if (section == InterfaceSettingsSection.DOWNLOADS) SettingsGroup(
         modifier = Modifier.background(Color.Transparent),
-        title = { Text(text = stringResource(R.string.settings_downloads_title)) },
     ) {
         var wifiOnlyDownload by rememberSaveable { mutableStateOf(PrefManager.downloadOnWifiOnly) }
         SettingsSwitch(

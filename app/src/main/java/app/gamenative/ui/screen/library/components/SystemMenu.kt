@@ -2,14 +2,7 @@ package app.gamenative.ui.screen.library.components
 
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -18,7 +11,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -77,7 +69,6 @@ import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.screen.PluviaScreen
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.util.SteamIconImage
-import app.gamenative.ui.util.adaptivePanelWidth
 import app.gamenative.ui.util.shouldShowGamepadUI
 import app.gamenative.utils.getAvatarURL
 import `in`.dragonbra.javasteam.enums.EPersonaState
@@ -234,7 +225,6 @@ fun SystemMenu(
 ) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
-    val firstItemFocusRequester = remember { FocusRequester() }
 
     var persona by remember { mutableStateOf<SteamFriend?>(null) }
     var selectedStatus by remember(persona) { mutableStateOf(persona?.state ?: EPersonaState.Online) }
@@ -271,9 +261,6 @@ fun SystemMenu(
     BackHandler(enabled = isOpen && showStatusPicker) {
         showStatusPicker = false
     }
-    BackHandler(enabled = isOpen && !showStatusPicker) {
-        onDismiss()
-    }
 
     val colorOnline = PluviaTheme.colors.statusInstalled
     val colorAway = PluviaTheme.colors.statusAway
@@ -288,62 +275,22 @@ fun SystemMenu(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        // Backdrop
-        AnimatedVisibility(
-            visible = isOpen,
-            enter = fadeIn(animationSpec = tween(140)),
-            exit = fadeOut(animationSpec = tween(110)),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismiss,
-                    ),
-            )
-        }
+    ConsoleSidePanel(
+        isOpen = isOpen,
+        onDismiss = onDismiss,
+        modifier = modifier,
+    ) { firstItemFocusRequester ->
+        ConsolePanelHeader(
+            title = stringResource(R.string.system_menu_title),
+            onBack = onDismiss,
+        )
 
-        // Menu panel - slides from right
-        AnimatedVisibility(
-            visible = isOpen,
-            enter = slideInHorizontally(
-                initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = 180),
-            ),
-            exit = slideOutHorizontally(
-                targetOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = 140),
-            ),
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            Surface(
-                modifier = Modifier
-                    .width(adaptivePanelWidth(460.dp))
-                    .fillMaxHeight(),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 28.dp, vertical = 20.dp),
-                ) {
-                    ConsolePanelHeader(
-                        title = stringResource(R.string.system_menu_title),
-                        onBack = onDismiss,
-                    )
+        Spacer(modifier = Modifier.height(12.dp))
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Profile section
-                    val profileInteractionSource = remember { MutableInteractionSource() }
-                    val isProfileFocused by profileInteractionSource.collectIsFocusedAsState()
-                    Box {
+        // Profile section
+        val profileInteractionSource = remember { MutableInteractionSource() }
+        val isProfileFocused by profileInteractionSource.collectIsFocusedAsState()
+        Box {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -640,17 +587,6 @@ fun SystemMenu(
                             )
                         }
                     }
-                }
-            }
-        }
-    }
-
-    // Request focus on first item when menu opens
-    LaunchedEffect(isOpen) {
-        if (isOpen) {
-            kotlinx.coroutines.delay(80)
-            runCatching { firstItemFocusRequester.requestFocus() }
-        }
     }
 }
 

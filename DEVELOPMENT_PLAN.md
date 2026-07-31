@@ -20,6 +20,16 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 - [x] Rebuilt and verified `modernDebug` after the integrated runtime, library, theme, settings, and UI changes.
 - [x] Replaced the repository README with Gameplay-specific product, capability, compatibility, build, contribution, and GPL compliance documentation.
 - [x] Removed unrelated repository artifacts: an unused screenshot, obsolete affiliate recommendation seed, upstream-only roadmap, and accidentally tracked debug signing files; replaced upstream contribution rules with Gameplay-specific guidance.
+- [x] Extracted the library side-panel chrome (scrim, slide-from-right motion, surface, Back/B dismiss, focus-on-open) into a shared `ConsoleSidePanel` shell with a shared `ConsoleMenuActionItem` and back-hint row; migrated the system menu, import, quick-action, and library-options panels to it.
+- [x] Converted the remaining specialized configuration surfaces to category-based console layouts: touch gestures and radial menu moved onto the shared full-screen page with the controller category rail (L1/R1 switching), and the in-game screen-effects tab gained a Scaling/Color/Shaders category strip for both Vulkan and GL renderers.
+- [x] Removed duplicated settings group titles: the right content pane no longer repeats the selected category name (rail remains the single source), and the Downloads group no longer renders a third copy.
+- [x] Added PlayStation glyph variants to the controller hint system: new DualShock/DualSense vector set (face buttons, L1/R1/L2/R2, Options, Share), `ControllerFamily` detection by vendor ID and device name with hot-plug recomposition, family-aware glyphs in the gamepad action bar and side-panel back hints.
+- [x] Added a Presets tab to the container configuration with five built-in compatibility presets (performance, compatibility, DirectDraw/DX8-era games, DirectX 12, low-memory devices), each with a plain-language description and an explicit list of changed settings; presets edit the in-memory configuration and remain fully tunable in the other tabs.
+- [x] Added reduced-motion support: a Reduce motion accessibility toggle (Appearance settings), a `LocalReduceMotion` composition local provided by `PluviaTheme` (also honoring the system animator-duration scale), a shared `motionSpec` helper applied to the main panel/tab/overlay transitions, and static fallbacks for the infinite skeleton, shimmer, drift, spin, and launch-progress animations.
+- [x] Added actionable recovery for failed installer executable discovery: the failure dialog now offers "Browse all executables", which rescans drive C: without the uninstaller/updater name filter and re-enters candidate selection (`FAILED → CANDIDATE_SELECTION` state edge, relaxed scanner variant, coordinator/ViewModel/UI wiring).
+- [x] Ported upstream PR #1464: Steam InstallScript VDF execution during container setup — depot-manifest script discovery via `EDepotFileFlag.InstallScript`, VDF parsing with env-var expansion and language overrides, pre-Wine registry writes to `system.reg`/`user.reg`, chained prerequisite run-processes with exit-code tracking, and a unified `PreLaunchSetup` command chain replacing the pre-install-only flow; includes the upstream review fixes (effective HasRunKey, hive-aware registry files, case-insensitive prefixes) plus ROOTDRIVE colon and process-quoting corrections, and the UbisoftConnect step now skips Steam games.
+- [x] Ported the useful parts of upstream PR #392: an adapted `baseline-prof.txt` covering the Gameplay console shell, Compose lazy/pager/animation paths, Coil, and startup classes, with the `profileinstaller` dependency. The XML theme engine itself was deliberately not ported — it duplicates and conflicts with Gameplay's native console shell and semantic theme system.
+- [x] Changed the application ID to `app.gameplay` so Gameplay installs side-by-side with GameNative; the `LAUNCH_GAME` intent action now derives from `BuildConfig.APPLICATION_ID` and the manifest placeholder. The Kotlin namespace remains `app.gamenative`, keeping activity-alias and provider wiring intact.
 
 ## 1. Product direction and constraints
 
@@ -66,8 +76,8 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 - [x] Redesign game details with a restrained hero layout and flatter information surfaces.
 - [x] Redesign per-game options as a category rail with an adaptive settings grid and L1/R1 navigation.
 - [x] Unify library system, import, quick-action, sorting/filtering, and game-option overlays under the same header, scrim, restrained motion, spacing, and focus conventions.
-- [ ] Extract a shared console side-panel shell after the remaining overlays use identical behavior.
-- [ ] Add a persistent, context-aware controller hint strip with Xbox and PlayStation glyph variants.
+- [x] Extract a shared console side-panel shell after the remaining overlays use identical behavior.
+- [x] Add a persistent, context-aware controller hint strip with Xbox and PlayStation glyph variants.
 - [ ] Finish empty, loading, offline, error, and no-results library states.
 - [ ] Verify complete D-pad/analog navigation, focus restoration, and Back/B/Circle behavior without touch.
 
@@ -79,8 +89,8 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 - [x] Convert language, region, orientation, frontend sync, runtime managers, driver managers, and content managers to console-oriented full-screen pages.
 - [x] Add delayed initial focus and safe focus requests to converted pages.
 - [x] Convert Box64 and FEX preset editors to the shared full-screen console settings page.
-- [-] Convert the remaining specialized configuration dialogs to the shared full-screen console page; touch gestures, shooter mode, controller binding, Box64, and FEX are converted.
-- [-] Replace long mobile-form layouts in touch/controller, radial-menu, shooter-mode, and screen-effect settings with category-based console screens; shooter mode now has a controller-driven category rail, while touch gestures, radial menu, and screen effects remain.
+- [x] Convert the remaining specialized configuration dialogs to the shared full-screen console page; touch gestures, shooter mode, controller binding, radial menu, Box64, and FEX are converted.
+- [x] Replace long mobile-form layouts in touch/controller, radial-menu, shooter-mode, and screen-effect settings with category-based console screens.
 - [ ] Reserve modal dialogs for confirmation, destructive actions, authentication, or short blocking decisions only.
 - [ ] Add search across application, container, and per-game settings.
 - [ ] Audit focus order and scrolling at narrow landscape heights.
@@ -94,14 +104,14 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 - [x] Document a stable semantic theme schema with versioning and a defined migration boundary.
 - [x] Validate imported themes for required tokens, readable contrast, file size, and recoverability.
 - [ ] Provide theme duplication (rename, visual editing, live preview, export, and reset-to-safe-theme are complete).
-- [ ] Add high-contrast and reduced-motion built-in themes.
+- [x] Add high-contrast and reduced-motion built-in themes; high contrast ships as the Monochrome palette profile with a dedicated contrast pass, and reduced motion is delivered as an accessibility toggle with theme-level propagation to transitions and ambient animations.
 
 ## 7. Controller and input parity
 
 - [x] Support touch controls as a first-class input method.
 - [x] Accept Xbox-compatible and DualSense/PS5-compatible physical controller input.
 - [x] Add console navigation semantics to the redesigned library and settings surfaces.
-- [ ] Centralize controller button mapping and glyph selection by detected controller family.
+- [x] Centralize controller button mapping and glyph selection by detected controller family.
 - [ ] Add controller hot-plug and disconnect recovery without losing focus.
 - [ ] Ensure every primary workflow is completable using only a controller.
 - [ ] Add automated focus-navigation tests for major screens and manual device test scripts.
@@ -110,8 +120,8 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 
 - [x] Limit the product scope to Windows software running through Wine/Proton-compatible layers.
 - [x] Support modern 32-bit and 64-bit Windows executables where the selected runtime and device permit it.
-- [ ] Define the 16-bit strategy explicitly: Win16 through compatible Wine paths where possible; DOS games through a future DOSBox integration rather than promising universal native execution.
-- [ ] Add compatibility presets and plain-language explanations for legacy DirectDraw/Direct3D, DXVK, VKD3D, CPU translation, and memory settings.
+- [x] Define the 16-bit strategy explicitly: Win16 through compatible Wine paths where possible; DOS games through a future DOSBox integration rather than promising universal native execution. (Decision recorded here; DOSBox integration remains unscheduled.)
+- [x] Add compatibility presets and plain-language explanations for legacy DirectDraw/Direct3D, DXVK, VKD3D, CPU translation, and memory settings; delivered as the container Presets tab with per-preset explanations and change summaries.
 - [ ] Maintain tested game profiles, including early-2000s titles such as Mafia, with device/GPU/runtime caveats.
 
 ## 9. Imported upstream work
@@ -135,13 +145,10 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 
 ## Current execution order
 
-1. Extract the now-stable library side-panel behavior into a shared shell component.
-2. Convert the remaining specialized configuration dialogs to full-screen console pages.
-3. Convert complex controller/touch configuration screens into category-based layouts.
-4. Complete focus restoration, controller hints, and narrow-landscape audits.
-5. Harden installer/runtime-cache progress, error recovery, and device tests.
-6. Add theme duplication and the remaining accessibility-oriented built-in themes.
-7. Add automated regressions and prepare a GPL-compliant Gameplay release process.
+1. Complete focus restoration, controller hints, and narrow-landscape audits.
+2. Harden installer/runtime-cache progress, error recovery, and device tests.
+3. Add theme duplication and the remaining accessibility-oriented built-in themes.
+4. Add automated regressions and prepare a GPL-compliant Gameplay release process.
 
 ## Definition of done for a converted console screen
 

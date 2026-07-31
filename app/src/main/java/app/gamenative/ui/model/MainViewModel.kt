@@ -83,7 +83,11 @@ class MainViewModel @Inject constructor(
             val title: String,
             val candidates: List<String>,
         ) : MainUiEvent()
-        data class InstallerCompletionFailed(val title: String, val reason: String) : MainUiEvent()
+        data class InstallerCompletionFailed(
+            val title: String,
+            val reason: String,
+            val sessionId: String? = null,
+        ) : MainUiEvent()
         data class InstallerCompleted(val title: String) : MainUiEvent()
         data object ServiceReady : MainUiEvent()
     }
@@ -606,7 +610,13 @@ class MainViewModel @Inject constructor(
                             )
                         }
                         is LocalInstallerCompletionCoordinator.Result.Failed -> {
-                            _uiEvent.send(MainUiEvent.InstallerCompletionFailed(result.session.title, result.reason))
+                            _uiEvent.send(
+                                MainUiEvent.InstallerCompletionFailed(
+                                    title = result.session.title,
+                                    reason = result.reason,
+                                    sessionId = result.session.id,
+                                ),
+                            )
                         }
                     }
                 }
@@ -675,6 +685,43 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun browseAllInstallerExecutables(context: Context, sessionId: String) {
+        viewModelScope.launch {
+            runCatching {
+                LocalInstallerCompletionCoordinator.browseAllExecutables(context, sessionId)
+            }.onSuccess { result ->
+                when (result) {
+                    is LocalInstallerCompletionCoordinator.Result.NeedsExecutableSelection -> {
+                        _uiEvent.send(
+                            MainUiEvent.SelectInstallerExecutable(
+                                sessionId = result.session.id,
+                                title = result.session.title,
+                                candidates = result.session.candidateExecutablePaths,
+                            ),
+                        )
+                    }
+                    is LocalInstallerCompletionCoordinator.Result.Failed -> {
+                        _uiEvent.send(
+                            MainUiEvent.InstallerCompletionFailed(
+                                title = result.session.title,
+                                reason = result.reason,
+                                sessionId = result.session.id,
+                            ),
+                        )
+                    }
+                    else -> Unit
+                }
+            }.onFailure { error ->
+                _uiEvent.send(
+                    MainUiEvent.InstallerCompletionFailed(
+                        title = "Installation",
+                        reason = error.message ?: "Could not scan the installed files",
+                    ),
+                )
+            }
+        }
+    }
+
     fun recoverInstallerSessions(context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             val sessions = InstallationSessionStore(context).loadAll()
@@ -709,7 +756,13 @@ class MainViewModel @Inject constructor(
                             )
                         }
                         is LocalInstallerCompletionCoordinator.Result.Failed -> {
-                            _uiEvent.send(MainUiEvent.InstallerCompletionFailed(result.session.title, result.reason))
+                            _uiEvent.send(
+                                MainUiEvent.InstallerCompletionFailed(
+                                    title = result.session.title,
+                                    reason = result.reason,
+                                    sessionId = result.session.id,
+                                ),
+                            )
                         }
                     }
                 }

@@ -93,6 +93,7 @@ import app.gamenative.R
 import app.gamenative.ui.data.PerformanceHudConfig
 import app.gamenative.ui.data.PerformanceHudSize
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.theme.motionSpec
 import app.gamenative.ui.util.adaptivePanelWidth
 import app.gamenative.utils.MathUtils.normalizedProgress
 import com.winlator.container.Container
@@ -435,8 +436,8 @@ fun QuickMenu(
     Box(modifier = modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = isVisible,
-            enter = fadeIn(animationSpec = tween(200)),
-            exit = fadeOut(animationSpec = tween(150)),
+            enter = fadeIn(animationSpec = motionSpec(tween(200))),
+            exit = fadeOut(animationSpec = motionSpec(tween(150))),
         ) {
             Box(
                 modifier = Modifier
@@ -454,11 +455,11 @@ fun QuickMenu(
             visibleState = visibleState,
             enter = slideInHorizontally(
                 initialOffsetX = { fullWidth -> -fullWidth },
-                animationSpec = tween(200),
+                animationSpec = motionSpec(tween(200)),
             ),
             exit = slideOutHorizontally(
                 targetOffsetX = { fullWidth -> -fullWidth },
-                animationSpec = tween(150),
+                animationSpec = motionSpec(tween(150)),
             ),
             modifier = Modifier.align(Alignment.CenterStart),
         ) {

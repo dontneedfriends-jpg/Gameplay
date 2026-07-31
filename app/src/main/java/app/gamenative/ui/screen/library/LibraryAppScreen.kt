@@ -132,6 +132,7 @@ import app.gamenative.ui.screen.library.components.GameOptionsPanel
 import app.gamenative.ui.screen.library.components.GameSourceIcon
 import app.gamenative.utils.HltbService
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.theme.isReduceMotionEnabled
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
 import com.winlator.container.ContainerData
@@ -151,16 +152,21 @@ private fun SkeletonText(
     lines: Int = 1,
     lineHeight: Int = 16,
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.1f,
-        targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "alpha",
-    )
+    val alpha = if (isReduceMotionEnabled()) {
+        0.18f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
+        val animatedAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.1f,
+            targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "alpha",
+        )
+        animatedAlpha
+    }
 
     val color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
 

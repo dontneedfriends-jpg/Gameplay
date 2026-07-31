@@ -15,6 +15,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -44,6 +49,7 @@ import app.gamenative.data.TouchGestureConfig.Companion.ZOOM_PAGE_UP_DOWN
 import app.gamenative.data.TouchGestureConfig.Companion.ZOOM_PLUS_MINUS
 import app.gamenative.data.TouchGestureConfig.Companion.ZOOM_SCROLL_WHEEL
 import app.gamenative.ui.component.settings.SettingsListDropdown
+import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
 import app.gamenative.ui.theme.PluviaBorder
@@ -59,6 +65,13 @@ import com.winlator.inputcontrols.Binding
  * @param onDismiss      Called when the user cancels (back button or X).
  * @param onSave         Called with the updated [TouchGestureConfig] when the user taps "Save".
  */
+private enum class GestureSettingsCategory {
+    SINGLE_FINGER,
+    TWO_FINGER,
+    THREE_FINGER,
+    OTHER,
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TouchGestureSettingsDialog(
@@ -67,6 +80,8 @@ fun TouchGestureSettingsDialog(
     onSave: (TouchGestureConfig) -> Unit,
 ) {
     var config by remember { mutableStateOf(gestureConfig) }
+    var selectedCategory by remember { mutableStateOf(GestureSettingsCategory.SINGLE_FINGER) }
+    val categories = GestureSettingsCategory.entries
 
     ConsoleSettingsPage(
         visible = true,
@@ -78,21 +93,54 @@ fun TouchGestureSettingsDialog(
             }
         },
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    val index = categories.indexOf(selectedCategory).coerceAtLeast(0)
+                    when (event.key) {
+                        Key.ButtonR1, Key.ButtonR2 -> {
+                            selectedCategory = categories[(index + 1) % categories.size]
+                            true
+                        }
+                        Key.ButtonL1, Key.ButtonL2 -> {
+                            selectedCategory = categories[(index - 1 + categories.size) % categories.size]
+                            true
+                        }
+                        else -> false
+                    }
+                },
+        ) {
+            ConsoleCategoryRail(
+                items = categories,
+                selectedItem = selectedCategory,
+                label = { category ->
+                    when (category) {
+                        GestureSettingsCategory.SINGLE_FINGER -> stringResource(R.string.gesture_section_single_finger)
+                        GestureSettingsCategory.TWO_FINGER -> stringResource(R.string.gesture_section_two_finger)
+                        GestureSettingsCategory.THREE_FINGER -> stringResource(R.string.gesture_section_three_finger)
+                        GestureSettingsCategory.OTHER -> stringResource(R.string.gesture_section_other)
+                    }
+                },
+                onSelected = { selectedCategory = it },
+                footer = stringResource(R.string.container_config_console_controls_hint),
+                requestInitialFocus = true,
+                compact = true,
+                modifier = Modifier.width(230.dp),
+            )
+            val scrollState = rememberScrollState()
+            LaunchedEffect(selectedCategory) {
+                scrollState.scrollTo(0)
+            }
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
+                    .weight(1f)
+                    .padding(start = 16.dp, bottom = 16.dp)
+                    .verticalScroll(scrollState),
             ) {
-                // ═══════════════════════════════════════════════════════════
-                // ── Single Finger ──────────────────────────────────────────
-                // ═══════════════════════════════════════════════════════════
-                Text(
-                    text = stringResource(R.string.gesture_section_single_finger),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 2.dp),
-                )
+                when (selectedCategory) {
+                    GestureSettingsCategory.SINGLE_FINGER -> {
 
                 // ── Tap (customisable action) ───────────────────────────
                 GestureRow(
@@ -175,16 +223,8 @@ fun TouchGestureSettingsDialog(
                     )
                 }
 
-                // ═══════════════════════════════════════════════════════════
-                // ── Two Finger ─────────────────────────────────────────────
-                // ═══════════════════════════════════════════════════════════
-                Text(
-                    text = stringResource(R.string.gesture_section_two_finger),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 2.dp),
-                )
+                }
+                    GestureSettingsCategory.TWO_FINGER -> {
 
                 // ── Two-Finger Tap (customisable action) ─────────────────
                 GestureRow(
@@ -254,16 +294,8 @@ fun TouchGestureSettingsDialog(
                     )
                 }
 
-                // ═══════════════════════════════════════════════════════════
-                // ── Three Finger ───────────────────────────────────────────
-                // ═══════════════════════════════════════════════════════════
-                Text(
-                    text = stringResource(R.string.gesture_section_three_finger),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 2.dp),
-                )
+                }
+                    GestureSettingsCategory.THREE_FINGER -> {
 
                 // ── Three-Finger Tap (customisable action) ──────────────
                 GestureRow(
@@ -315,16 +347,8 @@ fun TouchGestureSettingsDialog(
                     )
                 }
 
-                // ═══════════════════════════════════════════════════════════
-                // ── Other ──────────────────────────────────────────────────
-                // ═══════════════════════════════════════════════════════════
-                Text(
-                    text = stringResource(R.string.gesture_section_other),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 14.dp, top = 10.dp, bottom = 2.dp),
-                )
+                }
+                    GestureSettingsCategory.OTHER -> {
 
                 // ── Gesture Threshold ────────────────────────────────────
                 DelayTextField(
@@ -373,7 +397,10 @@ fun TouchGestureSettingsDialog(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
+                }
+                }
             }
+        }
     }
 }
 

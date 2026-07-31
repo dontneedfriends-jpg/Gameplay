@@ -12,10 +12,12 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 import kotlin.io.path.createTempDirectory
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class PreInstallStepsTest {
     private lateinit var container: Container
     private lateinit var gameDir: File
@@ -40,7 +42,7 @@ class PreInstallStepsTest {
     fun setUp() {
         container = mockk(relaxed = true)
         gameDir = createTempDirectory(prefix = "preinstall-steps-test").toFile()
-        every { container.drives } returns "A:${gameDir.absolutePath}"
+        every { container.drives } returns "A:${gameDir.absolutePath.replace('\\', '/').substringAfter(':')}"
         every { container.containerVariant } returns Container.BIONIC
     }
 
@@ -71,8 +73,8 @@ class PreInstallStepsTest {
 
         val result = PreInstallSteps.getPreInstallCommands(
             container = container,
-            appId = "STEAM_400",
-            gameSource = GameSource.STEAM,
+            appId = "GOG_400",
+            gameSource = GameSource.GOG,
             screenInfo = "1280x720",
             containerVariantChanged = false,
         )
@@ -94,8 +96,8 @@ class PreInstallStepsTest {
 
         val withoutReset = PreInstallSteps.getPreInstallCommands(
             container = container,
-            appId = "STEAM_400",
-            gameSource = GameSource.STEAM,
+            appId = "GOG_400",
+            gameSource = GameSource.GOG,
             screenInfo = "1280x720",
             containerVariantChanged = false,
         )
@@ -103,8 +105,8 @@ class PreInstallStepsTest {
 
         val withReset = PreInstallSteps.getPreInstallCommands(
             container = container,
-            appId = "STEAM_400",
-            gameSource = GameSource.STEAM,
+            appId = "GOG_400",
+            gameSource = GameSource.GOG,
             screenInfo = "1280x720",
             containerVariantChanged = true,
         )

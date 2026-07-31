@@ -80,6 +80,64 @@ object LocalInstallerCompletionCoordinator {
             finalizeSelection(store, session, container, relativePath)
         }
 
+    /**
+     * Recovery path after a failed or unsatisfying discovery: scans drive C:
+     * without the uninstaller/updater name filter and re-enters candidate
+     * selection so the user can point at the game executable manually.
+     */
+    suspend fun browseAllExecutables(context: Context, sessionId: String): Result = withContext(Dispatchers.IO) {
+        val store = InstallationSessionStore(context)
+        val session = store.load(sessionId)
+            ?: return@withContext Result.Failed(
+                InstallationSession(
+                    id = sessionId,
+                    title = "Installation",
+                    sourceUri = "",
+                    sourceName = "",
+                    installerType = InstallerType.EXE,
+                    managedInstallerPath = "",
+                    installerRelativePath = "",
+                    state = InstallationState.FAILED,
+                    createdAt = 0L,
+                    updatedAt = 0L,
+                ),
+                "Installation session was not found",
+            )
+        if (session.state !in setOf(
+                InstallationState.FAILED,
+                InstallationState.AWAITING_RESULT,
+                InstallationState.CANDIDATE_SELECTION,
+            )
+        ) {
+            return@withContext Result.Failed(session, "Installation cannot be browsed in its current state")
+        }
+        val appId = session.appId
+            ?: return@withContext Result.Failed(session, "Installation session has no app id")
+        val container = runCatching { ContainerUtils.getContainer(context, appId) }.getOrNull()
+            ?: return@withContext Result.Failed(session, "Installation container was not found")
+
+        val baseline = session.baselineExecutablePaths.map(String::lowercase).toSet()
+        val executables = InstalledExecutableScanner.findAllExecutables(File(container.rootDir, ".wine/drive_c"))
+            .filterNot { it.lowercase() in baseline }
+        if (executables.isEmpty()) {
+            return@withContext Result.Failed(session, "No executables found on drive C:")
+        }
+
+        val base = if (session.state == InstallationState.CANDIDATE_SELECTION) {
+            session
+        } else if (session.state == InstallationState.FAILED) {
+            session.copy(lastError = null).transitionTo(InstallationState.CANDIDATE_SELECTION)
+        } else {
+            session.transitionTo(InstallationState.CANDIDATE_SELECTION)
+        }
+        val selecting = base.copy(
+            candidateExecutablePaths = executables,
+            updatedAt = System.currentTimeMillis(),
+        )
+        store.save(selecting)
+        Result.NeedsExecutableSelection(selecting)
+    }
+
     private fun finalizeSelection(
         store: InstallationSessionStore,
         session: InstallationSession,

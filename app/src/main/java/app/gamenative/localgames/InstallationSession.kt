@@ -104,6 +104,7 @@ object InstallationStateMachine {
         ),
         InstallationState.FAILED to setOf(
             InstallationState.READY_TO_LAUNCH,
+            InstallationState.CANDIDATE_SELECTION,
             InstallationState.CANCELLED,
         ),
         InstallationState.COMPLETED to emptySet(),

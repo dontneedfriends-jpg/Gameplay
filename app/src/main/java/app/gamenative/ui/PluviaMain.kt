@@ -306,6 +306,9 @@ fun PluviaMain(
     var installerExecutableSelection by remember {
         mutableStateOf<InstallerExecutableSelection?>(null)
     }
+    var installerFailureSessionId by remember {
+        mutableStateOf<String?>(null)
+    }
 
     var hasBack by rememberSaveable { mutableStateOf(navController.previousBackStackEntry?.destination?.route != null) }
 
@@ -641,11 +644,17 @@ fun PluviaMain(
                 }
 
                 is MainViewModel.MainUiEvent.InstallerCompletionFailed -> {
+                    installerFailureSessionId = event.sessionId
                     msgDialogState = MessageDialogState(
                         visible = true,
                         type = DialogType.SYNC_FAIL,
                         title = context.getString(R.string.installer_completion_failed_title, event.title),
                         message = event.reason,
+                        confirmBtnText = if (event.sessionId != null) {
+                            context.getString(R.string.installer_browse_all_executables)
+                        } else {
+                            "Confirm"
+                        },
                         dismissBtnText = context.getString(R.string.ok),
                     )
                 }
@@ -859,11 +868,22 @@ fun PluviaMain(
         }
 
         DialogType.SYNC_FAIL -> {
-            onConfirmClick = null
+            val failedSessionId = installerFailureSessionId
+            onConfirmClick = if (failedSessionId != null) {
+                {
+                    setMessageDialogState(MessageDialogState(false))
+                    installerFailureSessionId = null
+                    viewModel.browseAllInstallerExecutables(context, failedSessionId)
+                }
+            } else {
+                null
+            }
             onDismissClick = {
+                installerFailureSessionId = null
                 setMessageDialogState(MessageDialogState(false))
             }
             onDismissRequest = {
+                installerFailureSessionId = null
                 setMessageDialogState(MessageDialogState(false))
             }
         }
@@ -1169,6 +1189,7 @@ fun PluviaMain(
         isAmoled = (state.appTheme == AppTheme.AMOLED),
         style = state.paletteStyle,
         customThemeJson = state.customThemeJson.takeIf { state.customThemeEnabled },
+        reduceMotion = PrefManager.reduceMotion,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             LoadingDialog(

@@ -1,6 +1,8 @@
 package app.gamenative.ui.theme
 
 import android.app.Activity
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.snap
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
@@ -9,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -142,6 +145,22 @@ private val DarkPluviaColors = pluviaColors(
 val BrandGradient = listOf(PluviaCyan, PluviaPurple, PluviaPink)
 
 private val LocalPluviaColors = staticCompositionLocalOf { DarkPluviaColors }
+
+/** True when interface motion should be minimized (accessibility). */
+val LocalReduceMotion = compositionLocalOf { false }
+
+/**
+ * Returns [spec] normally, or an instant snap when reduced motion is active.
+ * Use for enter/exit transitions and value animations:
+ * `fadeIn(motionSpec(tween(140)))`.
+ */
+@Composable
+fun <T> motionSpec(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =
+    if (LocalReduceMotion.current) snap() else spec
+
+/** True when reduced motion is active (user preference or system animator scale off). */
+@Composable
+fun isReduceMotionEnabled(): Boolean = LocalReduceMotion.current
 
 /**
  * Material3 dark color scheme using Pluvia colors.
@@ -335,6 +354,7 @@ fun PluviaTheme(
     isAmoled: Boolean = false,
     style: PaletteStyle = PaletteStyle.TonalSpot,
     customThemeJson: String? = null,
+    reduceMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val highContrast = style.name == "Monochrome" && customThemeJson == null
@@ -365,7 +385,22 @@ fun PluviaTheme(
         insetsController.isAppearanceLightNavigationBars = !isDark
     }
 
-    CompositionLocalProvider(LocalPluviaColors provides pluviaColors) {
+    val systemAnimationsOff = remember {
+        runCatching {
+            val resolver = view.context.contentResolver
+            android.provider.Settings.Global.getFloat(
+                resolver,
+                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            ) == 0f
+        }.getOrDefault(false)
+    }
+    val reduceMotionActive = reduceMotion || systemAnimationsOff
+
+    CompositionLocalProvider(
+        LocalPluviaColors provides pluviaColors,
+        LocalReduceMotion provides reduceMotionActive,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = PluviaTypography,

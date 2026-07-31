@@ -2340,6 +2340,27 @@
     <string name="radial_menu_settings_title">Radial menu</string>
     <string name="radial_menu_cancel">Cancel</string>
     <string name="radial_menu_slot_count">Slots</string>
+    <string name="radial_menu_category_layout">Layout</string>
+    <string name="settings_interface_reduce_motion_title">Reduce motion</string>
+    <string name="settings_interface_reduce_motion_subtitle">Minimize interface animations, transitions, and ambient effects. The system animator-duration setting is honored as well.</string>
+    <string name="container_config_tab_presets">Presets</string>
+    <string name="compat_presets_subtitle">Proven combinations of settings for common situations. Applying a preset edits the current configuration — nothing is saved until you tap Save, and every value can still be fine-tuned in the other tabs.</string>
+    <string name="compat_preset_applied">Applied</string>
+    <string name="compat_preset_performance_name">Best performance</string>
+    <string name="compat_preset_performance_desc">Favor frame rate over caution: asynchronous shader compilation, performance-oriented CPU translation, and a larger GPU memory budget.</string>
+    <string name="compat_preset_performance_changes">Changes: DXVK 2.6.1 (async) · Box64 Performance preset · 4 GB device memory · mailbox present mode</string>
+    <string name="compat_preset_stability_name">Maximum compatibility</string>
+    <string name="compat_preset_stability_desc">Conservative settings for games that crash, stutter, or render incorrectly: a proven DXVK release without async tricks, compatibility CPU translation, and strict shader math.</string>
+    <string name="compat_preset_stability_changes">Changes: DXVK 1.10.3 · Box64 Compatibility preset · strict shader math · fifo present mode</string>
+    <string name="compat_preset_old_games_name">Old games (DirectDraw / DX8 era)</string>
+    <string name="compat_preset_old_games_desc">For late-90s and early-2000s titles: the cnc-ddraw renderer for legacy DirectDraw/Direct3D, a 4:3 resolution, and a small reported video memory that old engines expect.</string>
+    <string name="compat_preset_old_games_changes">Changes: cnc-ddraw renderer · 1280x960 resolution · 256 MB video memory</string>
+    <string name="compat_preset_dx12_name">DirectX 12 games</string>
+    <string name="compat_preset_dx12_desc">Route DirectX 12 through VKD3D with a recent version and feature level. Only needed for DX12 titles; DX11 and older stay on DXVK.</string>
+    <string name="compat_preset_dx12_changes">Changes: VKD3D 2.14.1 · feature level 12_1</string>
+    <string name="compat_preset_low_memory_name">Low-memory devices</string>
+    <string name="compat_preset_low_memory_desc">Reduce memory pressure on devices with limited RAM: smaller reported video memory, smaller GPU device memory, aggressive startup trimming, and the light Steam runtime.</string>
+    <string name="compat_preset_low_memory_changes">Changes: 1 GB video memory · 1 GB device memory · aggressive startup · light Steam</string>
     <string name="radial_menu_slot_count_subtitle">%1$d slots enabled</string>
     <string name="radial_menu_decrease_slots">Decrease slots</string>
     <string name="radial_menu_increase_slots">Increase slots</string>
@@ -2365,5 +2386,6 @@
     <string name="installer_select_executable_title">Choose the game executable for %1$s</string>
     <string name="installer_completion_failed_title">Could not finish installing %1$s</string>
     <string name="installer_completed_message">%1$s is ready to play</string>
+    <string name="installer_browse_all_executables">Browse all executables</string>
     <string name="wfm_install_failed">Could not update the container file manager. Open Container was not started.</string>
 </resources>

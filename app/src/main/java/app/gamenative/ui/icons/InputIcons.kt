@@ -257,6 +257,69 @@ object InputIcons {
     }
 
     /**
+     * PlayStation (DualShock/DualSense) controller icons.
+     * Face buttons, shoulders, and menu buttons; D-pad aliases reuse the shared Xbox set.
+     */
+    object PlayStation {
+        // ==================== Face Buttons ====================
+
+        /** ✕ Cross (south / confirm) */
+        @DrawableRes
+        val cross = R.drawable.ic_input_ps_cross
+
+        /** ○ Circle (east / back) */
+        @DrawableRes
+        val circle = R.drawable.ic_input_ps_circle
+
+        /** □ Square (west) */
+        @DrawableRes
+        val square = R.drawable.ic_input_ps_square
+
+        /** △ Triangle (north) */
+        @DrawableRes
+        val triangle = R.drawable.ic_input_ps_triangle
+
+        // ==================== Shoulders ====================
+        @DrawableRes
+        val l1 = R.drawable.ic_input_ps_l1
+
+        @DrawableRes
+        val r1 = R.drawable.ic_input_ps_r1
+
+        @DrawableRes
+        val l2 = R.drawable.ic_input_ps_l2
+
+        @DrawableRes
+        val r2 = R.drawable.ic_input_ps_r2
+
+        // ==================== Menu Buttons ====================
+
+        /** ☰ Options (start) */
+        @DrawableRes
+        val options = R.drawable.ic_input_ps_options
+
+        /** Share/Create (select) */
+        @DrawableRes
+        val share = R.drawable.ic_input_ps_share
+
+        // ==================== D-Pad (shared shapes) ====================
+        @DrawableRes
+        val dpad = Xbox.dpad
+
+        @DrawableRes
+        val dpadUp = Xbox.dpadUp
+
+        @DrawableRes
+        val dpadDown = Xbox.dpadDown
+
+        @DrawableRes
+        val dpadLeft = Xbox.dpadLeft
+
+        @DrawableRes
+        val dpadRight = Xbox.dpadRight
+    }
+
+    /**
      * Keyboard icons.
      * Includes all letter keys, number keys, function keys, arrow keys, modifiers, and special keys.
      */

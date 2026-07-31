@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.gamenative.ui.enums.PaneType
+import app.gamenative.ui.theme.isReduceMotionEnabled
 
 /**
  * Skeleton loader for game items that matches the actual game item appearance
@@ -23,16 +24,21 @@ fun GameSkeletonLoader(
     modifier: Modifier = Modifier,
     paneType: PaneType = PaneType.LIST,
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.15f,
-        targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "alpha"
-    )
+    val alpha = if (isReduceMotionEnabled()) {
+        0.2f
+    } else {
+        val infiniteTransition = rememberInfiniteTransition(label = "skeleton")
+        val animatedAlpha by infiniteTransition.animateFloat(
+            initialValue = 0.15f,
+            targetValue = 0.25f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "alpha"
+        )
+        animatedAlpha
+    }
 
     val skeletonColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
 

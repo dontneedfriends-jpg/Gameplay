@@ -1071,6 +1071,14 @@ object PrefManager {
             setPref(SHOW_GAMEPAD_HINTS, value)
         }
 
+    // Whether to minimize interface animations (accessibility)
+    private val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
+    var reduceMotion: Boolean
+        get() = getPref(REDUCE_MOTION, false)
+        set(value) {
+            setPref(REDUCE_MOTION, value)
+        }
+
     private val ITEMS_PER_PAGE = intPreferencesKey("items_per_page")
     var itemsPerPage: Int
         get() = getPref(ITEMS_PER_PAGE, 50)

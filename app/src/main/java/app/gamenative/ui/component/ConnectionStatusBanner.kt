@@ -32,6 +32,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import app.gamenative.R
 import app.gamenative.ui.enums.ConnectionState
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.theme.isReduceMotionEnabled
 
 // shared with SteamUtils.awaitSteamLogin so banner UI and intent-launch await fall back to offline together.
 const val TIMEOUT_SHOW_OFFLINE_OPTION_SECONDS = 5
@@ -171,19 +174,24 @@ fun ConnectionStatusBanner(
 
 @Composable
 private fun ConnectionIcon(connectionState: ConnectionState) {
+    val reduceMotion = isReduceMotionEnabled()
     val infiniteTransition = rememberInfiniteTransition(label = "connectionIcon")
 
     when (connectionState) {
         ConnectionState.CONNECTING -> {
-            val rotation by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(1000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "rotation"
-            )
+            val rotation by if (reduceMotion) {
+                remember { mutableStateOf(0f) }
+            } else {
+                infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    ),
+                    label = "rotation"
+                )
+            }
 
             Box(
                 modifier = Modifier
