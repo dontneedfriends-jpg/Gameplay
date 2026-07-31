@@ -132,6 +132,7 @@ import app.gamenative.utils.SteamTokenLogin
 import app.gamenative.utils.SteamUtils
 import app.gamenative.utils.downloader.WinComponentDownloader
 import app.gamenative.utils.WineProcessSnapshotHelper
+import app.gamenative.utils.WfmInstaller
 import com.posthog.PostHog
 import com.winlator.alsaserver.ALSAClient
 import com.winlator.container.Container
@@ -4064,6 +4065,18 @@ private fun getWineStartCommand(
     val isEpicGame = gameSource == GameSource.EPIC
     val isSteamGame = gameSource == GameSource.STEAM
     val gameId = ContainerUtils.extractGameIdFromContainerId(appId)
+    val wfmInstalled = WfmInstaller.install(context, container)
+    if (!wfmInstalled) {
+        Timber.tag("XServerScreen").e("Could not install the Open Container file manager update")
+    }
+
+    fun wfmCommand(command: String): String {
+        if (!wfmInstalled) {
+            SnackbarManager.show(context.getString(R.string.wfm_install_failed))
+            throw IllegalStateException("Open Container file manager installation failed")
+        }
+        return command
+    }
 
     if (isSteamGame) {
         // Steam-specific setup
@@ -4086,7 +4099,7 @@ private fun getWineStartCommand(
     val args = if (testGraphics) {
         "\"Z:/opt/apps/TestD3D.exe\""
     } else if (bootToContainer) {
-        "\"wfm.exe\""
+        wfmCommand("\"wfm.exe\"")
     } else if (isGOGGame) {
         // For GOG games, use GOGService to get the launch command
         Timber.tag("XServerScreen").i("Launching GOG game: $gameId")
@@ -4378,7 +4391,7 @@ private fun getWineStartCommand(
         if (localLaunchMode == LocalContainerLaunch.MODE_INSTALLED_EXE_C) {
             if (localLaunchTarget.isBlank()) {
                 Timber.tag("XServerScreen").e("Installed local game has no C: launch target: $appId")
-                return "winhandler.exe \"wfm.exe\""
+                return wfmCommand("winhandler.exe \"wfm.exe\"")
             }
             val targetFile = File(
                 container.rootDir,
@@ -4395,7 +4408,7 @@ private fun getWineStartCommand(
         ) {
             if (gameFolderPath == null || localLaunchTarget.isBlank()) {
                 Timber.tag("XServerScreen").e("Installer session has no mapped source target: $appId")
-                return "winhandler.exe \"wfm.exe\""
+                return wfmCommand("winhandler.exe \"wfm.exe\"")
             }
             guestProgramLauncherComponent.workingDir = File(gameFolderPath)
             envVars.put("WINEPATH", "A:\\")
@@ -4411,7 +4424,7 @@ private fun getWineStartCommand(
             // Attempt auto-detection only when we have the physical folder path
             if (gameFolderPath == null) {
                 Timber.tag("XServerScreen").e("Could not find A: drive for Custom Game: $appId")
-                return "winhandler.exe \"wfm.exe\""
+                return wfmCommand("winhandler.exe \"wfm.exe\"")
             }
             val auto = CustomGameScanner.findUniqueExeRelativeToFolder(gameFolderPath!!)
             if (auto != null) {
@@ -4421,13 +4434,13 @@ private fun getWineStartCommand(
                 container.saveData()
             } else {
                 Timber.tag("XServerScreen").w("No unique executable found for Custom Game: $appId")
-                return "winhandler.exe \"wfm.exe\""
+                return wfmCommand("winhandler.exe \"wfm.exe\"")
             }
         }
 
         if (gameFolderPath == null) {
             Timber.tag("XServerScreen").e("Could not find A: drive for Custom Game: $appId")
-            return "winhandler.exe \"wfm.exe\""
+            return wfmCommand("winhandler.exe \"wfm.exe\"")
         }
 
         // Set working directory to the game folder
@@ -4441,7 +4454,7 @@ private fun getWineStartCommand(
     } else if (container.executablePath.isEmpty()) {
         // For Steam games, we need appLaunchInfo
         Timber.tag("XServerScreen").w("appLaunchInfo is null for Steam game: $appId")
-        "\"wfm.exe\""
+        wfmCommand("\"wfm.exe\"")
     } else {
         if (container.isLaunchBionicSteam) {
             // Bionic-Steam mode: launch the game executable directly.

@@ -284,6 +284,18 @@ class MainViewModel @Inject constructor(
                 _state.update { it.copy(paletteStyle = value) }
             }
         }
+
+        viewModelScope.launch {
+            appTheme.customThemeEnabledFlow.collect { value ->
+                _state.update { it.copy(customThemeEnabled = value) }
+            }
+        }
+
+        viewModelScope.launch {
+            appTheme.customThemeJsonFlow.collect { value ->
+                _state.update { it.copy(customThemeJson = value) }
+            }
+        }
     }
 
     override fun onCleared() {
@@ -306,6 +318,18 @@ class MainViewModel @Inject constructor(
 
     fun setPalette(value: PaletteStyle) {
         appTheme.currentPalette = value
+    }
+
+    fun setCustomTheme(json: String) {
+        appTheme.setCustomTheme(json = json, enabled = true)
+    }
+
+    fun setCustomThemeEnabled(enabled: Boolean) {
+        appTheme.setCustomThemeEnabled(enabled)
+    }
+
+    fun clearCustomTheme() {
+        appTheme.clearCustomTheme()
     }
 
     fun setAnnoyingDialogShown(value: Boolean) {

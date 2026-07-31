@@ -46,7 +46,6 @@ import app.gamenative.data.TouchGestureConfig.Companion.ZOOM_SCROLL_WHEEL
 import app.gamenative.ui.component.settings.SettingsListDropdown
 import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
-import app.gamenative.ui.theme.PluviaBackground
 import app.gamenative.ui.theme.PluviaBorder
 import app.gamenative.ui.theme.PluviaSurface
 import app.gamenative.ui.theme.PluviaSurfaceElevated
@@ -721,7 +720,7 @@ private fun PanActionPicker(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            containerColor = PluviaBackground,
+            containerColor = MaterialTheme.colorScheme.background,
             title = { Text(stringResource(R.string.gesture_action_label)) },
             text = {
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {

@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -45,6 +43,7 @@ fun ConsoleSettingsPage(
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             dismissOnClickOutside = false,
+            decorFitsSystemWindows = false,
         ),
     ) {
         Scaffold(
@@ -87,21 +86,10 @@ fun ConsoleSettingsPage(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = 24.dp, vertical = 18.dp),
-                contentAlignment = Alignment.TopCenter,
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                contentAlignment = Alignment.TopStart,
             ) {
-                Surface(
-                    modifier = Modifier
-                        .widthIn(max = 1100.dp)
-                        .fillMaxSize(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    tonalElevation = 0.dp,
-                ) {
-                    Box(modifier = Modifier.padding(20.dp)) {
-                        content()
-                    }
-                }
+                Box(modifier = Modifier.fillMaxSize()) { content() }
             }
         }
     }

@@ -22,6 +22,11 @@ interface IAppTheme {
     var currentTheme: AppTheme
     val paletteFlow: StateFlow<PaletteStyle>
     var currentPalette: PaletteStyle
+    val customThemeEnabledFlow: StateFlow<Boolean>
+    val customThemeJsonFlow: StateFlow<String>
+    fun setCustomTheme(json: String, enabled: Boolean)
+    fun setCustomThemeEnabled(enabled: Boolean)
+    fun clearCustomTheme()
 }
 
 class AppThemeImpl : IAppTheme {
@@ -33,6 +38,29 @@ class AppThemeImpl : IAppTheme {
     override val paletteFlow: MutableStateFlow<PaletteStyle> = MutableStateFlow(PrefManager.appThemePalette)
 
     override var currentPalette: PaletteStyle by AppPaletteDelegate()
+
+    override val customThemeEnabledFlow: MutableStateFlow<Boolean> = MutableStateFlow(PrefManager.customThemeEnabled)
+    override val customThemeJsonFlow: MutableStateFlow<String> = MutableStateFlow(PrefManager.customThemeJson)
+
+    override fun setCustomTheme(json: String, enabled: Boolean) {
+        PrefManager.customThemeJson = json
+        PrefManager.customThemeEnabled = enabled
+        customThemeJsonFlow.value = json
+        customThemeEnabledFlow.value = enabled
+    }
+
+    override fun setCustomThemeEnabled(enabled: Boolean) {
+        val safeEnabled = enabled && customThemeJsonFlow.value.isNotBlank()
+        PrefManager.customThemeEnabled = safeEnabled
+        customThemeEnabledFlow.value = safeEnabled
+    }
+
+    override fun clearCustomTheme() {
+        PrefManager.customThemeEnabled = false
+        PrefManager.customThemeJson = ""
+        customThemeEnabledFlow.value = false
+        customThemeJsonFlow.value = ""
+    }
 
     inner class AppThemeDelegate : ReadWriteProperty<Any, AppTheme> {
 

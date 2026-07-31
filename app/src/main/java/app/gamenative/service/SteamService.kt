@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.util.Base64
 import app.gamenative.ui.util.GameInviteNotificationManager
 import app.gamenative.ui.util.SnackbarManager
+import app.gamenative.ui.data.Achievement
 import app.gamenative.service.callback.GameInviteCallback
 import app.gamenative.service.handler.GameInviteHandler
 import androidx.room.withTransaction
@@ -30,6 +31,7 @@ import app.gamenative.data.GameSource
 import app.gamenative.data.LaunchInfo
 import app.gamenative.data.OwnedGames
 import app.gamenative.data.PostSyncInfo
+import app.gamenative.data.SteamLicenseForPics
 import app.gamenative.data.SteamApp
 import app.gamenative.data.SteamControllerConfigDetail
 import app.gamenative.data.SteamFriend
@@ -164,6 +166,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import timber.log.Timber
 import app.gamenative.data.DownloadingAppInfo
@@ -281,6 +284,10 @@ class SteamService : Service(), IChallengeUrlChanged {
     private val pendingSyncFileLock = Any()
     private val pendingSyncFile by lazy { File(applicationContext.filesDir, "pending_achievement_sync.txt") }
 
+    // Coalesce bursts of Steam license callbacks into one database/PICS pass.
+    private var licenseListDebounceJob: Job? = null
+    @Volatile private var pendingLicenseCallback: LicenseListCallback? = null
+
     private val onEndProcess: (AndroidEvent.EndProcess) -> Unit = {
         Companion.stop()
     }
@@ -312,6 +319,10 @@ class SteamService : Service(), IChallengeUrlChanged {
 
     companion object {
         const val MAX_PICS_BUFFER = 256
+
+        const val PICS_JOB_TIMEOUT_MS = 30_000L
+        const val MAX_PICS_BATCH_RETRIES = 3
+        const val PICS_RETRY_BACKOFF_MS = 5_000L
 
         const val MAX_RETRY_ATTEMPTS = 20
 
@@ -568,9 +579,13 @@ class SteamService : Service(), IChallengeUrlChanged {
          * Get licenses from database for use with DepotDownloader
          */
         suspend fun getLicensesFromDb(): List<License> = withContext(Dispatchers.IO) {
-            val cached = instance?.cachedLicenseDao?.getAll() ?: return@withContext emptyList()
-            cached.mapNotNull { cachedLicense ->
-                LicenseSerializer.deserializeLicense(cachedLicense.licenseJson)
+            val inst = instance ?: return@withContext emptyList()
+            val cached = inst.cachedLicenseDao.getAll()
+            if (cached.isNotEmpty()) {
+                cached.mapNotNull { LicenseSerializer.deserializeLicense(it.licenseJson) }
+            } else {
+                Timber.w("getLicensesFromDb: cachedLicenseDao empty, using in-memory licenses")
+                inst.licenses
             }
         }
 
@@ -2925,6 +2940,10 @@ class SteamService : Service(), IChallengeUrlChanged {
 
         fun clearDatabase(clearCloudSyncState: Boolean = false) {
             with(instance!!) {
+                licenseListDebounceJob?.cancel()
+                licenseListDebounceJob = null
+                pendingLicenseCallback = null
+                licenses = emptyList()
                 scope.launch {
                     db.withTransaction {
                         appDao.deleteAll()
@@ -2933,6 +2952,7 @@ class SteamService : Service(), IChallengeUrlChanged {
                             fileChangeListsDao.deleteAll()
                         }
                         licenseDao.deleteAll()
+                        cachedLicenseDao.deleteAll()
                         encryptedAppTicketDao.deleteAll()
                         downloadingAppInfoDao.deleteAll()
                         steamUnlockedBranchDao.deleteAll()
@@ -2963,7 +2983,13 @@ class SteamService : Service(), IChallengeUrlChanged {
         }
 
         suspend fun getOwnedGames(friendID: Long): List<OwnedGames> = withContext(Dispatchers.IO) {
-            instance?._unifiedFriends!!.getOwnedGames(friendID)
+            try {
+                instance?._unifiedFriends?.getOwnedGames(friendID) ?: emptyList()
+            } catch (e: Exception) {
+                ensureActive()
+                Timber.w(e, "getOwnedGames($friendID) failed; returning empty")
+                emptyList()
+            }
         }
 
         // Add helper to detect if any downloads or cloud sync are in progress
@@ -3098,6 +3124,57 @@ class SteamService : Service(), IChallengeUrlChanged {
             } catch (e: Exception) {
                 Timber.e(e, "Failed to check DLC ownership via PICS batch for ${dlcAppIds.size} appIds")
                 return emptySet()
+            }
+        }
+
+        suspend fun fetchAchievementsForDisplay(appId: Int): List<Achievement>? {
+            if (!isConnected) return null
+            return try {
+                withTimeout(15_000) {
+                    val steamUser = instance?._steamUser ?: return@withTimeout null
+                    val steamId = steamUser.steamID ?: return@withTimeout null
+                    val userStats = instance?._steamUserStats
+                        ?.getUserStats(appId, steamId)
+                        ?.await()
+                        ?: return@withTimeout null
+                    if (userStats.result != EResult.OK) return@withTimeout null
+
+                    val iconBaseUrl = SteamUtils.getBaseAchievementIconUrl(appId)
+                    val language = SteamUtils.steamLanguageForAppLocale()
+                    val localized = userStats.getExpandedAchievements(language)
+                    val englishByName by lazy {
+                        if (language == "english") emptyMap()
+                        else userStats.getExpandedAchievements("english").associateBy { it.name }
+                    }
+
+                    localized.map { block ->
+                        fun english() = englishByName[block.name]
+                        Achievement(
+                            displayName = block.displayName?.takeIf(String::isNotBlank)
+                                ?: english()?.displayName?.takeIf(String::isNotBlank)
+                                ?: block.name.orEmpty(),
+                            name = block.name,
+                            isUnlocked = block.isUnlocked,
+                            description = block.description?.takeIf(String::isNotBlank)
+                                ?: english()?.description?.takeIf(String::isNotBlank)
+                                ?: "",
+                            unlockTimestamp = block.unlockTimestamp,
+                            hidden = block.hidden,
+                            icon = block.icon?.takeIf(String::isNotEmpty)?.let(iconBaseUrl::plus).orEmpty(),
+                            iconGray = block.iconGray?.takeIf(String::isNotEmpty)?.let(iconBaseUrl::plus),
+                            progressCurrent = block.progressCurrent,
+                            progressMax = block.progressMax,
+                        )
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                Timber.w("Achievement fetch timed out for appId=$appId")
+                null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "Achievement fetch failed for appId=$appId")
+                null
             }
         }
 
@@ -4173,76 +4250,121 @@ class SteamService : Service(), IChallengeUrlChanged {
 
         Timber.i("Received License List ${callback.result}, size: ${callback.licenseList.size}")
 
-        scope.launch {
-            db.withTransaction {
-                // Note: I assume with every launch we do, in fact, update the licenses for app the apps if we join or get removed
-                //      from family sharing... We really can't test this as there is a 1-year cooldown.
-                //      Then 'findStaleLicences' will find these now invalid items to remove.
+        // Set the in-memory field immediately — DepotDownloader uses this for auth during the
+        // current session; the DB writes below are for persistence across restarts.
+        licenses = callback.licenseList
 
-                // Chunk the input to reduce memory pressures for very large items.
-                licenses = callback.licenseList
-                cachedLicenseDao.deleteAll()
-                callback.licenseList.chunked(500).forEach { chunk ->
-                    cachedLicenseDao.insertAll(
-                        chunk.map { license ->
-                            CachedLicense(licenseJson = LicenseSerializer.serializeLicense(license))
-                        },
+        // Coalesce rapid callbacks (e.g. bulk activations) so only the last in a burst triggers
+        // the expensive DB + PICS work, preventing parallel in-flight coroutines from OOMing.
+        pendingLicenseCallback = callback
+        licenseListDebounceJob?.cancel()
+        licenseListDebounceJob = scope.launch {
+            delay(5.seconds)
+            val pending = pendingLicenseCallback ?: return@launch
+
+            val licensesToAdd = pending.licenseList
+                .groupBy { it.packageID }
+                .map { licensesEntry ->
+                    val preferred = licensesEntry.value.firstOrNull {
+                        it.ownerAccountID == userSteamId?.accountID?.toInt()
+                    } ?: licensesEntry.value.first()
+                    SteamLicense(
+                        packageId = licensesEntry.key,
+                        lastChangeNumber = preferred.lastChangeNumber,
+                        timeCreated = preferred.timeCreated,
+                        timeNextProcess = preferred.timeNextProcess,
+                        minuteLimit = preferred.minuteLimit,
+                        minutesUsed = preferred.minutesUsed,
+                        paymentMethod = preferred.paymentMethod,
+                        licenseFlags = licensesEntry.value
+                            .map { it.licenseFlags }
+                            .reduceOrNull { first, second ->
+                                val combined = EnumSet.copyOf(first)
+                                combined.addAll(second)
+                                combined
+                            } ?: EnumSet.noneOf(ELicenseFlags::class.java),
+                        purchaseCode = preferred.purchaseCode,
+                        licenseType = preferred.licenseType,
+                        territoryCode = preferred.territoryCode,
+                        accessToken = preferred.accessToken,
+                        ownerAccountId = licensesEntry.value.map { it.ownerAccountID },
+                        masterPackageID = preferred.masterPackageID,
                     )
                 }
-                val licensesToAdd = callback.licenseList
-                    .groupBy { it.packageID }
-                    .map { licensesEntry ->
-                        val preferred = licensesEntry.value.firstOrNull {
-                            it.ownerAccountID == userSteamId?.accountID?.toInt()
-                        } ?: licensesEntry.value.first()
-                        SteamLicense(
-                            packageId = licensesEntry.key,
-                            lastChangeNumber = preferred.lastChangeNumber,
-                            timeCreated = preferred.timeCreated,
-                            timeNextProcess = preferred.timeNextProcess,
-                            minuteLimit = preferred.minuteLimit,
-                            minutesUsed = preferred.minutesUsed,
-                            paymentMethod = preferred.paymentMethod,
-                            licenseFlags = licensesEntry.value
-                                .map { it.licenseFlags }
-                                .reduceOrNull { first, second ->
-                                    val combined = EnumSet.copyOf(first)
-                                    combined.addAll(second)
-                                    combined
-                                } ?: EnumSet.noneOf(ELicenseFlags::class.java),
-                            purchaseCode = preferred.purchaseCode,
-                            licenseType = preferred.licenseType,
-                            territoryCode = preferred.territoryCode,
-                            accessToken = preferred.accessToken,
-                            ownerAccountId = licensesEntry.value.map { it.ownerAccountID }, // Read note above
-                            masterPackageID = preferred.masterPackageID,
-                        )
-                    }
 
-                if (licensesToAdd.isNotEmpty()) {
-                    Timber.i("Adding ${licensesToAdd.size} licenses")
-                    licensesToAdd.chunked(500).forEach { chunk ->
-                        licenseDao.insertAll(chunk)
-                    }
+
+            // Compare the new and changed licences so we only update/add what we need
+            val existingStubs = licenseDao.getLicenseStubs().associateBy { it.packageId }
+            val incomingIds = licensesToAdd.mapTo(HashSet(licensesToAdd.size)) { it.packageId }
+
+            val newLicenses = licensesToAdd.filter { it.packageId !in existingStubs }
+            val changedLicenses = licensesToAdd.filter { pkg ->
+                val stub = existingStubs[pkg.packageId]
+                stub != null && (stub.lastChangeNumber != pkg.lastChangeNumber || stub.accessToken != pkg.accessToken)
+            }
+            val staleIds = existingStubs.keys.filterNot { it in incomingIds }
+
+            Timber.i(
+                "onLicenseList diff: ${newLicenses.size} new, ${changedLicenses.size} changed, " +
+                    "${staleIds.size} stale, " +
+                    "${licensesToAdd.size - newLicenses.size - changedLicenses.size} unchanged",
+            )
+
+            // For changed licenses, read their existing PICS-derived columns (app_ids/depot_ids) so
+            // we can carry them forward — licensesToAdd is built from the callback, which doesn't
+            // carry those. We only fetch full rows for the small changed subset, not the whole list.
+            val mergedChangedLicenses = if (changedLicenses.isNotEmpty()) {
+                val existingPics = licenseDao.findLicenses(changedLicenses.map { it.packageId })
+                    .associateBy { it.packageId }
+                changedLicenses.map { updated ->
+                    val pics = existingPics[updated.packageId]
+                    updated.copy(
+                        appIds = pics?.appIds ?: emptyList(),
+                        depotIds = pics?.depotIds ?: emptyList(),
+                    )
                 }
+            } else {
+                emptyList()
+            }
 
-                val licensesToRemove = licenseDao.findStaleLicences(
-                    packageIds = callback.licenseList.map { it.packageID },
-                )
-                if (licensesToRemove.isNotEmpty()) {
-                    Timber.i("Removing ${licensesToRemove.size} (stale) licenses")
-                    val packageIds = licensesToRemove.map { it.packageId }
-                    licenseDao.deleteStaleLicenses(packageIds)
+            // transaction - Only update based on new and changed licences
+            db.withTransaction {
+                val toWrite = newLicenses + mergedChangedLicenses
+                if (toWrite.isNotEmpty()) {
+                    toWrite.chunked(MAX_PICS_BUFFER).forEach { licenseDao.insertAll(it) }
                 }
+                if (staleIds.isNotEmpty()) {
+                    Timber.i("Removing ${staleIds.size} (stale) licenses")
+                    licenseDao.deleteStaleLicenses(staleIds)
+                }
+            }
 
-                // Get PICS information with the current license database.
-                licenseDao.getAllLicenses()
+            // queue only new and changed packages for PICS to reduce db load.
+            val toQueue = newLicenses + changedLicenses
+            if (toQueue.isNotEmpty()) {
+                toQueue
                     .map { PICSRequest(it.packageId, it.accessToken) }
                     .chunked(MAX_PICS_BUFFER)
                     .forEach { chunk ->
                         Timber.d("onLicenseList: Queueing ${chunk.size} package(s) for PICS")
                         packagePicsChannel.send(chunk)
                     }
+            } else {
+                Timber.i("onLicenseList: no packages need PICS sync, skipping queue")
+            }
+
+            // JSON serialization of the full license list happens here (outside T1) so T1's lock
+            // window stays short. A single wrapping transaction ensures getLicensesFromDb() sees
+            // either the previous complete snapshot or the new one, with no empty window between.
+            // Chunked writes cap peak allocation while keeping the entire replace atomic.
+            db.withTransaction {
+                cachedLicenseDao.deleteAll()
+                pending.licenseList.chunked(MAX_PICS_BUFFER).forEach { chunk ->
+                    val cachedChunk = chunk.map { license ->
+                        CachedLicense(licenseJson = LicenseSerializer.serializeLicense(license))
+                    }
+                    cachedLicenseDao.insertAll(cachedChunk)
+                }
             }
         }
     }
@@ -4371,61 +4493,101 @@ class SteamService : Service(), IChallengeUrlChanged {
                     if (!isLoggedIn) return@collect
                     val steamApps = instance?._steamApps ?: return@collect
 
-                    try {
-                        val callback = steamApps.picsGetProductInfo(
-                            apps = appRequests,
-                            packages = emptyList(),
-                        ).await()
-
-                        callback.results.forEachIndexed { index, picsCallback ->
-                            Timber.d(
-                                "onPicsProduct: ${index + 1} of ${callback.results.size}" +
-                                    "\n\tReceived PICS result of ${picsCallback.apps.size} app(s)." +
-                                    "\n\tReceived PICS result of ${picsCallback.packages.size} package(s).",
+                    var picsAttempt = 0
+                    while (picsAttempt <= MAX_PICS_BATCH_RETRIES) {
+                        try {
+                            val job = steamApps.picsGetProductInfo(
+                                apps = appRequests,
+                                packages = emptyList(),
                             )
+                            job.timeout = PICS_JOB_TIMEOUT_MS
+                            val callback = job.await()
 
-                            ensureActive()
-                            val steamAppsMap = picsCallback.apps.values.mapNotNull { app ->
-                                val appFromDb = appDao.findApp(app.id)
-                                val packageId = appFromDb?.packageId ?: INVALID_PKG_ID
-                                val packageFromDb = if (packageId != INVALID_PKG_ID) licenseDao.findLicense(packageId) else null
-                                val ownerAccountId = packageFromDb?.ownerAccountId ?: emptyList()
+                            callback.results.forEachIndexed { index, picsCallback ->
+                                Timber.d(
+                                    "onPicsProduct: ${index + 1} of ${callback.results.size}" +
+                                        "\n\tReceived PICS result of ${picsCallback.apps.size} app(s)." +
+                                        "\n\tReceived PICS result of ${picsCallback.packages.size} package(s).",
+                                )
 
-                                // Apps with -1 for the ownerAccountId should be added.
-                                //  This can help with friend game names.
+                                ensureActive()
 
-                                // TODO maybe apps with -1 for the ownerAccountId can be stripped with necessities and name.
-
-                                val ufsParseVersionOutdated = appFromDb != null && appFromDb.ufsParseVersion < CURRENT_UFS_PARSE_VERSION
-
-                                if (app.changeNumber != appFromDb?.lastChangeNumber || ufsParseVersionOutdated) {
-                                    val newApp = app.keyValues.generateSteamApp().copy(
-                                        packageId = packageId,
-                                        ownerAccountId = ownerAccountId,
-                                        receivedPICS = true,
-                                        lastChangeNumber = app.changeNumber,
-                                        licenseFlags = packageFromDb?.licenseFlags ?: EnumSet.noneOf(ELicenseFlags::class.java),
+                                // Batch the DB reads that the per-app decision needs, instead of
+                                // issuing two point queries (findApp + findLicense) per app. For a
+                                // 30K-game library the per-app path was ~512 queries per 256-app
+                                // batch, each findApp deserializing the full depots/config/UFS blob
+                                // just to compare a change number. Here we do two batched reads:
+                                // a slim metadata projection keyed by appId, and the licenses keyed
+                                // by packageId, then decide everything in memory.
+                                val appMetaById = appDao
+                                    .findAppPicsMeta(picsCallback.apps.values.map { it.id })
+                                    .associateBy { it.id }
+                                val licensesByPkgId = licenseDao
+                                    .findLicenses(
+                                        appMetaById.values
+                                            .map { it.packageId }
+                                            .filter { it != INVALID_PKG_ID }
+                                            .distinct(),
                                     )
-                                    if (ufsParseVersionOutdated && newApp.ufs.saveFilePatterns.any { it.uploadRoot != it.root || it.uploadPath != it.path }) {
-                                        // UFS path logic changed and this app has rootoverrides: store 0 to force one
-                                        // full cloud query while preserving the local sync snapshot.
-                                        changeNumbersDao.insert(app.id, 0L)
-                                    }
-                                    newApp
-                                } else {
-                                    null
-                                }
-                            }
+                                    .associateBy { it.packageId }
 
-                            if (steamAppsMap.isNotEmpty()) {
-                                Timber.i("Inserting ${steamAppsMap.size} PICS apps to database")
-                                db.withTransaction {
-                                    appDao.insertAll(steamAppsMap)
+                                val steamAppsMap = picsCallback.apps.values.mapNotNull { app ->
+                                    val appMeta = appMetaById[app.id]
+                                    val packageId = appMeta?.packageId ?: INVALID_PKG_ID
+                                    val packageFromDb = if (packageId != INVALID_PKG_ID) licensesByPkgId[packageId] else null
+                                    val ownerAccountId = packageFromDb?.ownerAccountId ?: emptyList()
+
+                                    // Apps with -1 for the ownerAccountId should be added.
+                                    //  This can help with friend game names.
+
+                                    // TODO maybe apps with -1 for the ownerAccountId can be stripped with necessities and name.
+
+                                    val ufsParseVersionOutdated = appMeta != null && appMeta.ufsParseVersion < CURRENT_UFS_PARSE_VERSION
+
+                                    if (app.changeNumber != appMeta?.lastChangeNumber || ufsParseVersionOutdated) {
+                                        val newApp = app.keyValues.generateSteamApp().copy(
+                                            packageId = packageId,
+                                            ownerAccountId = ownerAccountId,
+                                            receivedPICS = true,
+                                            lastChangeNumber = app.changeNumber,
+                                            licenseFlags = packageFromDb?.licenseFlags ?: EnumSet.noneOf(ELicenseFlags::class.java),
+                                        )
+                                        if (ufsParseVersionOutdated && newApp.ufs.saveFilePatterns.any { it.uploadRoot != it.root || it.uploadPath != it.path }) {
+                                            // UFS path logic changed and this app has rootoverrides: store 0 to force one
+                                            // full cloud query while preserving the local sync snapshot.
+                                            changeNumbersDao.insert(app.id, 0L)
+                                        }
+                                        newApp
+                                    } else {
+                                        null
+                                    }
+                                }
+
+                                if (steamAppsMap.isNotEmpty()) {
+                                    Timber.i("Inserting ${steamAppsMap.size} PICS apps to database")
+                                    db.withTransaction {
+                                        appDao.insertAll(steamAppsMap)
+                                    }
                                 }
                             }
+                            break
+                        } catch (e: CancellationException) {
+                            // A timed-out AsyncJobMultiple with zero results calls future.cancel()
+                            // rather than failing the future, so this looks like coroutine
+                            // cancellation. Only rethrow if this collector's own job was cancelled;
+                            // otherwise retry with backoff until the limit is reached.
+                            ensureActive()
+                            picsAttempt++
+                            if (picsAttempt > MAX_PICS_BATCH_RETRIES) {
+                                Timber.w("PICS product info request timed out for ${appRequests.size} app(s); max retries exceeded, dropping batch")
+                            } else {
+                                Timber.w("PICS product info timed out for ${appRequests.size} app(s); retry $picsAttempt of $MAX_PICS_BATCH_RETRIES")
+                                delay(picsAttempt.toLong() * PICS_RETRY_BACKOFF_MS)
+                            }
+                        } catch (e: AsyncJobFailedException) {
+                            Timber.w("Could not get PICS product info $e")
+                            break
                         }
-                    } catch (e: AsyncJobFailedException) {
-                        Timber.w("Could not get PICS product info $e")
                     }
                 }
         }
@@ -4441,17 +4603,22 @@ class SteamService : Service(), IChallengeUrlChanged {
                     if (!isLoggedIn) return@collect
                     val steamApps = instance?._steamApps ?: return@collect
 
-                    val callback = steamApps.picsGetProductInfo(
-                        apps = emptyList(),
-                        packages = packageRequests,
-                    ).await()
+                    var picsAttempt = 0
+                    while (picsAttempt <= MAX_PICS_BATCH_RETRIES) {
+                        try {
+                            val job = steamApps.picsGetProductInfo(
+                                apps = emptyList(),
+                                packages = packageRequests,
+                            )
+                            job.timeout = PICS_JOB_TIMEOUT_MS
+                            val callback = job.await()
 
-                    callback.results.forEach { picsCallback ->
+                            callback.results.forEach { picsCallback ->
                         // Don't race the queue.
                         if (!isLoggedIn) return@collect
                         val queue = Collections.synchronizedList(mutableListOf<Int>())
 
-                        db.withTransaction {
+                                db.withTransaction {
                             // When the same app appears in multiple packages (e.g. user owns the game and
                             // also has a free-weekend / demo / family-shared sub for it), the previous
                             // implementation overwrote SteamApp.packageId with whichever pkg was iterated
@@ -4460,10 +4627,17 @@ class SteamService : Service(), IChallengeUrlChanged {
                             // To fix that we (a) process user-owned packages last so they win the
                             // last-write-wins assignment within this batch and (b) refuse to downgrade an
                             // existing user-owned packageId across batches.
-                            val accountId = userSteamId?.accountID?.toInt()
-                            val packageLicenses: Map<Int, SteamLicense> = if (accountId != null) {
-                                val packageIds = picsCallback.packages.values.map { it.id }
-                                licenseDao.findLicenses(packageIds).associateBy { it.packageId }
+                                    val accountId = userSteamId?.accountID?.toInt()
+                                    val referencedAppIds = picsCallback.packages.values
+                                        .flatMap { pkg -> pkg.keyValues["appids"].children.map { it.asInteger() } }
+                                        .distinct()
+                                    val originalPkgById = appDao.findAppPicsMeta(referencedAppIds)
+                                        .associate { it.id to it.packageId }
+                                    val packageLicenses: Map<Int, SteamLicense> = if (accountId != null) {
+                                        val lookupIds = (picsCallback.packages.values.map { it.id } + originalPkgById.values)
+                                            .filter { it != INVALID_PKG_ID }
+                                            .distinct()
+                                        licenseDao.findLicenses(lookupIds).associateBy { it.packageId }
                             } else {
                                 emptyMap()
                             }
@@ -4482,7 +4656,19 @@ class SteamService : Service(), IChallengeUrlChanged {
                                 return if (expired) 1 else 2
                             }
 
+                            fun licenseRank(pkgId: Int): Int {
+                                if (accountId == null || pkgId == INVALID_PKG_ID) return 0
+                                val license = packageLicenses[pkgId]
+                                return when {
+                                    license == null -> 0
+                                    !license.ownerAccountId.contains(accountId) -> 0
+                                    ELicenseFlags.Expired in license.licenseFlags -> 1
+                                    else -> 2
+                                }
+                            }
+
                             val orderedPackages = picsCallback.packages.values.sortedBy { pkgRank(it.id) }
+                            val assignedPkgById = HashMap<Int, Int>(originalPkgById)
 
                             orderedPackages.forEach { pkg ->
                                 val appIds = pkg.keyValues["appids"].children.map { it.asInteger() }
@@ -4491,42 +4677,42 @@ class SteamService : Service(), IChallengeUrlChanged {
                                 val depotIds = pkg.keyValues["depotids"].children.map { it.asInteger() }
                                 licenseDao.updateDepots(pkg.id, depotIds)
 
-                                // Insert a stub row (or update) of SteamApps to the database.
                                 appIds.forEach { appid ->
-                                    val existing = appDao.findApp(appid)
-                                    if (existing == null) {
-                                        appDao.insert(SteamApp(id = appid, packageId = pkg.id))
-                                        return@forEach
+                                    val current = assignedPkgById[appid]
+                                    when {
+                                        current == null -> assignedPkgById[appid] = pkg.id
+                                        current == pkg.id -> Unit
+                                        licenseRank(current) > pkgRank(pkg.id) -> Unit
+                                        else -> assignedPkgById[appid] = pkg.id
                                     }
-                                    if (existing.packageId == pkg.id) {
-                                        return@forEach
-                                    }
-                                    if (accountId != null && existing.packageId != INVALID_PKG_ID) {
-                                        val existingLicense = packageLicenses[existing.packageId]
-                                            ?: licenseDao.findLicense(existing.packageId)
-                                        val existingRank = when {
-                                            existingLicense == null -> 0
-                                            !existingLicense.ownerAccountId.contains(accountId) -> 0
-                                            ELicenseFlags.Expired in existingLicense.licenseFlags -> 1
-                                            else -> 2
-                                        }
-                                        if (existingRank > pkgRank(pkg.id)) {
-                                            return@forEach
-                                        }
-                                    }
-                                    appDao.update(existing.copy(packageId = pkg.id))
                                 }
 
                                 queue.addAll(appIds)
                             }
+
+                            val stubs = mutableListOf<SteamApp>()
+                            val updatesByPkg = HashMap<Int, MutableList<Int>>()
+                            assignedPkgById.forEach { (appId, pkgId) ->
+                                val original = originalPkgById[appId]
+                                if (original == null) {
+                                    stubs += SteamApp(id = appId, packageId = pkgId)
+                                } else if (original != pkgId) {
+                                    updatesByPkg.getOrPut(pkgId) { mutableListOf() }.add(appId)
+                                }
+                            }
+                            if (stubs.isNotEmpty()) appDao.insertAll(stubs)
+                            updatesByPkg.forEach { (pkgId, appIds) ->
+                                appDao.updatePackageIdForApps(pkgId, appIds)
+                            }
                         }
 
                         try {
-                            // TODO: This could be an issue. (Stalling)
-                            steamApps.picsGetAccessTokens(
+                            val tokensJob = steamApps.picsGetAccessTokens(
                                 appIds = queue,
                                 packageIds = emptyList(),
-                            ).await()
+                            )
+                            tokensJob.timeout = PICS_JOB_TIMEOUT_MS
+                            tokensJob.await()
                                 .appTokens
                                 .forEach { (key, value) ->
                                     appTokens[key] = value
@@ -4540,8 +4726,26 @@ class SteamService : Service(), IChallengeUrlChanged {
                                     Timber.d("bufferedPICSGetProductInfo: Queueing ${chunk.size} for PICS")
                                     appPicsChannel.send(chunk)
                                 }
+                        } catch (e: CancellationException) {
+                            ensureActive()
+                            Timber.w("PICS access token request timed out for ${queue.size} app(s); skipping batch")
                         } catch (e: AsyncJobFailedException) {
                             Timber.w("Could not get PICS product info $e")
+                        }
+                    }
+                            break
+                        } catch (e: CancellationException) {
+                            ensureActive()
+                            picsAttempt++
+                            if (picsAttempt > MAX_PICS_BATCH_RETRIES) {
+                                Timber.w("PICS product info request timed out for ${packageRequests.size} package(s); max retries exceeded, dropping batch")
+                            } else {
+                                Timber.w("PICS product info timed out for ${packageRequests.size} package(s); retry $picsAttempt of $MAX_PICS_BATCH_RETRIES")
+                                delay(picsAttempt.toLong() * PICS_RETRY_BACKOFF_MS)
+                            }
+                        } catch (e: AsyncJobFailedException) {
+                            Timber.w("Could not get PICS product info for packages $e")
+                            break
                         }
                     }
                 }

@@ -38,6 +38,7 @@ import app.gamenative.ui.component.dialog.ContainerConfigDialog
 import app.gamenative.ui.component.dialog.LoadingDialog
 import app.gamenative.ui.component.dialog.NexusModsDialog
 import app.gamenative.ui.data.AppMenuOption
+import app.gamenative.ui.data.Achievement
 import app.gamenative.ui.data.GameDisplayInfo
 import app.gamenative.ui.enums.AppOptionMenuType
 import app.gamenative.ui.util.ContainerConfigTransfer
@@ -1201,6 +1202,9 @@ abstract class BaseAppScreen {
         var hasLeftoverInstallState by remember(libraryItem.appId) {
             mutableStateOf(hasLeftoverInstall(context, libraryItem))
         }
+        var achievementsState by remember(libraryItem.appId) {
+            mutableStateOf<List<Achievement>?>(null)
+        }
 
         val uiScope = rememberCoroutineScope()
 
@@ -1227,19 +1231,53 @@ abstract class BaseAppScreen {
             performStateRefresh(true)
         }
 
+        LaunchedEffect(libraryItem.appId) {
+            if (getGameSource(libraryItem) != GameSource.STEAM) return@LaunchedEffect
+            repeat(3) { attempt ->
+                val achievements = try {
+                    withContext(Dispatchers.IO) {
+                        app.gamenative.service.SteamService.fetchAchievementsForDisplay(getGameId(libraryItem))
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to fetch achievements for ${getGameId(libraryItem)}")
+                    null
+                }
+                if (achievements != null) {
+                    achievementsState = achievements
+                    return@LaunchedEffect
+                }
+                if (attempt < 2) delay(2_000)
+            }
+        }
+
         var showConfigDialog by androidx.compose.runtime.remember {
             androidx.compose.runtime.mutableStateOf(false)
         }
         var containerData by androidx.compose.runtime.remember {
             androidx.compose.runtime.mutableStateOf(ContainerData())
         }
+        var containerDataLoaded by remember(libraryItem.appId) { mutableStateOf(false) }
         var communityContainerData by remember(appId) {
             mutableStateOf<ContainerData?>(null)
         }
 
         val onEditContainer: () -> Unit = {
             containerData = loadContainerData(context, libraryItem)
+            containerDataLoaded = true
             showConfigDialog = true
+        }
+
+        LaunchedEffect(libraryItem.appId, isInstalledState) {
+            if (isInstalledState) {
+                containerData = withContext(Dispatchers.IO) {
+                    loadContainerData(context, libraryItem)
+                }
+                containerDataLoaded = true
+            } else {
+                containerDataLoaded = false
+            }
         }
 
         // Export for Frontend launcher
@@ -1543,6 +1581,8 @@ abstract class BaseAppScreen {
             otherSources = libraryItem.otherSources,
             isInstalledOnOtherSource = libraryItem.isInstalledOnOtherSource,
             onSourceClick = onSourceClick,
+            runtimeConfig = containerData.takeIf { containerDataLoaded },
+            achievements = achievementsState,
         )
 
         if (showReadiness && launchActivity != null) {
@@ -1566,6 +1606,8 @@ abstract class BaseAppScreen {
                 onDismissRequest = { showConfigDialog = false },
                 onSave = {
                     saveContainerConfig(context, libraryItem, it)
+                    containerData = it
+                    containerDataLoaded = true
                     showConfigDialog = false
                 },
             )

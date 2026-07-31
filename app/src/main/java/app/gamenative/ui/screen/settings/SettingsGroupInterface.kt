@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.BrightnessMedium
+import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,6 +87,7 @@ import app.gamenative.utils.LocaleHelper
 import app.gamenative.service.epic.EpicAuthManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.CoroutineScope
@@ -101,6 +104,10 @@ import app.gamenative.data.GameSource
 import app.gamenative.sync.FrontendSyncManager
 import app.gamenative.ui.util.PlatformAuthUiHelpers
 import app.gamenative.ui.util.SnackbarManager
+import app.gamenative.ui.theme.GameplayThemeCodec
+import app.gamenative.ui.theme.GameplayThemeDecodeResult
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 /** Icon button that triggers [FrontendSyncManager.resyncAll] and shows a spinner while syncing. */
 @Composable
@@ -128,9 +135,17 @@ private fun FrontendSyncResyncButton() {
 /** Settings group covering interface preferences: theme, downloads, frontend sync, language, and icons. */
 enum class InterfaceSettingsSection {
     APPEARANCE,
+    CONTROLS,
     LIBRARY,
     DOWNLOADS,
 }
+
+private data class BuiltInColorProfile(
+    val style: PaletteStyle,
+    val label: String,
+    val description: String,
+    val swatches: List<Color>,
+)
 
 @Composable
 fun SettingsGroupInterface(
@@ -138,14 +153,135 @@ fun SettingsGroupInterface(
     paletteStyle: PaletteStyle,
     onAppTheme: (AppTheme) -> Unit,
     onPaletteStyle: (PaletteStyle) -> Unit,
+    customThemeEnabled: Boolean = false,
+    customThemeJson: String = "",
+    onCustomTheme: (String) -> Unit = {},
+    onCustomThemeEnabled: (Boolean) -> Unit = {},
+    onClearCustomTheme: () -> Unit = {},
     section: InterfaceSettingsSection = InterfaceSettingsSection.APPEARANCE,
 ) {
     val context = LocalContext.current
+    val paletteProfiles = listOfNotNull(
+        PaletteStyle.entries.firstOrNull { it.name == "TonalSpot" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_slate),
+                stringResource(R.string.theme_profile_slate_description),
+                listOf(Color(0xFF6F91AA), Color(0xFF202831), Color(0xFFB4BEC8)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "Neutral" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_steel),
+                stringResource(R.string.theme_profile_steel_description),
+                listOf(Color(0xFF87939D), Color(0xFF252A2E), Color(0xFFC4CBD0)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "Vibrant" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_ocean),
+                stringResource(R.string.theme_profile_ocean_description),
+                listOf(Color(0xFF65A5C7), Color(0xFF17242B), Color(0xFFB8D2DF)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "Expressive" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_dusk),
+                stringResource(R.string.theme_profile_dusk_description),
+                listOf(Color(0xFF8F94C9), Color(0xFF222331), Color(0xFFCBCDE3)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "Rainbow" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_forest),
+                stringResource(R.string.theme_profile_forest_description),
+                listOf(Color(0xFF6F977E), Color(0xFF18231D), Color(0xFFB7C8BD)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "FruitSalad" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_copper),
+                stringResource(R.string.theme_profile_copper_description),
+                listOf(Color(0xFFA47B5D), Color(0xFF261F1A), Color(0xFFD1C0B3)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "Fidelity" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_wine),
+                stringResource(R.string.theme_profile_wine_description),
+                listOf(Color(0xFF967080), Color(0xFF251D21), Color(0xFFD0BCC5)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "Content" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_arctic),
+                stringResource(R.string.theme_profile_arctic_description),
+                listOf(Color(0xFF668B91), Color(0xFF172124), Color(0xFFB6C9CC)),
+            )
+        },
+        PaletteStyle.entries.firstOrNull { it.name == "Monochrome" }?.let {
+            BuiltInColorProfile(
+                it,
+                stringResource(R.string.theme_profile_high_contrast),
+                stringResource(R.string.theme_profile_high_contrast_description),
+                listOf(Color.White, Color(0xFF101214), Color(0xFF737A80)),
+            )
+        },
+    )
 
     var openWebLinks by rememberSaveable { mutableStateOf(PrefManager.openWebLinksExternally) }
 
     var openAppThemeDialog by rememberSaveable { mutableStateOf(false) }
     var openAppPaletteDialog by rememberSaveable { mutableStateOf(false) }
+    var showClearThemeDialog by rememberSaveable { mutableStateOf(false) }
+    var showThemeEditor by rememberSaveable { mutableStateOf(false) }
+
+    val customThemeDocument = remember(customThemeJson) {
+        when (val result = GameplayThemeCodec.decode(customThemeJson)) {
+            is GameplayThemeDecodeResult.Success -> result.document
+            is GameplayThemeDecodeResult.Error -> null
+        }
+    }
+    var pendingThemeExport by remember { mutableStateOf("") }
+    val importThemeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val source = runCatching { readThemeDocument(context, uri) }
+            .getOrElse {
+                SnackbarManager.show(context.getString(R.string.settings_custom_theme_import_failed, it.message ?: "unknown error"))
+                return@rememberLauncherForActivityResult
+            }
+        when (val result = GameplayThemeCodec.decode(source)) {
+            is GameplayThemeDecodeResult.Success -> {
+                onCustomTheme(GameplayThemeCodec.encode(result.document))
+                SnackbarManager.show(context.getString(R.string.settings_custom_theme_imported, result.document.name))
+            }
+            is GameplayThemeDecodeResult.Error -> {
+                SnackbarManager.show(context.getString(R.string.settings_custom_theme_import_failed, result.reason))
+            }
+        }
+    }
+    val exportThemeLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        if (uri == null || pendingThemeExport.isBlank()) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { writer ->
+                writer.write(pendingThemeExport)
+            } ?: error("Could not open the selected file")
+        }.onSuccess {
+            SnackbarManager.show(context.getString(R.string.settings_custom_theme_exported))
+        }.onFailure {
+            SnackbarManager.show(context.getString(R.string.settings_custom_theme_export_failed))
+        }
+        pendingThemeExport = ""
+    }
 
     var openStartScreenDialog by rememberSaveable { mutableStateOf(false) }
     var startScreenOption by rememberSaveable(openStartScreenDialog) { mutableStateOf(PrefManager.startScreen) }
@@ -258,7 +394,87 @@ fun SettingsGroupInterface(
         }
     }
 
-    if (section == InterfaceSettingsSection.APPEARANCE) SettingsGroup(modifier = Modifier.background(Color.Transparent)) {
+    if (section == InterfaceSettingsSection.APPEARANCE || section == InterfaceSettingsSection.CONTROLS) SettingsGroup(
+        modifier = Modifier.background(Color.Transparent),
+    ) {
+        if (section == InterfaceSettingsSection.APPEARANCE) {
+        val themeOptions = listOf(
+            stringResource(R.string.settings_app_theme_system),
+            stringResource(R.string.settings_app_theme_light),
+            stringResource(R.string.settings_app_theme_dark),
+            stringResource(R.string.settings_app_theme_oled),
+        )
+        val activePaletteProfile = paletteProfiles.firstOrNull { it.style == paletteStyle }
+
+        SettingsMenuLink(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_app_theme_title)) },
+            subtitle = { Text(text = themeOptions[appTheme.ordinal]) },
+            onClick = { openAppThemeDialog = true },
+        )
+        SettingsMenuLink(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_color_profile_title)) },
+            subtitle = {
+                Text(
+                    text = activePaletteProfile?.label
+                        ?: paletteStyle.name.replace(Regex("([a-z])([A-Z])"), "$1 $2"),
+                )
+            },
+            onClick = { openAppPaletteDialog = true },
+        )
+
+        SettingsSwitch(
+            colors = settingsTileColorsAlt(),
+            enabled = customThemeDocument != null,
+            title = { Text(text = stringResource(R.string.settings_custom_theme_enabled)) },
+            subtitle = {
+                Text(
+                    text = customThemeDocument?.name
+                        ?: stringResource(R.string.settings_custom_theme_not_imported),
+                )
+            },
+            state = customThemeEnabled && customThemeDocument != null,
+            onCheckedChange = onCustomThemeEnabled,
+        )
+        SettingsMenuLink(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_custom_theme_edit)) },
+            subtitle = { Text(text = stringResource(R.string.settings_custom_theme_edit_subtitle)) },
+            onClick = { showThemeEditor = true },
+        )
+        SettingsMenuLink(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_custom_theme_import)) },
+            subtitle = { Text(text = stringResource(R.string.settings_custom_theme_import_subtitle)) },
+            onClick = { importThemeLauncher.launch(arrayOf("*/*")) },
+        )
+        SettingsMenuLink(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_custom_theme_export)) },
+            subtitle = { Text(text = stringResource(R.string.settings_custom_theme_export_subtitle)) },
+            onClick = {
+                val document = customThemeDocument ?: GameplayThemeCodec.safeDocument()
+                pendingThemeExport = GameplayThemeCodec.encode(document)
+                val filename = document.name
+                    .lowercase()
+                    .replace(Regex("[^a-z0-9]+"), "-")
+                    .trim('-')
+                    .ifBlank { "gameplay-theme" }
+                exportThemeLauncher.launch("$filename.gameplay-theme.json")
+            },
+        )
+        if (customThemeDocument != null) {
+            SettingsMenuLink(
+                colors = settingsTileColorsAlt(),
+                title = { Text(text = stringResource(R.string.settings_custom_theme_remove)) },
+                subtitle = { Text(text = stringResource(R.string.settings_custom_theme_remove_subtitle)) },
+                onClick = { showClearThemeDialog = true },
+            )
+        }
+        }
+
+        if (section == InterfaceSettingsSection.CONTROLS) {
         SettingsSwitch(
             colors = settingsTileColorsAlt(),
             title = { Text(text = stringResource(R.string.settings_achievement_show_notification)) },
@@ -296,7 +512,9 @@ fun SettingsGroupInterface(
             },
             colors = settingsTileColorsAlt(),
         )
+        }
 
+        if (section == InterfaceSettingsSection.APPEARANCE) {
         SettingsSwitch(
             colors = settingsTileColorsAlt(),
             title = { Text(text = stringResource(R.string.settings_interface_external_links_title)) },
@@ -307,7 +525,6 @@ fun SettingsGroupInterface(
                 PrefManager.openWebLinksExternally = it
             },
         )
-
         SettingsSwitch(
             colors = settingsTileColorsAlt(),
             title = { Text(text = stringResource(R.string.settings_interface_hide_statusbar_title)) },
@@ -321,7 +538,9 @@ fun SettingsGroupInterface(
                 showStatusBarRestartDialog = true
             },
         )
+        }
 
+        if (section == InterfaceSettingsSection.CONTROLS) {
         SettingsSwitch(
             colors = settingsTileColorsAlt(),
             title = { Text(text = stringResource(R.string.settings_interface_swap_face_buttons_title)) },
@@ -355,7 +574,9 @@ fun SettingsGroupInterface(
                 PrefManager.showGamepadHints = newValue
             },
         )
+        }
 
+        if (section == InterfaceSettingsSection.APPEARANCE) {
         if (!BuildConfig.MODERN_ANDROID) {
             val anyFrontendSyncConfigured by FrontendSyncManager.anyConfigured.collectAsState()
             SettingsMenuLink(
@@ -411,6 +632,7 @@ fun SettingsGroupInterface(
                     },
                 )
             }
+        }
         }
     }
 
@@ -649,6 +871,76 @@ fun SettingsGroupInterface(
         message = context.getString(R.string.settings_saving_restarting),
     )
 
+    SingleChoiceDialog(
+        openDialog = openAppThemeDialog,
+        icon = Icons.Default.BrightnessMedium,
+        title = stringResource(R.string.settings_app_theme_title),
+        items = listOf(
+            stringResource(R.string.settings_app_theme_system),
+            stringResource(R.string.settings_app_theme_light),
+            stringResource(R.string.settings_app_theme_dark),
+            stringResource(R.string.settings_app_theme_oled),
+        ),
+        currentItem = appTheme.ordinal,
+        onSelected = { index ->
+            onAppTheme(AppTheme.entries[index])
+            openAppThemeDialog = false
+        },
+        onDismiss = { openAppThemeDialog = false },
+    )
+
+    MessageDialog(
+        visible = showClearThemeDialog,
+        title = stringResource(R.string.settings_custom_theme_remove),
+        message = stringResource(R.string.settings_custom_theme_remove_message),
+        confirmBtnText = stringResource(R.string.settings_custom_theme_remove_confirm),
+        dismissBtnText = stringResource(R.string.cancel),
+        onConfirmClick = {
+            showClearThemeDialog = false
+            onClearCustomTheme()
+        },
+        onDismissRequest = { showClearThemeDialog = false },
+        onDismissClick = { showClearThemeDialog = false },
+    )
+
+    ThemeEditorPage(
+        visible = showThemeEditor,
+        initialDocument = customThemeDocument ?: GameplayThemeCodec.safeDocument(),
+        onSave = { document ->
+            onCustomTheme(GameplayThemeCodec.encode(document))
+            showThemeEditor = false
+            SnackbarManager.show(context.getString(R.string.settings_custom_theme_saved, document.name))
+        },
+        onDismiss = { showThemeEditor = false },
+    )
+
+    val paletteEntries = paletteProfiles.map { it.style }
+    val selectedPaletteIndex = paletteEntries.indexOf(paletteStyle).takeIf { it >= 0 } ?: 0
+    SingleChoiceDialog(
+        openDialog = openAppPaletteDialog,
+        icon = Icons.Default.ColorLens,
+        title = stringResource(R.string.settings_color_profile_title),
+        items = paletteProfiles.map { it.label },
+        currentItem = selectedPaletteIndex,
+        onSelected = { index ->
+            onPaletteStyle(paletteEntries[index])
+            openAppPaletteDialog = false
+        },
+        onDismiss = { openAppPaletteDialog = false },
+        itemDescription = { index -> paletteProfiles[index].description },
+        itemPreview = { index ->
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                paletteProfiles[index].swatches.forEach { color ->
+                    Box(
+                        modifier = Modifier
+                            .size(width = 10.dp, height = 32.dp)
+                            .background(color, RoundedCornerShape(2.dp)),
+                    )
+                }
+            }
+        },
+    )
+
     // Language selection dialog
     SingleChoiceDialog(
         openDialog = openLanguageDialog,
@@ -727,6 +1019,27 @@ fun SettingsGroupInterface(
     // GOG/Epic/Amazon login and logout flows (including loading dialogs and
     // confirmations) are now owned by the System Menu and shared helpers.
 
+}
+
+private const val MAX_THEME_FILE_BYTES = 128 * 1024
+
+private fun readThemeDocument(context: Context, uri: Uri): String {
+    val declaredSize = context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+    require(declaredSize <= MAX_THEME_FILE_BYTES || declaredSize < 0L) { "Theme file is larger than 128 KiB" }
+    return context.contentResolver.openInputStream(uri)?.use(::readThemeDocument)
+        ?: error("Could not open the selected file")
+}
+
+private fun readThemeDocument(input: InputStream): String {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(8 * 1024)
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        require(output.size() + count <= MAX_THEME_FILE_BYTES) { "Theme file is larger than 128 KiB" }
+        output.write(buffer, 0, count)
+    }
+    return output.toString(Charsets.UTF_8.name())
 }
 
 

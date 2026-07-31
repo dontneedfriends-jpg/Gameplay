@@ -8,6 +8,8 @@ import com.materialkolor.PaletteStyle
 data class MainState(
     val appTheme: AppTheme = AppTheme.NIGHT,
     val paletteStyle: PaletteStyle = PaletteStyle.TonalSpot,
+    val customThemeEnabled: Boolean = false,
+    val customThemeJson: String = "",
     val resettedScreen: PluviaScreen? = null,
     val currentScreen: PluviaScreen? = PluviaScreen.LoginUser,
     val hasLaunched: Boolean = false,

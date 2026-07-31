@@ -997,6 +997,20 @@ object PrefManager {
             setPref(APP_THEME_PALETTE, value.ordinal)
         }
 
+    private val CUSTOM_THEME_ENABLED = booleanPreferencesKey("custom_theme_enabled")
+    var customThemeEnabled: Boolean
+        get() = getPref(CUSTOM_THEME_ENABLED, false)
+        set(value) {
+            setPref(CUSTOM_THEME_ENABLED, value)
+        }
+
+    private val CUSTOM_THEME_JSON = stringPreferencesKey("custom_theme_json")
+    var customThemeJson: String
+        get() = getPref(CUSTOM_THEME_JSON, "")
+        set(value) {
+            setPref(CUSTOM_THEME_JSON, value)
+        }
+
     private val START_SCREEN = intPreferencesKey("start screen")
     var startScreen: HomeDestination
         get() {

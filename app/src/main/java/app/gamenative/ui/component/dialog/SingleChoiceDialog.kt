@@ -48,6 +48,8 @@ fun SingleChoiceDialog(
     currentItem: Int,
     onSelected: (Int) -> Unit,
     onDismiss: () -> Unit,
+    itemPreview: (@Composable (Int) -> Unit)? = null,
+    itemDescription: (@Composable (Int) -> String?)? = null,
 ) {
     if (!openDialog) {
         return
@@ -101,15 +103,22 @@ fun SingleChoiceDialog(
                             .padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        itemPreview?.invoke(index)
                         RadioButton(
                             selected = selected,
                             onClick = null,
+                            modifier = if (itemPreview != null) Modifier.padding(start = 10.dp) else Modifier,
                         )
-                        Text(
-                            text = entry,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 16.dp),
-                        )
+                        Column(modifier = Modifier.padding(start = 16.dp)) {
+                            Text(text = entry, style = MaterialTheme.typography.bodyLarge)
+                            itemDescription?.invoke(index)?.let { description ->
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             }

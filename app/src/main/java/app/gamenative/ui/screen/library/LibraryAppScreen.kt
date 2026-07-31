@@ -63,6 +63,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -75,6 +76,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,6 +119,7 @@ import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.component.LoadingScreen
 import app.gamenative.ui.data.AppMenuOption
+import app.gamenative.ui.data.Achievement
 import app.gamenative.ui.data.GameDisplayInfo
 import app.gamenative.ui.enums.AppOptionMenuType
 import app.gamenative.ui.internal.fakeAppInfo
@@ -131,6 +134,8 @@ import app.gamenative.utils.HltbService
 import app.gamenative.ui.theme.PluviaTheme
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
+import com.winlator.container.ContainerData
+import com.winlator.core.KeyValueSet
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -339,6 +344,63 @@ private fun ActionIconButton(
             contentDescription = contentDescription,
             tint = Color.White,
             modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+@Composable
+private fun GameRuntimeSummary(
+    config: ContainerData,
+    modifier: Modifier = Modifier,
+) {
+    val dxConfig = remember(config.dxwrapperConfig) { KeyValueSet(config.dxwrapperConfig) }
+    val directXName = remember(config.dxwrapper, config.dxwrapperConfig) {
+        when (config.dxwrapper.lowercase(Locale.ROOT)) {
+            "dxvk" -> listOf("DXVK", dxConfig.get("version")).filter { it.isNotBlank() }.joinToString(" ")
+            "vkd3d" -> listOf("VKD3D", dxConfig.get("vkd3dVersion")).filter { it.isNotBlank() }.joinToString(" ")
+            else -> config.dxwrapper.replaceFirstChar { it.titlecase(Locale.ROOT) }
+        }
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+        RuntimeSummaryValue(
+            label = stringResource(R.string.game_runtime_driver),
+            value = config.graphicsDriverVersion.ifBlank { config.graphicsDriver },
+        )
+        RuntimeSummaryValue(
+            label = stringResource(R.string.game_runtime_wine_proton),
+            value = config.wineVersion.ifBlank { "—" },
+        )
+        RuntimeSummaryValue(
+            label = stringResource(R.string.game_runtime_directx),
+            value = directXName.ifBlank { "—" },
+        )
+    }
+}
+
+@Composable
+private fun RuntimeSummaryValue(
+    label: String,
+    value: String,
+) {
+    Column(modifier = Modifier.widthIn(min = 132.dp, max = 260.dp)) {
+        Text(
+            text = label.uppercase(Locale.getDefault()),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.54f),
+            maxLines = 1,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+            color = Color.White.copy(alpha = 0.92f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -814,10 +876,13 @@ internal fun AppScreenContent(
     otherSources: List<GameSource> = emptyList(),
     isInstalledOnOtherSource: Boolean = false,
     onSourceClick: (GameSource) -> Unit = {},
+    runtimeConfig: ContainerData? = null,
+    achievements: List<Achievement>? = null,
 ) {
     val context = LocalContext.current
     // reactive — recomposes when network state changes
     val runtime = remember { AppScreenRuntimeState() }
+    var achievementsVisible by rememberSaveable(displayInfo.appId) { mutableStateOf(false) }
     val network = rememberAppScreenNetworkState(downloadInfo)
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
 
@@ -842,7 +907,7 @@ internal fun AppScreenContent(
     }
 
     // Handle back press when options panel is open
-    BackHandler(enabled = runtime.optionsMenuVisible) {
+    BackHandler(enabled = runtime.optionsMenuVisible && !achievementsVisible) {
         runtime.optionsMenuVisible = false
     }
 
@@ -862,6 +927,7 @@ internal fun AppScreenContent(
                 }
             }
             .onKeyEvent {
+                if (achievementsVisible) return@onKeyEvent true
                 if (it.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
                     runtime.ambientInteractionCounter++
                 }
@@ -1064,6 +1130,17 @@ internal fun AppScreenContent(
                                 onClick = onDeleteDownloadClick,
                             )
                         }
+                    }
+
+                    if (runtimeConfig != null) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(top = 10.dp),
+                            color = Color.White.copy(alpha = 0.14f),
+                        )
+                        GameRuntimeSummary(
+                            config = runtimeConfig,
+                            modifier = Modifier.padding(top = 10.dp),
+                        )
                     }
 
                     if (isDownloading && isPortrait) {
@@ -1290,6 +1367,15 @@ internal fun AppScreenContent(
                     }
                 }
 
+                if (!achievements.isNullOrEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    AchievementSummaryButton(
+                        achievements = achievements,
+                        onClick = { achievementsVisible = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+
                 if (otherSources.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -1333,7 +1419,7 @@ internal fun AppScreenContent(
             }
         }
 
-        AppScreenGamepadActions(
+        if (!achievementsVisible) AppScreenGamepadActions(
             runtime = runtime,
             network = network,
             isInstalled = isInstalled,
@@ -1347,7 +1433,7 @@ internal fun AppScreenContent(
         )
 
         // Options panel - slides in from right
-        GameOptionsPanel(
+        if (!achievementsVisible) GameOptionsPanel(
             isOpen = runtime.optionsMenuVisible,
             onDismiss = { runtime.optionsMenuVisible = false },
             options = optionsMenu.toList(),
@@ -1355,13 +1441,21 @@ internal fun AppScreenContent(
         )
 
         // Ambient mode during downloads
-        if (isDownloading) {
+        if (isDownloading && !achievementsVisible) {
             AmbientDownloadOverlay(
                 gameName = displayInfo.name,
                 downloadProgress = downloadProgress,
                 iconUrl = displayInfo.iconUrl,
                 originBounds = runtime.progressBarBounds,
                 userInteractionCounter = runtime.ambientInteractionCounter,
+            )
+        }
+
+        if (achievementsVisible && !achievements.isNullOrEmpty()) {
+            SteamAchievementsPage(
+                gameName = displayInfo.name,
+                achievements = achievements,
+                onBack = { achievementsVisible = false },
             )
         }
         }

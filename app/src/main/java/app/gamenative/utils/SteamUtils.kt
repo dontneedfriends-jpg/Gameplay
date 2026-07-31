@@ -63,6 +63,28 @@ object SteamUtils {
     fun hasStoredCredentials(): Boolean =
         PrefManager.username.isNotEmpty() && PrefManager.refreshToken.isNotEmpty()
 
+    fun getBaseAchievementIconUrl(appId: Int): String =
+        "https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/$appId/"
+
+    fun steamLanguageForAppLocale(locale: Locale = Locale.getDefault()): String = when (locale.language) {
+        "ko" -> "koreana"
+        "es" -> if (locale.country.isNotEmpty() && !locale.country.equals("ES", true)) "latam" else "spanish"
+        "pt" -> if (locale.country.equals("BR", true)) "brazilian" else "portuguese"
+        "zh" -> if (
+            locale.country.equals("TW", true) ||
+            locale.country.equals("HK", true) ||
+            locale.country.equals("MO", true) ||
+            locale.script.equals("Hant", true)
+        ) {
+            "tchinese"
+        } else {
+            "schinese"
+        }
+        else -> locale.getDisplayLanguage(Locale.ENGLISH)
+            .lowercase(Locale.ENGLISH)
+            .substringBefore(' ')
+    }
+
     // fall back at the same moment the banner would offer "Continue Offline".
     const val STEAM_LOGIN_AWAIT_MS: Long = TIMEOUT_SHOW_OFFLINE_OPTION_SECONDS * 1000L
 

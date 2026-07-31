@@ -1168,6 +1168,7 @@ fun PluviaMain(
         },
         isAmoled = (state.appTheme == AppTheme.AMOLED),
         style = state.paletteStyle,
+        customThemeJson = state.customThemeJson.takeIf { state.customThemeEnabled },
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             LoadingDialog(
@@ -1564,6 +1565,11 @@ fun PluviaMain(
                         paletteStyle = state.paletteStyle,
                         onAppTheme = viewModel::setTheme,
                         onPaletteStyle = viewModel::setPalette,
+                        customThemeEnabled = state.customThemeEnabled,
+                        customThemeJson = state.customThemeJson,
+                        onCustomTheme = viewModel::setCustomTheme,
+                        onCustomThemeEnabled = viewModel::setCustomThemeEnabled,
+                        onClearCustomTheme = viewModel::clearCustomTheme,
                         onBack = { navController.navigateUp() },
                     )
                 }

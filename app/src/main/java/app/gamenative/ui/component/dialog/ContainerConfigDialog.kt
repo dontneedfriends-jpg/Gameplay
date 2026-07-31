@@ -104,7 +104,6 @@ import app.gamenative.utils.ManifestInstaller
 import app.gamenative.service.SteamService
 import app.gamenative.utils.ManifestComponentHelper.VersionOptionList
 import app.gamenative.utils.ManifestRepository
-import app.gamenative.utils.PaddingUtils
 import com.winlator.contents.ContentProfile
 import com.alorma.compose.settings.ui.SettingsGroup
 import com.alorma.compose.settings.ui.SettingsMenuLink
@@ -1267,6 +1266,7 @@ fun ContainerConfigDialog(
             properties = DialogProperties(
                 usePlatformDefaultWidth = false,
                 dismissOnClickOutside = false,
+                decorFitsSystemWindows = false,
             ),
             content = {
                 val scrollState = rememberScrollState()
@@ -1334,7 +1334,7 @@ fun ContainerConfigDialog(
                                 }
                             }
                             .padding(
-                                top = PaddingUtils.statusBarAwarePadding().calculateTopPadding() + paddingValues.calculateTopPadding(),
+                                top = paddingValues.calculateTopPadding(),
                                 bottom = 32.dp + paddingValues.calculateBottomPadding(),
                                 start = paddingValues.calculateStartPadding(LayoutDirection.Ltr),
                                 end = paddingValues.calculateEndPadding(LayoutDirection.Ltr),

@@ -35,7 +35,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
 import app.gamenative.ui.component.NoExtractOutlinedTextField
-import app.gamenative.ui.theme.PluviaBackground
 import app.gamenative.ui.theme.PluviaBorder
 import app.gamenative.ui.theme.PluviaSurface
 import app.gamenative.ui.theme.PluviaSurfaceElevated
@@ -201,7 +200,7 @@ fun CategorizedActionPicker(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            containerColor = PluviaBackground,
+            containerColor = MaterialTheme.colorScheme.background,
             title = { Text(dialogTitle) },
             text = {
                 LazyColumn(modifier = Modifier.fillMaxWidth()) {

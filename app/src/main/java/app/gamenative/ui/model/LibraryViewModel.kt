@@ -63,6 +63,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.util.EnumSet
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import kotlin.math.max
@@ -117,6 +118,9 @@ class LibraryViewModel @Inject constructor(
     // How many items loaded on one page of results
     @Volatile private var paginationCurrentPage: Int = 0
     @Volatile private var lastPageInCurrentFilter: Int = 0
+
+    // Depot size calculation is expensive and stable until Steam metadata changes.
+    private val steamSizeCache = ConcurrentHashMap<String, Long>()
 
     // Complete and unfiltered app list
     private var appList: List<SteamApp> = emptyList()
@@ -207,6 +211,7 @@ class LibraryViewModel @Inject constructor(
                     // Check if the list has actually changed before triggering a re-filter
                     if (appList != apps) {
                         appList = apps
+                        steamSizeCache.clear()
                         invalidateLibrarySnapshot()
                         onFilterApps(paginationCurrentPage)
                     }
@@ -841,7 +846,9 @@ class LibraryViewModel @Inject constructor(
             }
 
             // Map Steam apps to UI items
-            data class LibraryEntry(val item: LibraryItem, val isInstalled: Boolean, val lastPlayed: Long = 0L)
+            data class LibraryEntry(val item: LibraryItem, val isInstalled: Boolean, val lastPlayed: Long = 0L) {
+                val sortName: String = item.name.lowercase()
+            }
 
             fun lastPlayedFor(appId: String): Long = playHistoryByAppId[appId] ?: 0L
 
@@ -859,9 +866,11 @@ class LibraryViewModel @Inject constructor(
                 }
                 // base-game size: ownedDlc=emptyMap excludes DLC depots
                 val licensedDepots = licensedDepotMap[item.id]
-                val resolved = SteamService.resolveDownloadableDepots(item.depots, "", emptyMap(), licensedDepots)
-                val totalSizeBytes = resolved.values.sumOf { depot ->
-                    depot.manifests[installedBranch]?.size ?: depot.manifests.values.firstOrNull()?.size ?: 0L
+                val totalSizeBytes = steamSizeCache.getOrPut("${item.id}:$installedBranch") {
+                    val resolved = SteamService.resolveDownloadableDepots(item.depots, "", emptyMap(), licensedDepots)
+                    resolved.values.sumOf { depot ->
+                        depot.manifests[installedBranch]?.size ?: depot.manifests.values.firstOrNull()?.size ?: 0L
+                    }
                 }
 
                 // Move appId here
@@ -1058,6 +1067,9 @@ class LibraryViewModel @Inject constructor(
             // Use captured currentState (not _state.value) to avoid TOCTOU race
             val currentTab = currentState.currentTab
             val isInstalledLibrary = currentTab == LibraryTab.INSTALLED
+            val hasGOGCredentials = GOGService.hasStoredCredentials(context)
+            val hasEpicCredentials = EpicService.hasStoredCredentials(context)
+            val hasAmazonCredentials = AmazonService.hasStoredCredentials(context)
             val includeSteam = if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
                 currentState.showSteamInLibrary
             } else {
@@ -1073,57 +1085,57 @@ class LibraryViewModel @Inject constructor(
                 currentState.showGOGInLibrary
             } else {
                 currentTab.showGoG
-            }) && (isInstalledLibrary || GOGService.hasStoredCredentials(context))
+            }) && (isInstalledLibrary || hasGOGCredentials)
 
             val includeEpic = (if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
                 currentState.showEpicInLibrary
             } else {
                 currentTab.showEpic
-            }) && (isInstalledLibrary || EpicService.hasStoredCredentials(context))
+            }) && (isInstalledLibrary || hasEpicCredentials)
 
             val includeAmazon = (if (currentTab == app.gamenative.ui.enums.LibraryTab.ALL) {
                 currentState.showAmazonInLibrary
             } else {
                 currentTab.showAmazon
-            }) && (isInstalledLibrary || AmazonService.hasStoredCredentials(context))
+            }) && (isInstalledLibrary || hasAmazonCredentials)
 
             // Combine both lists and apply sort option
             val sortComparator: Comparator<LibraryEntry> = when (currentState.currentSortOption) {
                 SortOption.INSTALLED_FIRST -> compareBy<LibraryEntry> { entry ->
                     if (entry.isInstalled) 0 else 1
-                }.thenBy { it.item.name.lowercase() }
+                }.thenBy { it.sortName }
 
-                SortOption.NAME_ASC -> compareBy { it.item.name.lowercase() }
+                SortOption.NAME_ASC -> compareBy { it.sortName }
 
-                SortOption.NAME_DESC -> compareByDescending { it.item.name.lowercase() }
+                SortOption.NAME_DESC -> compareByDescending { it.sortName }
 
                 SortOption.RECENTLY_PLAYED -> LibrarySortUtils.recentlyPlayedComparator(
-                    name = { it.item.name },
+                    name = { it.sortName },
                     isInstalled = { it.isInstalled },
                     lastPlayed = { it.lastPlayed },
                 )
 
                 SortOption.SIZE_SMALLEST -> compareBy<LibraryEntry> { it.item.sizeBytes }
-                    .thenBy { it.item.name.lowercase() }
+                    .thenBy { it.sortName }
 
                 SortOption.SIZE_LARGEST -> compareByDescending<LibraryEntry> { it.item.sizeBytes }
-                    .thenBy { it.item.name.lowercase() }
+                    .thenBy { it.sortName }
 
                 SortOption.FPS_HIGH -> compareByDescending<LibraryEntry> {
                     currentState.statsFor(it.item)?.fps ?: -1
-                }.thenBy { it.item.name.lowercase() }
+                }.thenBy { it.sortName }
 
                 SortOption.RUNS_HIGH -> compareByDescending<LibraryEntry> {
                     currentState.statsFor(it.item)?.runsGpu ?: -1
-                }.thenBy { it.item.name.lowercase() }
+                }.thenBy { it.sortName }
 
                 SortOption.REVIEWS_HIGH -> compareByDescending<LibraryEntry> {
                     currentState.statsFor(it.item)?.reviewsDevice ?: -1
-                }.thenBy { it.item.name.lowercase() }
+                }.thenBy { it.sortName }
 
                 SortOption.REVIEWS_GPU_HIGH -> compareByDescending<LibraryEntry> {
                     currentState.statsFor(it.item)?.reviewsGpu ?: -1
-                }.thenBy { it.item.name.lowercase() }
+                }.thenBy { it.sortName }
             }
 
             // A Steam collection can only contain Steam apps, so when one is selected the non-Steam

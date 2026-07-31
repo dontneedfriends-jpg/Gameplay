@@ -102,13 +102,13 @@ private enum class DownloadsSection(
     val titleResId: Int,
     val icon: ImageVector,
 ) {
-    Storage(
-        titleResId = R.string.settings_storage_manage_title,
-        icon = Icons.Default.Storage,
-    ),
     Downloads(
         titleResId = R.string.downloads_section_title,
         icon = Icons.Default.Download,
+    ),
+    Storage(
+        titleResId = R.string.settings_storage_manage_title,
+        icon = Icons.Default.Storage,
     ),
 }
 
@@ -123,7 +123,7 @@ fun HomeDownloadsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val storageManagerState = rememberContainerStorageManagerUiState()
     val scope = rememberCoroutineScope()
-    var selectedSectionIndex by rememberSaveable { mutableIntStateOf(DownloadsSection.Storage.ordinal) }
+    var selectedSectionIndex by rememberSaveable { mutableIntStateOf(DownloadsSection.Downloads.ordinal) }
     val sections = remember { DownloadsSection.values().toList() }
     val selectedSection = sections.getOrElse(selectedSectionIndex) { DownloadsSection.Downloads }
     var selectedLibraryItem by remember { mutableStateOf<LibraryItem?>(null) }
@@ -236,10 +236,10 @@ fun HomeDownloadsScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
-                    shape = RoundedCornerShape(24.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = PluviaTheme.colors.surfacePanel.copy(alpha = 0.94f),
-                    tonalElevation = 2.dp,
-                    shadowElevation = 12.dp,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp,
                 ) {
                     when (selectedSection) {
                         DownloadsSection.Downloads -> DownloadsContent(

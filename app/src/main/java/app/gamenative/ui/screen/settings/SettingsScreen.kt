@@ -23,12 +23,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Gamepad
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -65,12 +65,12 @@ import app.gamenative.ui.theme.PluviaTheme
 import com.materialkolor.PaletteStyle
 
 private enum class SettingsCategory(val titleRes: Int, val icon: ImageVector) {
-    EMULATION(R.string.settings_emulation_title, Icons.Default.Gamepad),
-    APPEARANCE(R.string.settings_interface_title, Icons.Default.Palette),
-    LIBRARY(R.string.settings_interface_custom_games, Icons.Default.LibraryBooks),
+    INTERFACE(R.string.settings_interface_title, Icons.Default.Palette),
+    CONTROLS(R.string.settings_controls_title, Icons.Default.Gamepad),
+    RUNTIME(R.string.settings_runtime_title, Icons.Default.Tune),
+    LIBRARY(R.string.settings_library_title, Icons.Default.LibraryBooks),
     DOWNLOADS(R.string.settings_downloads_title, Icons.Default.Download),
-    INFO(R.string.settings_info_title, Icons.Default.Info),
-    DEBUG(R.string.settings_debug_title, Icons.Default.BugReport),
+    SYSTEM(R.string.settings_system_title, Icons.Default.Settings),
 }
 
 @Composable
@@ -79,6 +79,11 @@ fun SettingsScreen(
     paletteStyle: PaletteStyle,
     onAppTheme: (AppTheme) -> Unit,
     onPaletteStyle: (PaletteStyle) -> Unit,
+    customThemeEnabled: Boolean,
+    customThemeJson: String,
+    onCustomTheme: (String) -> Unit,
+    onCustomThemeEnabled: (Boolean) -> Unit,
+    onClearCustomTheme: () -> Unit,
     onBack: () -> Unit,
 ) {
     SettingsScreenContent(
@@ -86,6 +91,11 @@ fun SettingsScreen(
         paletteStyle = paletteStyle,
         onAppTheme = onAppTheme,
         onPaletteStyle = onPaletteStyle,
+        customThemeEnabled = customThemeEnabled,
+        customThemeJson = customThemeJson,
+        onCustomTheme = onCustomTheme,
+        onCustomThemeEnabled = onCustomThemeEnabled,
+        onClearCustomTheme = onClearCustomTheme,
         onBack = onBack,
     )
 }
@@ -96,11 +106,16 @@ private fun SettingsScreenContent(
     paletteStyle: PaletteStyle,
     onAppTheme: (AppTheme) -> Unit,
     onPaletteStyle: (PaletteStyle) -> Unit,
+    customThemeEnabled: Boolean,
+    customThemeJson: String,
+    onCustomTheme: (String) -> Unit,
+    onCustomThemeEnabled: (Boolean) -> Unit,
+    onClearCustomTheme: () -> Unit,
     onBack: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
     val categories = remember { SettingsCategory.entries.toList() }
-    var selectedCategory by rememberSaveable { mutableStateOf(SettingsCategory.EMULATION) }
+    var selectedCategory by rememberSaveable { mutableStateOf(SettingsCategory.INTERFACE) }
     val categoryRailWidth = if (LocalConfiguration.current.screenWidthDp < 600) 156.dp else 228.dp
 
     LaunchedEffect(selectedCategory) {
@@ -182,14 +197,26 @@ private fun SettingsScreenContent(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     when (selectedCategory) {
-                        SettingsCategory.EMULATION -> SettingsGroupEmulation()
-                        SettingsCategory.APPEARANCE -> SettingsGroupInterface(
+                        SettingsCategory.INTERFACE -> SettingsGroupInterface(
                             appTheme = appTheme,
                             paletteStyle = paletteStyle,
                             onAppTheme = onAppTheme,
                             onPaletteStyle = onPaletteStyle,
+                            customThemeEnabled = customThemeEnabled,
+                            customThemeJson = customThemeJson,
+                            onCustomTheme = onCustomTheme,
+                            onCustomThemeEnabled = onCustomThemeEnabled,
+                            onClearCustomTheme = onClearCustomTheme,
                             section = InterfaceSettingsSection.APPEARANCE,
                         )
+                        SettingsCategory.CONTROLS -> SettingsGroupInterface(
+                            appTheme = appTheme,
+                            paletteStyle = paletteStyle,
+                            onAppTheme = onAppTheme,
+                            onPaletteStyle = onPaletteStyle,
+                            section = InterfaceSettingsSection.CONTROLS,
+                        )
+                        SettingsCategory.RUNTIME -> SettingsGroupEmulation()
                         SettingsCategory.LIBRARY -> SettingsGroupInterface(
                             appTheme = appTheme,
                             paletteStyle = paletteStyle,
@@ -204,8 +231,11 @@ private fun SettingsScreenContent(
                             onPaletteStyle = onPaletteStyle,
                             section = InterfaceSettingsSection.DOWNLOADS,
                         )
-                        SettingsCategory.INFO -> SettingsGroupInfo()
-                        SettingsCategory.DEBUG -> SettingsGroupDebug()
+                        SettingsCategory.SYSTEM -> {
+                            SettingsGroupInfo()
+                            Spacer(modifier = Modifier.height(20.dp))
+                            SettingsGroupDebug()
+                        }
                     }
                 }
             }
@@ -299,6 +329,11 @@ private fun Preview_SettingsScreen() {
             paletteStyle = PaletteStyle.TonalSpot,
             onAppTheme = { },
             onPaletteStyle = { },
+            customThemeEnabled = false,
+            customThemeJson = "",
+            onCustomTheme = { },
+            onCustomThemeEnabled = { },
+            onClearCustomTheme = { },
             onBack = { },
         )
     }
