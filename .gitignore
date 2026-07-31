@@ -62,6 +62,8 @@ app/keystores/*
 *.pyc
 __pycache__/
 resign.keystore
+/keystore
+*.lineage
 
 /app/modernXr/
 

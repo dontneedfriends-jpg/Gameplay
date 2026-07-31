@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-31
 
-This document is the working implementation plan for Gameplay, the GPL-3.0 fork of GameNative. It records product requirements, completed work, current priorities, and acceptance criteria. `ROADMAP.md` remains the upstream GameNative roadmap and is not used to track Gameplay-specific progress.
+This document is the working implementation plan for Gameplay, the GPL-3.0 fork of GameNative. It records product requirements, completed work, current priorities, and acceptance criteria.
 
 Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs device verification.
 
@@ -19,6 +19,7 @@ Status legend: `[x]` complete, `[-]` in progress, `[ ]` planned, `[!]` needs dev
 - [x] Preserved Gameplay-specific Steam session caching, installed-library counts, achievements, and user-owned license priority while porting upstream performance changes.
 - [x] Rebuilt and verified `modernDebug` after the integrated runtime, library, theme, settings, and UI changes.
 - [x] Replaced the repository README with Gameplay-specific product, capability, compatibility, build, contribution, and GPL compliance documentation.
+- [x] Removed unrelated repository artifacts: an unused screenshot, obsolete affiliate recommendation seed, upstream-only roadmap, and accidentally tracked debug signing files; replaced upstream contribution rules with Gameplay-specific guidance.
 
 ## 1. Product direction and constraints
 

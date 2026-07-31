@@ -137,7 +137,6 @@ Never commit `local.properties`, API keys, signing credentials, keystores, or ge
 - `PRODUCT.md` — product principles and design constraints.
 - `NOTICE` — Gameplay fork attribution and naming information.
 - `THIRD_PARTY_NOTICES` — component licenses, notices, and source information.
-- `ROADMAP.md` — retained upstream GameNative roadmap; Gameplay-specific progress is tracked separately.
 
 The Kotlin namespace and Android application ID remain `app.gamenative`. This is an internal compatibility identifier used by existing data, migrations, JNI bindings, and native components; it is not the displayed product name.
 
