@@ -137,7 +137,7 @@
     <string name="container_storage_move_to_internal_button">Przenieś do wewnętrznej</string>
     <string name="container_storage_move_external_disabled">Ustaw ścieżkę pamięci zewnętrznej w Ustawieniach przed przenoszeniem gier.</string>
     <string name="container_storage_move_success">Przeniesiono %1$s do %2$s</string>
-    <string name="container_storage_move_failed">Nie udało się przenieść gry: %1$s</string>
+    <string name="container_storage_move_failed">Nie udało się przenieść gry: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Usuń kontener</string>
     <string name="container_storage_remove_title">Usuń kontener</string>
     <string name="container_storage_remove_message">Usunąć kontener dla %1$s? Pliki gry pozostaną na dysku.</string>

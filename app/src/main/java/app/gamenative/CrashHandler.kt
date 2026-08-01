@@ -23,6 +23,13 @@ class CrashHandler(
     companion object {
         private const val LOG_CAT_COUNT = 256
         private const val CRASH_FILE_HISTORY_COUNT = 1
+        private val bearerTokenPattern = Regex("(?i)\\bBearer\\s+\\S+")
+        private val sensitiveAssignmentPattern = Regex(
+            "(?i)([\\\"']?(?:authorization|proxy-authorization|cookie|set-cookie|x-api-key|api-key|api[_-]?key|api[_-]?token|access[_-]?token|refresh[_-]?token|password|passwd|secret|token)[\\\"']?\\s*[:=]\\s*)(?:[\\\"'][^\\\"']*[\\\"']|[^\\s,;}]*)",
+        )
+        private val sensitiveQueryPattern = Regex(
+            "(?i)([?&](?:access[_-]?token|refresh[_-]?token|api[_-]?key|token|signature)=)[^&\\s]+",
+        )
 
         val timestamp: String
             get() = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
@@ -56,13 +63,20 @@ class CrashHandler(
                     log.append(line).append("\n")
                 }
 
-                log.toString()
+                sanitizeLogcat(log.toString())
             } catch (e: Exception) {
                 "Failed to capture logs: ${e.message}"
             } finally {
                 reader?.close()
                 process?.destroy()
             }
+        }
+
+        internal fun sanitizeLogcat(log: String): String {
+            return log
+                .replace(bearerTokenPattern) { "Bearer <redacted>" }
+                .replace(sensitiveAssignmentPattern) { "${it.groupValues[1]}<redacted>" }
+                .replace(sensitiveQueryPattern) { "${it.groupValues[1]}<redacted>" }
         }
     }
 
@@ -73,12 +87,7 @@ class CrashHandler(
     }
 
     private val recentLogcat: String
-        get() = try {
-            val process = Runtime.getRuntime().exec("logcat -d -t $LOG_CAT_COUNT --pid=${android.os.Process.myPid()}")
-            process.inputStream.bufferedReader().use { it.readText() }
-        } catch (e: Exception) {
-            "Failed to retrieve logcat: ${e.message}"
-        }
+        get() = getAppLogs(LOG_CAT_COUNT)
 
     private val cleanupOldCrashFiles: () -> Unit = {
         crashFileDir.listFiles()?.let { files ->
@@ -105,6 +114,7 @@ class CrashHandler(
 
             val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault()).format(Date())
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            val launchContext = CrashContext.snapshot()
 
             val crashReport = buildString {
                 appendLine("Timestamp: $timestamp")
@@ -114,14 +124,22 @@ class CrashHandler(
                 appendLine("${android.os.Build.MANUFACTURER} - ${android.os.Build.BRAND} - ${android.os.Build.MODEL}")
                 appendLine("Android Version: ${android.os.Build.VERSION.RELEASE}")
                 appendLine()
+                appendLine("---------- Launch Context ----------")
+                appendLine("Game: ${launchContext.gameName ?: "unknown"}")
+                appendLine("App ID: ${launchContext.appId ?: "unknown"}")
+                appendLine("Container: ${launchContext.containerId ?: "unknown"}")
+                appendLine("Runtime: ${launchContext.runtime ?: "unknown"}")
+                appendLine("GPU: ${launchContext.gpu ?: "unknown"}")
+                appendLine("Launch stage: ${launchContext.launchStage}")
+                appendLine()
                 appendLine("---------- Cause ----------")
                 appendLine("Exception: ${throwable.javaClass.name}")
-                appendLine("Message: ${throwable.message}")
+                appendLine("Message: ${CrashHandler.sanitizeLogcat(throwable.message.orEmpty())}")
                 appendLine()
                 appendLine("---------- Stack Trace ----------")
-                appendLine(stackTrace)
+                appendLine(CrashHandler.sanitizeLogcat(stackTrace))
                 appendLine()
-                appendLine("---------- Logcat ----------")
+                appendLine("---------- Logcat (redacted) ----------")
                 appendLine(recentLogcat)
             }
 

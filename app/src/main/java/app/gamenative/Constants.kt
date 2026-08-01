@@ -36,6 +36,5 @@ object Constants {
     object Misc {
         const val GITHUB_LINK = "https://github.com/utkarshdalal/GameNative"
         const val PRIVACY_LINK = "https://github.com/utkarshdalal/GameNative/tree/master/PrivacyPolicy"
-        const val UPDATE_CHECK_URL = "https://api.gamenative.app/api/update-check"
     }
 }

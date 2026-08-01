@@ -67,6 +67,34 @@ object LocalInstallerCompletionCoordinator {
         }
     }
 
+    /** Marks a session interrupted by process death without pretending installer exited cleanly. */
+    suspend fun markInterrupted(context: Context, sessionId: String): Result = withContext(Dispatchers.IO) {
+        val store = InstallationSessionStore(context)
+        val session = store.load(sessionId)
+            ?: return@withContext Result.Failed(
+                missingSession(sessionId),
+                "Installation session was not found",
+            )
+        if (session.state == InstallationState.FAILED) {
+            return@withContext Result.Failed(session, session.lastError ?: "Installation was interrupted")
+        }
+        if (session.state !in setOf(
+                InstallationState.INSTALLER_RUNNING,
+                InstallationState.PAUSED,
+                InstallationState.RESTART_REQUIRED,
+            )
+        ) {
+            return@withContext Result.Failed(session, "Installation cannot be recovered from ${session.state}")
+        }
+
+        val failed = session.transitionTo(
+            InstallationState.FAILED,
+            error = "Installation was interrupted. Run the installer again to continue.",
+        )
+        store.save(failed)
+        Result.Failed(failed, requireNotNull(failed.lastError))
+    }
+
     suspend fun selectExecutable(context: Context, sessionId: String, relativePath: String): Result =
         withContext(Dispatchers.IO) {
             val store = InstallationSessionStore(context)
@@ -217,4 +245,17 @@ object LocalInstallerCompletionCoordinator {
         store.save(completed)
         return Result.Completed(completed)
     }
+
+    private fun missingSession(sessionId: String) = InstallationSession(
+        id = sessionId,
+        title = "Installation",
+        sourceUri = "",
+        sourceName = "",
+        installerType = InstallerType.EXE,
+        managedInstallerPath = "",
+        installerRelativePath = "",
+        state = InstallationState.FAILED,
+        createdAt = 0L,
+        updatedAt = 0L,
+    )
 }

@@ -3,6 +3,7 @@ package app.gamenative.externaldisplay
 import android.app.Presentation
 import android.content.Context
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Display
@@ -117,7 +118,11 @@ class ExternalDisplaySwapController(
     }
 
     private fun findPresentationDisplay(): Display? {
-        val currentDisplay = context.display ?: return null
+        val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.display
+        } else {
+            displayManager?.getDisplay(Display.DEFAULT_DISPLAY)
+        } ?: return null
         return displayManager
             ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
             ?.firstOrNull { display ->

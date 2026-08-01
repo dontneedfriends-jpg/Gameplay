@@ -117,6 +117,16 @@ app/build/outputs/apk/modern/debug/app-modern-debug.apk
 
 Other available flavors include `legacy`, `legacyXr`, `modern`, and `modernXr`. Gameplay development primarily validates `modernDebug`.
 
+### Updates and releases
+
+Gameplay checks the latest non-prerelease GitHub Release for `dontneedfriends-jpg/Gameplay` at most once per day. An update is never downloaded without user approval. The release must contain these assets:
+
+- `Gameplay-modern-release.apk`
+- `Gameplay-modern-release.json`
+- `SHA256SUMS.txt`
+
+The APK is verified for package name, newer version code, size, and SHA-256 before Android's package installer is opened. The release workflow is [`.github/workflows/release.yml`](.github/workflows/release.yml). Production releases must use the same signing key as the installed `app.gameplay` package; losing that key makes in-place updates impossible.
+
 ### Optional artwork integration
 
 Automatic artwork lookup for imported games can use a SteamGridDB API key placed in `local.properties`:

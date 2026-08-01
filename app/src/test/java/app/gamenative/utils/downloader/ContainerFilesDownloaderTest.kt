@@ -5,8 +5,12 @@ import androidx.test.core.app.ApplicationProvider
 import app.gamenative.PrefManager
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream
+import org.apache.commons.compress.compressors.zstandard.ZstdCompressorOutputStream
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -14,7 +18,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import timber.log.Timber
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Test suite for ContainerFilesDownloader functionality.
@@ -211,7 +217,7 @@ class ContainerFilesDownloaderTest {
         // Create a mock cached file
         cacheDir.mkdirs()
         val cachedFile = File(cacheDir, "$componentId.tzst")
-        cachedFile.writeText("mock cached content")
+        writeValidCacheArchive(cachedFile)
 
         val retrievedFile = ContainerFilesDownloader.ensureContainerFileAvailable(
             context,
@@ -355,7 +361,7 @@ class ContainerFilesDownloaderTest {
         // Create a mock cached file
         cacheDir.mkdirs()
         val cachedFile = File(cacheDir, "$componentId.tzst")
-        cachedFile.writeText("mock cached content for blocking test")
+        writeValidCacheArchive(cachedFile)
 
         // Call the blocking wrapper (not in a coroutine context)
         val retrievedFile = ensureContainerFileAvailableBlocking(
@@ -420,7 +426,7 @@ class ContainerFilesDownloaderTest {
         // Create a mock cached file
         cacheDir.mkdirs()
         val cachedFile = File(cacheDir, "$componentId.tzst")
-        cachedFile.writeText("mock cached content for null callback test")
+        writeValidCacheArchive(cachedFile)
 
         // Call the blocking wrapper with null callback (simulating Java code)
         val retrievedFile = ensureContainerFileAvailableBlocking(
@@ -435,6 +441,31 @@ class ContainerFilesDownloaderTest {
             println("Blocking wrapper with null callback successfully returned: ${retrievedFile.absolutePath}")
         } else {
             println("Blocking wrapper returned null (legacy variant)")
+        }
+    }
+
+    @Test
+    fun testInvalidCachedArchiveIsRejected() {
+        cacheDir.mkdirs()
+        val cachedFile = File(cacheDir, "extras.tzst")
+        cachedFile.writeText("not an archive")
+
+        assertFalse(ContainerFilesDownloader.isValidCacheArchive(cachedFile))
+    }
+
+    private fun writeValidCacheArchive(file: File) {
+        val payload = "valid archive payload".toByteArray()
+        FileOutputStream(file).use { output ->
+            ZstdCompressorOutputStream(BufferedOutputStream(output)).use { compressed ->
+                TarArchiveOutputStream(compressed).use { archive ->
+                    val entry = TarArchiveEntry("payload.txt")
+                    entry.size = payload.size.toLong()
+                    archive.putArchiveEntry(entry)
+                    archive.write(payload)
+                    archive.closeArchiveEntry()
+                    archive.finish()
+                }
+            }
         }
     }
 }

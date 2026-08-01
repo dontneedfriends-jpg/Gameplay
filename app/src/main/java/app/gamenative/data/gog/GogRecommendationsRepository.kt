@@ -204,7 +204,7 @@ object GogRecommendationsRepository {
                 .build()
             Net.http.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
-                val body = (response.body?.string() ?: return null).removePrefix("﻿")
+                val body = (response.body?.string() ?: return null).removePrefix("\uFEFF")
                 val items = json.decodeFromString<SteamSearchResponse>(body).items
                 val norm = GogMapRepository.normalizeTitle(title)
                 items.firstOrNull { GogMapRepository.normalizeTitle(it.name) == norm }?.id?.toString()
@@ -226,7 +226,7 @@ object GogRecommendationsRepository {
                 .build()
             Net.http.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
-                val body = (response.body?.string() ?: return null).removePrefix("﻿")
+                val body = (response.body?.string() ?: return null).removePrefix("\uFEFF")
                 val data = json.decodeFromString<Map<String, SteamAppEnvelope>>(body)[appId]
                     ?.takeIf { it.success }?.data ?: return null
                 val video = data.movies.firstOrNull()?.hls?.takeIf { it.isNotBlank() }

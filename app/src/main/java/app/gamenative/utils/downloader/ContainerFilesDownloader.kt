@@ -3,13 +3,18 @@ package app.gamenative.utils.downloader
 import android.content.Context
 import app.gamenative.BuildConfig
 import app.gamenative.service.SteamService
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
+import org.apache.commons.compress.compressors.zstandard.ZstdCompressorInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import timber.log.Timber
+import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 
 /**
  * Utility for downloading container pattern files (extras, container patterns, proton patterns) from the manifest server.
@@ -63,9 +68,13 @@ object ContainerFilesDownloader {
         // Modern variant: download from server
         // Check if already downloaded and cached
         val destFile = File(context.filesDir, "$CONTAINER_FILES_CACHE_DIR/$componentId.tzst")
-        if (destFile.exists() && destFile.length() > 0) {
+        if (isValidCacheArchive(destFile)) {
             Timber.d("Using cached container file: $componentId at ${destFile.absolutePath}")
             return@withContext destFile
+        }
+        if (destFile.exists()) {
+            Timber.w("Removing invalid cached container file: ${destFile.absolutePath}")
+            destFile.delete()
         }
 
         // Download from server using local manifest
@@ -80,6 +89,10 @@ object ContainerFilesDownloader {
                 context = context,
                 onProgress = onProgress
             )
+            if (!isValidCacheArchive(destFile)) {
+                destFile.delete()
+                throw IOException("Downloaded container file is not a readable tar.zstd archive")
+            }
             Timber.i("Successfully downloaded container file: $componentId")
         } catch (e: Exception) {
             Timber.e(e, "Failed to download container file: $componentId")
@@ -88,6 +101,33 @@ object ContainerFilesDownloader {
         }
 
         return@withContext destFile
+    }
+
+    /** Reads the complete tar.zstd stream so truncated or arbitrary files are never reused. */
+    internal fun isValidCacheArchive(file: File): Boolean {
+        if (!file.isFile || file.length() == 0L) return false
+
+        return runCatching {
+            FileInputStream(file).use { source ->
+                BufferedInputStream(source).use { buffered ->
+                    ZstdCompressorInputStream(buffered).use { compressed ->
+                        TarArchiveInputStream(compressed).use { archive ->
+                            val buffer = ByteArray(16 * 1024)
+                            var readableEntries = 0
+                            while (true) {
+                                val entry = archive.getNextTarEntry() ?: break
+                                if (!archive.canReadEntryData(entry)) continue
+                                readableEntries++
+                                while (archive.read(buffer) != -1) {
+                                    // Consume entry so compressor and archive checks run fully.
+                                }
+                            }
+                            readableEntries > 0
+                        }
+                    }
+                }
+            }
+        }.getOrDefault(false)
     }
 
     /**

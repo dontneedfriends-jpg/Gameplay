@@ -240,12 +240,12 @@ object ContainerUtils {
         PrefManager.fexcoreX87Mode = containerData.fexcoreX87Mode
         PrefManager.fexcoreMultiBlock = containerData.fexcoreMultiBlock
         PrefManager.fexcorePreset = containerData.fexcorePreset
-		// Persist renderer and controller defaults
-		PrefManager.renderer = containerData.renderer
+        // Persist renderer and controller defaults
+        PrefManager.renderer = containerData.renderer
         PrefManager.useSteamInput = containerData.useSteamInput
         PrefManager.xinputEnabled = containerData.enableXInput
-		PrefManager.dinputEnabled = containerData.enableDInput
-		PrefManager.dinputMapperType = containerData.dinputMapperType.toInt()
+        PrefManager.dinputEnabled = containerData.enableDInput
+        PrefManager.dinputMapperType = containerData.dinputMapperType.toInt()
         PrefManager.forceDlc = containerData.forceDlc
         PrefManager.localSavesOnly = containerData.localSavesOnly
         PrefManager.steamOfflineMode = containerData.steamOfflineMode

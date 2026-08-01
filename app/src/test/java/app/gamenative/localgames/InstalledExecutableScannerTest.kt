@@ -6,6 +6,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 class InstalledExecutableScannerTest {
     @get:Rule
@@ -39,10 +41,31 @@ class InstalledExecutableScannerTest {
         assertFalse(candidates.any { it.contains("windows", ignoreCase = true) })
     }
 
+    @Test
+    fun `rejects files that only have an exe extension`() {
+        val driveC = temporaryFolder.newFolder("drive_c")
+        executable(driveC, "Program Files/Example/Example.exe")
+        File(driveC, "Program Files/Example/fake.exe").writeBytes(byteArrayOf(0x4d, 0x5a))
+
+        assertEquals(
+            listOf("Program Files/Example/Example.exe"),
+            InstalledExecutableScanner.findCandidates(driveC),
+        )
+    }
+
     private fun executable(root: File, relativePath: String) {
         File(root, relativePath).apply {
             parentFile?.mkdirs()
-            writeBytes(byteArrayOf(0x4d, 0x5a))
+            val bytes = ByteBuffer.allocate(0x80 + 4 + 20 + 2).order(ByteOrder.LITTLE_ENDIAN)
+            bytes.put(0x4d.toByte())
+            bytes.put(0x5a.toByte())
+            bytes.position(0x3c)
+            bytes.putInt(0x80)
+            bytes.position(0x80)
+            bytes.put(byteArrayOf(0x50, 0x45, 0, 0))
+            bytes.position(0x80 + 4 + 20)
+            bytes.putShort(0x10b.toShort())
+            writeBytes(bytes.array())
         }
     }
 }

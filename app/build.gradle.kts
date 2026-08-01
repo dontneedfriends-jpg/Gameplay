@@ -261,6 +261,7 @@ android {
             }
         }
         getByName("modernXr") {
+            java.srcDir("src/nonXr/java")
             assets {
                 srcDirs("src/modern/assets", "src/main/assets")
             }

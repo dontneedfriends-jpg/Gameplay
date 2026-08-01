@@ -4,6 +4,7 @@ import android.app.Presentation
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Display
@@ -111,7 +112,11 @@ class ExternalDisplayInputController(
     }
 
     private fun findPresentationDisplay(): Display? {
-        val currentDisplay = context.display ?: return null
+        val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context.display
+        } else {
+            displayManager?.getDisplay(Display.DEFAULT_DISPLAY)
+        } ?: return null
         // Required detection logic for external presentation displays
         return displayManager
             ?.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)

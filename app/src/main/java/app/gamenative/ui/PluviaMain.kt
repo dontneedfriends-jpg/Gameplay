@@ -1141,6 +1141,9 @@ fun PluviaMain(
                             onProgress = { progress ->
                                 viewModel.setLoadingDialogProgress(progress)
                             },
+                            expectedSha256 = updateInfo.sha256,
+                            expectedSizeBytes = updateInfo.sizeBytes,
+                            expectedPackageName = updateInfo.packageName,
                         )
 
                         viewModel.setLoadingDialogVisible(false)

@@ -1,6 +1,7 @@
 package app.gamenative.localgames
 
 import java.io.File
+import java.io.FileInputStream
 
 /** Finds likely game launchers created inside a Wine C: drive by a local installer. */
 object InstalledExecutableScanner {
@@ -73,10 +74,22 @@ object InstalledExecutableScanner {
 
     private fun isCandidate(file: File, applyNameFilter: Boolean): Boolean {
         if (!file.isFile || !file.name.endsWith(".exe", ignoreCase = true)) return false
-        if (!applyNameFilter) return true
         val normalizedName = file.nameWithoutExtension.lowercase()
-        return rejectedNameFragments.none(normalizedName::contains)
+        if (applyNameFilter && rejectedNameFragments.any(normalizedName::contains)) return false
+
+        return isWindowsExecutable(file)
     }
+
+    private fun isWindowsExecutable(file: File): Boolean = runCatching {
+        FileInputStream(file).use { input ->
+            when (WindowsExecutableInspector.inspect(input).kind) {
+                ExecutableKind.WINDOWS_16_NE,
+                ExecutableKind.WINDOWS_32_PE,
+                ExecutableKind.WINDOWS_64_PE -> true
+                else -> false
+            }
+        }
+    }.getOrDefault(false)
 
     private fun isSafeRelativePath(path: String): Boolean =
         path.isNotBlank() &&

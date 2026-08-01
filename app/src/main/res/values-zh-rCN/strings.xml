@@ -128,7 +128,7 @@
     <string name="container_storage_move_to_internal_button">移动到内部</string>
     <string name="container_storage_move_external_disabled">移动游戏前，请先在设置中配置外部存储路径。</string>
     <string name="container_storage_move_success">已将 %1$s 移动到 %2$s</string>
-    <string name="container_storage_move_failed">移动游戏失败：%1$s</string>
+    <string name="container_storage_move_failed">移动游戏失败：%1$s：%2$s</string>
     <string name="container_storage_remove_button">移除容器</string>
     <string name="container_storage_remove_title">移除容器</string>
     <string name="container_storage_remove_message">要移除 %1$s 的容器吗？游戏文件将保留在磁盘上。</string>

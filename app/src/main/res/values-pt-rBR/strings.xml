@@ -80,7 +80,7 @@
     <string name="container_storage_move_to_internal_button">Mover para interno</string>
     <string name="container_storage_move_external_disabled">Defina um caminho de armazenamento externo nas Configurações antes de mover jogos.</string>
     <string name="container_storage_move_success">Moveu %1$s para %2$s</string>
-    <string name="container_storage_move_failed">Falha ao mover o jogo: %1$s</string>
+    <string name="container_storage_move_failed">Falha ao mover o jogo: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Remover contêiner</string>
     <string name="container_storage_remove_title">Remover contêiner</string>
     <string name="container_storage_remove_message">Remover o contêiner de %1$s? Os arquivos do jogo permanecerão no disco.</string>

@@ -125,7 +125,7 @@
     <string name="container_storage_move_to_internal_button">Перемістити на внутрішнє</string>
     <string name="container_storage_move_external_disabled">Перш ніж переміщувати ігри, у Налаштуваннях задайте шлях до зовнішнього сховища.</string>
     <string name="container_storage_move_success">Переміщено %1$s до %2$s</string>
-    <string name="container_storage_move_failed">Не вдалося перемістити гру: %1$s</string>
+    <string name="container_storage_move_failed">Не вдалося перемістити гру: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Видалити контейнер</string>
     <string name="container_storage_remove_title">Видалити контейнер</string>
     <string name="container_storage_remove_message">Видалити контейнер для %1$s? Файли гри залишаться на диску.</string>

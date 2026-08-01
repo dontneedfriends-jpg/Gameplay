@@ -6,117 +6,172 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
 import app.gamenative.BuildConfig
-import app.gamenative.service.SteamService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import timber.log.Timber
 import java.io.File
+import java.io.FileOutputStream
+import java.net.URI
+import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 
 object UpdateInstaller {
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(2, TimeUnit.MINUTES)
+        .build()
+
     suspend fun downloadAndInstall(
         context: Context,
         downloadUrl: String,
         versionName: String,
-        onProgress: (Float) -> Unit
+        onProgress: (Float) -> Unit,
+        expectedSha256: String? = null,
+        expectedSizeBytes: Long? = null,
+        expectedPackageName: String? = null,
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val apkFileName = "gamenative-v$versionName.apk"
-            val destFile = File(context.cacheDir, apkFileName)
+            require(isTrustedGitHubUrl(downloadUrl)) { "Update URL is not a trusted GitHub asset" }
 
-            // Extract filename from URL for fetchFileWithFallback
-            // The URL should be like: https://downloads.gamenative.app/gamenative-v0.5.3.apk
-            val fileName = downloadUrl.substringAfterLast("https://downloads.gamenative.app/")
+            val safeVersionName = versionName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            val apkFileName = "gameplay-v$safeVersionName.apk"
+            val destination = File(context.cacheDir, apkFileName)
+            val partial = File(context.cacheDir, "$apkFileName.part")
 
-            Timber.i("Downloading update: $fileName from URL: $downloadUrl")
-            Timber.i("Saving to: ${destFile.absolutePath}")
-
-            // Use the existing fetchFileWithFallback method which handles fallback URLs
-            SteamService.fetchFileWithFallback(
-                fileName = fileName,
-                dest = destFile,
+            downloadApk(downloadUrl, partial, expectedSizeBytes, onProgress)
+            destination.delete()
+            require(partial.renameTo(destination)) { "Could not finalize downloaded APK" }
+            verifyApk(
                 context = context,
-                onProgress = onProgress
+                apkFile = destination,
+                expectedSha256 = expectedSha256,
+                expectedSizeBytes = expectedSizeBytes,
+                expectedPackageName = expectedPackageName ?: BuildConfig.APPLICATION_ID,
             )
 
-            // Verify the file exists and has content
-            if (!destFile.exists()) {
-                Timber.e("Downloaded file does not exist: ${destFile.absolutePath}")
-                return@withContext false
-            }
-
-            val fileSize = destFile.length()
-            if (fileSize == 0L) {
-                Timber.e("Downloaded file is empty: ${destFile.absolutePath}")
-                return@withContext false
-            }
-
-            Timber.i("Download complete: ${destFile.absolutePath}, size: $fileSize bytes")
-
-            // Install the APK
-            withContext(Dispatchers.Main) {
-                installApk(context, destFile)
-            }
-
-            return@withContext true
-        } catch (e: Exception) {
-            Timber.e(e, "Error downloading/installing update")
-            return@withContext false
+            withContext(Dispatchers.Main) { installApk(context, destination) }
+        } catch (error: Exception) {
+            Timber.e(error, "Error downloading/installing Gameplay update")
+            false
         }
     }
 
-    private fun installApk(context: Context, apkFile: File) {
-        try {
-            // Verify file exists before attempting installation
-            if (!apkFile.exists()) {
-                Timber.e("APK file does not exist: ${apkFile.absolutePath}")
-                return
-            }
+    private fun downloadApk(
+        downloadUrl: String,
+        destination: File,
+        expectedSizeBytes: Long?,
+        onProgress: (Float) -> Unit,
+    ) {
+        destination.parentFile?.mkdirs()
+        val request = Request.Builder()
+            .url(downloadUrl)
+            .header("Accept", "application/octet-stream")
+            .header("User-Agent", "Gameplay/${BuildConfig.VERSION_NAME}")
+            .build()
 
-            Timber.i("Installing APK from: ${apkFile.absolutePath}, size: ${apkFile.length()} bytes")
-
-            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                // Use FileProvider for Android 7.0+
-                try {
-                    FileProvider.getUriForFile(
-                        context,
-                        "${BuildConfig.APPLICATION_ID}.fileprovider",
-                        apkFile
-                    )
-                } catch (e: Exception) {
-                    Timber.e(e, "Error getting FileProvider URI")
-                    return
+        httpClient.newCall(request).execute().use { response ->
+            require(response.isSuccessful) { "GitHub download failed: HTTP ${response.code}" }
+            val body = requireNotNull(response.body) { "GitHub returned an empty APK response" }
+            val totalBytes = expectedSizeBytes ?: body.contentLength()
+            body.byteStream().use { input ->
+                FileOutputStream(destination).use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    var downloaded = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        if (totalBytes > 0L) onProgress(downloaded.toFloat() / totalBytes)
+                    }
+                    output.fd.sync()
+                    require(downloaded > 0L) { "Downloaded APK is empty" }
+                    if (expectedSizeBytes != null) {
+                        require(downloaded == expectedSizeBytes) { "Downloaded APK size does not match metadata" }
+                    }
                 }
+            }
+        }
+    }
+
+    private fun verifyApk(
+        context: Context,
+        apkFile: File,
+        expectedSha256: String?,
+        expectedSizeBytes: Long?,
+        expectedPackageName: String,
+    ) {
+        require(apkFile.isFile && apkFile.length() > 0L) { "Downloaded APK is missing or empty" }
+        if (expectedSizeBytes != null) {
+            require(apkFile.length() == expectedSizeBytes) { "Downloaded APK size does not match metadata" }
+        }
+        if (expectedSha256 != null) {
+            val digest = MessageDigest.getInstance("SHA-256")
+            apkFile.inputStream().use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            val actualSha256 = digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+            require(actualSha256.equals(expectedSha256, ignoreCase = true)) {
+                "Downloaded APK checksum mismatch"
+            }
+        }
+
+        val packageInfo = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+        requireNotNull(packageInfo) { "Downloaded file is not a readable APK" }
+        require(packageInfo.packageName == expectedPackageName) {
+            "Downloaded APK package does not match Gameplay"
+        }
+        val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo.versionCode.toLong()
+        }
+        require(versionCode > BuildConfig.VERSION_CODE) { "Downloaded APK is not newer than current app" }
+    }
+
+    private fun installApk(context: Context, apkFile: File): Boolean {
+        return try {
+            if (!apkFile.isFile) return false
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                FileProvider.getUriForFile(
+                    context,
+                    "${BuildConfig.APPLICATION_ID}.fileprovider",
+                    apkFile,
+                )
             } else {
-                // Use file:// URI for older versions
                 Uri.fromFile(apkFile)
             }
-
-            Timber.i("FileProvider URI: $uri")
-            Timber.i("File absolute path: ${apkFile.absolutePath}")
-            Timber.i("File exists: ${apkFile.exists()}, size: ${apkFile.length()}")
 
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-
-            // Grant URI permissions to the package installer
-            val resInfoList = context.packageManager.queryIntentActivities(intent, 0)
-            for (resolveInfo in resInfoList) {
-                val packageName = resolveInfo.activityInfo.packageName
+            context.packageManager.queryIntentActivities(intent, 0).forEach { resolveInfo ->
                 context.grantUriPermission(
-                    packageName,
+                    resolveInfo.activityInfo.packageName,
                     uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
             }
-
             context.startActivity(intent)
-            Timber.i("Install intent launched successfully")
-        } catch (e: Exception) {
-            Timber.e(e, "Error launching install intent")
+            true
+        } catch (error: Exception) {
+            Timber.e(error, "Error launching APK installer")
+            false
         }
     }
-}
 
+    private fun isTrustedGitHubUrl(url: String): Boolean = runCatching {
+        val uri = URI(url)
+        uri.scheme == "https" && uri.host == "github.com"
+    }.getOrDefault(false)
+}

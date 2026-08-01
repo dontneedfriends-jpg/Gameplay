@@ -128,7 +128,7 @@
     <string name="container_storage_move_to_internal_button">Déplacer vers l’interne</string>
     <string name="container_storage_move_external_disabled">Définissez un chemin de stockage externe dans les paramètres avant de déplacer des jeux.</string>
     <string name="container_storage_move_success">%1$s déplacé vers %2$s</string>
-    <string name="container_storage_move_failed">Échec du déplacement du jeu : %1$s</string>
+    <string name="container_storage_move_failed">Échec du déplacement du jeu : %1$s : %2$s</string>
     <string name="container_storage_remove_button">Supprimer le conteneur</string>
     <string name="container_storage_remove_title">Supprimer le conteneur</string>
     <string name="container_storage_remove_message">Supprimer le conteneur de %1$s ? Les fichiers du jeu resteront sur le disque.</string>

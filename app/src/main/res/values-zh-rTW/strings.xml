@@ -128,7 +128,7 @@
     <string name="container_storage_move_to_internal_button">移動到內部</string>
     <string name="container_storage_move_external_disabled">移動遊戲前，請先在設定中設定外部儲存路徑。</string>
     <string name="container_storage_move_success">已將 %1$s 移動到 %2$s</string>
-    <string name="container_storage_move_failed">移動遊戲失敗：%1$s</string>
+    <string name="container_storage_move_failed">移動遊戲失敗：%1$s：%2$s</string>
     <string name="container_storage_remove_button">移除容器</string>
     <string name="container_storage_remove_title">移除容器</string>
     <string name="container_storage_remove_message">要移除 %1$s 的容器嗎？遊戲檔案將保留在磁碟上。</string>

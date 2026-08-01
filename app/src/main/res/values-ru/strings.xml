@@ -1367,7 +1367,7 @@ https://gamenative.app
     <string name="container_storage_move_to_internal_button">Переместить во внутреннее</string>
     <string name="container_storage_move_external_disabled">Перед перемещением игр укажите путь к внешнему хранилищу в настройках.</string>
     <string name="container_storage_move_success">%1$s перемещено в %2$s</string>
-    <string name="container_storage_move_failed">Не удалось переместить игру: %1$s</string>
+    <string name="container_storage_move_failed">Не удалось переместить игру: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Удалить контейнер</string>
     <string name="container_storage_remove_title">Удалить контейнер</string>
     <string name="container_storage_remove_message">Удалить контейнер для %1$s? Файлы игры останутся на диске.</string>

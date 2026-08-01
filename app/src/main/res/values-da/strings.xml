@@ -84,7 +84,7 @@
     <string name="container_storage_move_to_internal_button">Flyt til intern</string>
     <string name="container_storage_move_external_disabled">Angiv en ekstern lagersti i Indstillinger, før du flytter spil.</string>
     <string name="container_storage_move_success">Flyttede %1$s til %2$s</string>
-    <string name="container_storage_move_failed">Kunne ikke flytte spillet: %1$s</string>
+    <string name="container_storage_move_failed">Kunne ikke flytte spillet: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Fjern container</string>
     <string name="container_storage_remove_title">Fjern container</string>
     <string name="container_storage_remove_message">Fjern containeren for %1$s? Spilfilerne bliver på disken.</string>

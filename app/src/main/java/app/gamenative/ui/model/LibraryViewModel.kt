@@ -540,7 +540,9 @@ class LibraryViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val result = LocalInstallerImporter.importInstaller(context, uri)
-            if (result is LocalInstallerImporter.ImportResult.Ready) {
+            if (result is LocalInstallerImporter.ImportResult.Ready ||
+                result is LocalInstallerImporter.ImportResult.ReadyPortable
+            ) {
                 onFilterApps(paginationCurrentPage)
             }
             onResult(result)

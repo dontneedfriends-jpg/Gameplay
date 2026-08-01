@@ -5,6 +5,7 @@ import android.os.Process
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.gamenative.CrashContext
 import app.gamenative.PluviaApp
 import app.gamenative.PrefManager
 import app.gamenative.R
@@ -39,6 +40,7 @@ import app.gamenative.utils.IntentLaunchManager
 import app.gamenative.utils.SteamUtils
 import app.gamenative.utils.UpdateInfo
 import com.materialkolor.PaletteStyle
+import com.winlator.core.GPUInformation
 import com.winlator.xserver.Window
 import dagger.hilt.android.lifecycle.HiltViewModel
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.AppProcessInfo
@@ -488,6 +490,11 @@ class MainViewModel @Inject constructor(
 
     fun setLaunchedAppId(value: String) {
         _state.update { it.copy(launchedAppId = value) }
+        if (value.isBlank()) {
+            CrashContext.clear()
+        } else {
+            CrashContext.beginLaunch(value)
+        }
     }
 
     fun setBootToContainer(value: Boolean) {
@@ -504,6 +511,7 @@ class MainViewModel @Inject constructor(
 
     fun launchApp(context: Context, appId: String) {
         // Show booting splash before launching the app
+        CrashContext.setStage("preparing_launch")
         viewModelScope.launch {
             viewModelScope.launch(Dispatchers.IO) {
                 libraryPlayHistoryDao.upsert(
@@ -556,6 +564,22 @@ class MainViewModel @Inject constructor(
 
             val apiJob = viewModelScope.async(Dispatchers.IO) {
                 val container = ContainerUtils.getOrCreateContainer(context, appId)
+                CrashContext.update(
+                    gameName = runCatching { ContainerUtils.resolveGameName(appId) }.getOrNull(),
+                    containerId = container.id,
+                    runtime = buildString {
+                        append("Wine/Proton=")
+                        append(container.getWineVersion())
+                        append("; graphics=")
+                        append(container.getGraphicsDriver())
+                        append(" ")
+                        append(container.getGraphicsDriverVersion())
+                        append("; DXVK/VKD3D=")
+                        append(container.getDXWrapper())
+                    },
+                    gpu = runCatching { GPUInformation.getRenderer(context) }.getOrNull(),
+                    launchStage = "preparing_runtime",
+                )
                 val gameSource = ContainerUtils.extractGameSourceFromContainerId(appId)
                 if (gameSource == GameSource.STEAM) {
                     if (container.isLaunchRealSteam() || container.isLaunchBionicSteam()) {
@@ -575,6 +599,7 @@ class MainViewModel @Inject constructor(
             delay(100)
 
             apiJob.await()
+            CrashContext.setStage("launching_game")
 
             // Installer sessions get an explicit stage label on the boot splash.
             runCatching {
@@ -671,7 +696,11 @@ class MainViewModel @Inject constructor(
                     Timber.w(e, "Failed to check/update feedback dialog state for $appId")
                 }
             } finally {
-                onComplete?.invoke()
+                try {
+                    onComplete?.invoke()
+                } finally {
+                    CrashContext.clearIfMatches(appId)
+                }
             }
         }
     }
@@ -770,33 +799,52 @@ class MainViewModel @Inject constructor(
                 return@launch
             }
 
-            sessions.firstOrNull { it.state == InstallationState.INSTALLER_RUNNING && it.appId != null }
-                ?.let { interrupted ->
-                    when (val result = LocalInstallerCompletionCoordinator.handleInstallerExit(context, interrupted.appId!!)) {
-                        LocalInstallerCompletionCoordinator.Result.NotAnInstallerSession -> Unit
-                        is LocalInstallerCompletionCoordinator.Result.Completed -> {
-                            _uiEvent.send(MainUiEvent.InstallerCompleted(result.session.title))
-                        }
-                        is LocalInstallerCompletionCoordinator.Result.NeedsExecutableSelection -> {
-                            _uiEvent.send(
-                                MainUiEvent.SelectInstallerExecutable(
-                                    result.session.id,
-                                    result.session.title,
-                                    result.session.candidateExecutablePaths,
-                                ),
-                            )
-                        }
-                        is LocalInstallerCompletionCoordinator.Result.Failed -> {
-                            _uiEvent.send(
-                                MainUiEvent.InstallerCompletionFailed(
-                                    title = result.session.title,
-                                    reason = result.reason,
-                                    sessionId = result.session.id,
-                                ),
-                            )
-                        }
+            val awaitingResult = sessions.firstOrNull {
+                it.state == InstallationState.AWAITING_RESULT && it.appId != null
+            }
+            if (awaitingResult != null) {
+                when (val result = LocalInstallerCompletionCoordinator.handleInstallerExit(context, awaitingResult.appId!!)) {
+                    LocalInstallerCompletionCoordinator.Result.NotAnInstallerSession -> Unit
+                    is LocalInstallerCompletionCoordinator.Result.Completed -> {
+                        _uiEvent.send(MainUiEvent.InstallerCompleted(result.session.title))
+                    }
+                    is LocalInstallerCompletionCoordinator.Result.NeedsExecutableSelection -> {
+                        _uiEvent.send(
+                            MainUiEvent.SelectInstallerExecutable(
+                                result.session.id,
+                                result.session.title,
+                                result.session.candidateExecutablePaths,
+                            ),
+                        )
+                    }
+                    is LocalInstallerCompletionCoordinator.Result.Failed -> {
+                        _uiEvent.send(
+                            MainUiEvent.InstallerCompletionFailed(
+                                title = result.session.title,
+                                reason = result.reason,
+                                sessionId = result.session.id,
+                            ),
+                        )
                     }
                 }
+                return@launch
+            }
+
+            val interrupted = sessions.firstOrNull {
+                it.state == InstallationState.INSTALLER_RUNNING && it.appId != null
+            }
+            if (interrupted != null) {
+                val result = LocalInstallerCompletionCoordinator.markInterrupted(context, interrupted.id)
+                if (result is LocalInstallerCompletionCoordinator.Result.Failed) {
+                    _uiEvent.send(
+                        MainUiEvent.InstallerCompletionFailed(
+                            title = result.session.title,
+                            reason = result.reason,
+                            sessionId = result.session.id,
+                        ),
+                    )
+                }
+            }
         }
     }
 

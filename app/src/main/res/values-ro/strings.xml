@@ -128,7 +128,7 @@
     <string name="container_storage_move_to_internal_button">Mută pe intern</string>
     <string name="container_storage_move_external_disabled">Setează o cale de stocare externă în Setări înainte de a muta jocuri.</string>
     <string name="container_storage_move_success">S-a mutat %1$s în %2$s</string>
-    <string name="container_storage_move_failed">Mutarea jocului a eșuat: %1$s</string>
+    <string name="container_storage_move_failed">Mutarea jocului a eșuat: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Elimină containerul</string>
     <string name="container_storage_remove_title">Elimină containerul</string>
     <string name="container_storage_remove_message">Elimini containerul pentru %1$s? Fișierele jocului vor rămâne pe disc.</string>

@@ -128,7 +128,7 @@
     <string name="container_storage_move_to_internal_button">Sposta su interna</string>
     <string name="container_storage_move_external_disabled">Imposta un percorso di archiviazione esterna nelle Impostazioni prima di spostare i giochi.</string>
     <string name="container_storage_move_success">Spostato %1$s in %2$s</string>
-    <string name="container_storage_move_failed">Impossibile spostare il gioco: %1$s</string>
+    <string name="container_storage_move_failed">Impossibile spostare il gioco: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Rimuovi container</string>
     <string name="container_storage_remove_title">Rimuovi container</string>
     <string name="container_storage_remove_message">Rimuovere il container per %1$s? I file di gioco rimarranno sul disco.</string>

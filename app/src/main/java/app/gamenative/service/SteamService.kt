@@ -4614,19 +4614,19 @@ class SteamService : Service(), IChallengeUrlChanged {
                             val callback = job.await()
 
                             callback.results.forEach { picsCallback ->
-                        // Don't race the queue.
-                        if (!isLoggedIn) return@collect
-                        val queue = Collections.synchronizedList(mutableListOf<Int>())
+                                // Don't race the queue.
+                                if (!isLoggedIn) return@collect
+                                val queue = Collections.synchronizedList(mutableListOf<Int>())
 
                                 db.withTransaction {
-                            // When the same app appears in multiple packages (e.g. user owns the game and
-                            // also has a free-weekend / demo / family-shared sub for it), the previous
-                            // implementation overwrote SteamApp.packageId with whichever pkg was iterated
-                            // last — non-deterministic and prone to landing on a non-user-owned package,
-                            // which then makes the user's own game appear as family-shared in the library.
-                            // To fix that we (a) process user-owned packages last so they win the
-                            // last-write-wins assignment within this batch and (b) refuse to downgrade an
-                            // existing user-owned packageId across batches.
+                                    // When the same app appears in multiple packages (e.g. user owns the game and
+                                    // also has a free-weekend / demo / family-shared sub for it), the previous
+                                    // implementation overwrote SteamApp.packageId with whichever pkg was iterated
+                                    // last — non-deterministic and prone to landing on a non-user-owned package,
+                                    // which then makes the user's own game appear as family-shared in the library.
+                                    // To fix that we (a) process user-owned packages last so they win the
+                                    // last-write-wins assignment within this batch and (b) refuse to downgrade an
+                                    // existing user-owned packageId across batches.
                                     val accountId = userSteamId?.accountID?.toInt()
                                     val referencedAppIds = picsCallback.packages.values
                                         .flatMap { pkg -> pkg.keyValues["appids"].children.map { it.asInteger() } }
@@ -4638,16 +4638,16 @@ class SteamService : Service(), IChallengeUrlChanged {
                                             .filter { it != INVALID_PKG_ID }
                                             .distinct()
                                         licenseDao.findLicenses(lookupIds).associateBy { it.packageId }
-                            } else {
-                                emptyMap()
-                            }
-                            val userOwnedPackageIds: Set<Int> = if (accountId != null) {
-                                packageLicenses.values
-                                    .filter { it.ownerAccountId.contains(accountId) }
-                                    .mapTo(HashSet()) { it.packageId }
-                            } else {
-                                emptySet()
-                            }
+                                    } else {
+                                        emptyMap()
+                                    }
+                                    val userOwnedPackageIds: Set<Int> = if (accountId != null) {
+                                        packageLicenses.values
+                                            .filter { it.ownerAccountId.contains(accountId) }
+                                            .mapTo(HashSet()) { it.packageId }
+                                    } else {
+                                        emptySet()
+                                    }
 
                             // Prefer non-expired user-owned packages so a live sub wins over an expired remnant.
                             fun pkgRank(pkgId: Int): Int {

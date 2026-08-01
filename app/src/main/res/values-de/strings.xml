@@ -123,7 +123,7 @@
     <string name="container_storage_move_to_internal_button">Nach intern verschieben</string>
     <string name="container_storage_move_external_disabled">Lege in den Einstellungen zuerst einen externen Speicherpfad fest, bevor du Spiele verschiebst.</string>
     <string name="container_storage_move_success">%1$s nach %2$s verschoben</string>
-    <string name="container_storage_move_failed">Spiel konnte nicht verschoben werden: %1$s</string>
+    <string name="container_storage_move_failed">Spiel konnte nicht verschoben werden: %1$s: %2$s</string>
     <string name="container_storage_remove_button">Container entfernen</string>
     <string name="container_storage_remove_title">Container entfernen</string>
     <string name="container_storage_remove_message">Container für %1$s entfernen? Die Spieldateien bleiben auf dem Datenträger.</string>
