@@ -22,7 +22,7 @@ The goal is a complete Android console environment for Windows games—not a col
 - Touch controls and physical Xbox-compatible and DualSense/PS5-compatible controllers as equal input methods.
 - A semantic theme system with built-in themes, full-screen editing, import/export, validation, and recovery.
 
-The detailed implementation state and acceptance criteria live in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md).
+Release status and support scope are tracked through GitHub Releases and Issues.
 
 ## Current capabilities
 
@@ -145,8 +145,6 @@ Never commit `local.properties`, API keys, signing credentials, keystores, or ge
 - `ubuntufs/` — filesystem/runtime packaging module.
 - `app/src/main/assets/` — manifests and bundled runtime-support assets.
 - `docs/THEMES.md` — versioned Gameplay theme format and authoring notes.
-- `DEVELOPMENT_PLAN.md` — completed work, active priorities, planned work, and definitions of done.
-- `PRODUCT.md` — product principles and design constraints.
 - `NOTICE` — Gameplay fork attribution and naming information.
 - `THIRD_PARTY_NOTICES` — component licenses, notices, and source information.
 
@@ -178,7 +176,7 @@ New bundled binaries must include their applicable license, notice, and reproduc
 
 Issues and focused pull requests are welcome. Describe the device, Android version, SoC/GPU, selected driver, Wine/Proton version, graphics layer, and the exact stage that fails when reporting compatibility problems. Do not attach copyrighted games, credentials, authentication tokens, or private logs.
 
-Large interface changes should follow [PRODUCT.md](PRODUCT.md) and update [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) when they complete or materially change a tracked requirement.
+Large interface changes should preserve Gameplay's controller-first, touch-compatible product direction and document user-visible behavior in the pull request.
 
 ## License, attribution, and trademarks
 
