@@ -70,11 +70,19 @@ android {
         buildConfigField("boolean", "GOLD", "false")
         fun secret(name: String) =
             project.findProperty(name) as String? ?: System.getenv(name) ?: ""
+        fun buildConfigString(name: String): String {
+            val value = secret(name)
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\r", "\\r")
+                .replace("\n", "\\n")
+            return "\"$value\""
+        }
 
-        buildConfigField("String", "POSTHOG_API_KEY", "\"${secret("POSTHOG_API_KEY")}\"")
-        buildConfigField("String", "POSTHOG_HOST",  "\"${secret("POSTHOG_HOST")}\"")
-        buildConfigField("String", "STEAMGRIDDB_API_KEY", "\"${secret("STEAMGRIDDB_API_KEY")}\"")
-        buildConfigField("String", "CLOUD_PROJECT_NUMBER", "\"${secret("CLOUD_PROJECT_NUMBER")}\"")
+        buildConfigField("String", "POSTHOG_API_KEY", buildConfigString("POSTHOG_API_KEY"))
+        buildConfigField("String", "POSTHOG_HOST", buildConfigString("POSTHOG_HOST"))
+        buildConfigField("String", "STEAMGRIDDB_API_KEY", buildConfigString("STEAMGRIDDB_API_KEY"))
+        buildConfigField("String", "CLOUD_PROJECT_NUMBER", buildConfigString("CLOUD_PROJECT_NUMBER"))
         val iconValue = "@mipmap/ic_launcher"
         val iconRoundValue = "@mipmap/ic_launcher_round"
         manifestPlaceholders.putAll(

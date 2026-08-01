@@ -108,16 +108,7 @@ object UpdateInstaller {
             require(apkFile.length() == expectedSizeBytes) { "Downloaded APK size does not match metadata" }
         }
         if (expectedSha256 != null) {
-            val digest = MessageDigest.getInstance("SHA-256")
-            apkFile.inputStream().use { input ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    digest.update(buffer, 0, read)
-                }
-            }
-            val actualSha256 = digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+            val actualSha256 = sha256(apkFile)
             require(actualSha256.equals(expectedSha256, ignoreCase = true)) {
                 "Downloaded APK checksum mismatch"
             }
@@ -170,7 +161,20 @@ object UpdateInstaller {
         }
     }
 
-    private fun isTrustedGitHubUrl(url: String): Boolean = runCatching {
+    internal fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    internal fun isTrustedGitHubUrl(url: String): Boolean = runCatching {
         val uri = URI(url)
         uri.scheme == "https" && uri.host == "github.com"
     }.getOrDefault(false)

@@ -62,7 +62,7 @@ object UpdateChecker {
     )
 
     @Serializable
-    private data class ReleaseMetadata(
+    internal data class ReleaseMetadata(
         val schemaVersion: Int = 1,
         val packageName: String,
         val versionCode: Int,
@@ -127,13 +127,7 @@ object UpdateChecker {
 
                 val apkAsset = release.assets.firstOrNull { it.name == metadata.assetName }
                     ?: return@withContext cached?.takeIf(UpdateInfo::updateAvailable)
-                if (
-                    metadata.packageName != BuildConfig.APPLICATION_ID ||
-                    metadata.versionCode <= BuildConfig.VERSION_CODE ||
-                    !isTrustedGitHubUrl(apkAsset.browserDownloadUrl) ||
-                    !metadata.sha256.matches(Regex("[A-Fa-f0-9]{64}")) ||
-                    metadata.sizeBytes <= 0L
-                ) {
+                if (!isCompatibleReleaseMetadata(metadata) || !isTrustedGitHubUrl(apkAsset.browserDownloadUrl)) {
                     Timber.w("GitHub release metadata is not valid for this build")
                     return@withContext null
                 }
@@ -162,7 +156,18 @@ object UpdateChecker {
         return@withContext null
     }
 
-    private fun isTrustedGitHubUrl(url: String): Boolean = runCatching {
+    internal fun isCompatibleReleaseMetadata(
+        metadata: ReleaseMetadata,
+        packageName: String = BuildConfig.APPLICATION_ID,
+        currentVersionCode: Int = BuildConfig.VERSION_CODE,
+    ): Boolean =
+        metadata.schemaVersion == 1 &&
+            metadata.packageName == packageName &&
+            metadata.versionCode > currentVersionCode &&
+            metadata.sha256.matches(Regex("[A-Fa-f0-9]{64}")) &&
+            metadata.sizeBytes > 0L
+
+    internal fun isTrustedGitHubUrl(url: String): Boolean = runCatching {
         val uri = URI(url)
         uri.scheme == "https" && uri.host == "github.com"
     }.getOrDefault(false)

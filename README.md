@@ -127,6 +127,8 @@ Gameplay checks the latest non-prerelease GitHub Release for `dontneedfriends-jp
 
 The APK is verified for package name, newer version code, size, and SHA-256 before Android's package installer is opened. The release workflow is [`.github/workflows/release.yml`](.github/workflows/release.yml). Production releases must use the same signing key as the installed `app.gameplay` package; losing that key makes in-place updates impossible.
 
+On Windows, run `powershell -ExecutionPolicy Bypass -File .\scripts\release-preflight.ps1 -Tag v1.1.2` locally before publishing. It requires local `app/keystores/keystore.properties`, which must never be committed.
+
 ### Optional artwork integration
 
 Automatic artwork lookup for imported games can use a SteamGridDB API key placed in `local.properties`:
