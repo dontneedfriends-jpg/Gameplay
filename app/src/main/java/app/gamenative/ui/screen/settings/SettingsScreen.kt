@@ -1,9 +1,8 @@
 package app.gamenative.ui.screen.settings
 
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,12 +13,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -29,8 +25,6 @@ import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +36,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -59,18 +52,53 @@ import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.enums.AppTheme
-import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.component.ConsoleCategoryRail
+import app.gamenative.ui.component.ConsoleIconButton
+import app.gamenative.ui.component.SettingsSearchToggle
 import app.gamenative.ui.theme.PluviaTheme
 import com.materialkolor.PaletteStyle
+import com.alorma.compose.settings.ui.SettingsMenuLink
 
-private enum class SettingsCategory(val titleRes: Int, val icon: ImageVector) {
+internal enum class SettingsCategory(val titleRes: Int, val icon: ImageVector) {
     INTERFACE(R.string.settings_interface_title, Icons.Default.Palette),
     CONTROLS(R.string.settings_controls_title, Icons.Default.Gamepad),
     RUNTIME(R.string.settings_runtime_title, Icons.Default.Tune),
     LIBRARY(R.string.settings_library_title, Icons.Default.LibraryBooks),
     DOWNLOADS(R.string.settings_downloads_title, Icons.Default.Download),
     SYSTEM(R.string.settings_system_title, Icons.Default.Settings),
+}
+
+internal data class SettingsSearchEntry(
+    val category: SettingsCategory,
+    val titleRes: Int,
+    val keywords: List<String> = emptyList(),
+)
+
+internal val settingsSearchEntries = listOf(
+    SettingsSearchEntry(SettingsCategory.INTERFACE, R.string.settings_app_theme_title, listOf("appearance", "dark", "light", "oled")),
+    SettingsSearchEntry(SettingsCategory.INTERFACE, R.string.settings_color_profile_title, listOf("palette", "color", "contrast")),
+    SettingsSearchEntry(SettingsCategory.INTERFACE, R.string.settings_custom_theme_edit, listOf("custom", "theme", "colors")),
+    SettingsSearchEntry(SettingsCategory.INTERFACE, R.string.settings_interface_reduce_motion_title, listOf("accessibility", "animation", "motion")),
+    SettingsSearchEntry(SettingsCategory.INTERFACE, R.string.settings_language, listOf("locale", "translation")),
+    SettingsSearchEntry(SettingsCategory.CONTROLS, R.string.settings_achievement_show_notification, listOf("achievements", "notification")),
+    SettingsSearchEntry(SettingsCategory.CONTROLS, R.string.settings_interface_show_gamepad_hints_title, listOf("controller", "gamepad", "hints")),
+    SettingsSearchEntry(SettingsCategory.RUNTIME, R.string.settings_runtime_title, listOf("wine", "proton", "box64", "fex", "dxvk", "vkd3d")),
+    SettingsSearchEntry(SettingsCategory.LIBRARY, R.string.settings_interface_custom_games, listOf("local", "exe", "games")),
+    SettingsSearchEntry(SettingsCategory.DOWNLOADS, R.string.settings_downloads_title, listOf("storage", "network", "wifi", "server")),
+    SettingsSearchEntry(SettingsCategory.SYSTEM, R.string.settings_system_title, listOf("debug", "about", "logs")),
+)
+
+internal fun filterSettings(
+    entries: List<SettingsSearchEntry>,
+    query: String,
+    titleProvider: (Int) -> String,
+): List<SettingsSearchEntry> {
+    val normalizedQuery = query.trim().lowercase()
+    if (normalizedQuery.isBlank()) return emptyList()
+    return entries.filter { entry ->
+        titleProvider(entry.titleRes).lowercase().contains(normalizedQuery) ||
+            entry.keywords.any { keyword -> keyword.contains(normalizedQuery) }
+    }
 }
 
 @Composable
@@ -113,10 +141,20 @@ private fun SettingsScreenContent(
     onClearCustomTheme: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
     val categories = remember { SettingsCategory.entries.toList() }
     var selectedCategory by rememberSaveable { mutableStateOf(SettingsCategory.INTERFACE) }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val categoryRailWidth = if (LocalConfiguration.current.screenWidthDp < 600) 156.dp else 228.dp
+
+    val closeSearch: () -> Unit = {
+        searchActive = false
+        searchQuery = ""
+    }
+
+    BackHandler(enabled = searchActive, onBack = closeSearch)
 
     LaunchedEffect(selectedCategory) {
         scrollState.scrollTo(0)
@@ -133,10 +171,15 @@ private fun SettingsScreenContent(
                 .statusBarsPadding()
                 .displayCutoutPadding(),
         ) {
-            SettingsHeader(
-                onBack = onBack,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            )
+                SettingsHeader(
+                    onBack = onBack,
+                    searchActive = searchActive,
+                    searchQuery = searchQuery,
+                    onSearchQuery = { searchQuery = it },
+                    onSearchOpen = { searchActive = true },
+                    onSearchClose = closeSearch,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                )
 
             Row(
                 modifier = Modifier
@@ -176,7 +219,31 @@ private fun SettingsScreenContent(
                 ) {
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    when (selectedCategory) {
+                    if (searchActive && searchQuery.isNotBlank()) {
+                        val results = filterSettings(
+                            entries = settingsSearchEntries,
+                            query = searchQuery,
+                            titleProvider = { resourceId -> context.getString(resourceId) },
+                        )
+                        if (results.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.settings_search_no_results),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            results.forEach { result ->
+                                SettingsMenuLink(
+                                    title = { Text(stringResource(result.titleRes)) },
+                                    subtitle = { Text(stringResource(result.category.titleRes)) },
+                                     onClick = {
+                                         selectedCategory = result.category
+                                         closeSearch()
+                                     },
+                                )
+                            }
+                        }
+                    } else when (selectedCategory) {
                         SettingsCategory.INTERFACE -> SettingsGroupInterface(
                             appTheme = appTheme,
                             paletteStyle = paletteStyle,
@@ -226,6 +293,11 @@ private fun SettingsScreenContent(
 @Composable
 private fun SettingsHeader(
     onBack: () -> Unit,
+    searchActive: Boolean,
+    searchQuery: String,
+    onSearchQuery: (String) -> Unit,
+    onSearchOpen: () -> Unit,
+    onSearchClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -250,6 +322,15 @@ private fun SettingsHeader(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
+        SettingsSearchToggle(
+            active = searchActive,
+            query = searchQuery,
+            onQueryChange = onSearchQuery,
+            onOpen = onSearchOpen,
+            onClose = onSearchClose,
+            fieldWidth = if (LocalConfiguration.current.screenWidthDp < 600) 190.dp else 300.dp,
+        )
     }
 }
 
@@ -258,37 +339,12 @@ private fun BackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-    val shape = RoundedCornerShape(10.dp)
-
-    Box(
-        modifier = modifier
-            .size(44.dp)
-            .clip(shape)
-            .background(
-                if (isFocused) {
-                    MaterialTheme.colorScheme.primaryContainer
-                } else {
-                    PluviaTheme.colors.surfaceElevated
-                },
-            )
-            .focusRing(interactionSource, shape, width = 2.dp)
-            .selectable(
-                selected = isFocused,
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-            contentDescription = stringResource(R.string.back),
-            tint = if (isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(24.dp),
-        )
-    }
+    ConsoleIconButton(
+        onClick = onClick,
+        icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+        contentDescription = stringResource(R.string.back),
+        modifier = modifier,
+    )
 }
 
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES or Configuration.UI_MODE_TYPE_NORMAL)

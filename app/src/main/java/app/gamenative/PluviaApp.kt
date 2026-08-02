@@ -225,6 +225,10 @@ class PluviaApp : SplitCompatApplication() {
         @Volatile
         var isActivityInForeground: Boolean = true
 
+        /** Set by the in-game container settings overlay to relaunch the game after exit. */
+        @Volatile
+        var pendingRelaunchAppId: String? = null
+
         // Active runtime suspend policy for the current in-game session.
         var activeSuspendPolicy: String = Container.SUSPEND_POLICY_MANUAL
             private set

@@ -700,6 +700,10 @@ class MainViewModel @Inject constructor(
                     onComplete?.invoke()
                 } finally {
                     CrashContext.clearIfMatches(appId)
+                    if (PluviaApp.pendingRelaunchAppId == appId) {
+                        PluviaApp.pendingRelaunchAppId = null
+                        launchApp(context, appId)
+                    }
                 }
             }
         }

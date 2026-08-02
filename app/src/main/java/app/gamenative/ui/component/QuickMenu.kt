@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -92,6 +93,8 @@ import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.ui.data.PerformanceHudConfig
 import app.gamenative.ui.data.PerformanceHudSize
+import app.gamenative.ui.screen.xserver.InGameContainerSettings
+import app.gamenative.ui.screen.xserver.InGameContainerSettingsOverlay
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.theme.motionSpec
 import app.gamenative.ui.util.adaptivePanelWidth
@@ -115,6 +118,8 @@ object QuickMenuAction {
     const val DISABLE_MOUSE = 8
     const val SHOOTER_MODE = 9
     const val RADIAL_MENU = 10
+    const val CONTAINER_SETTINGS = 11
+    const val CONTAINER_RESTART = 12
 }
 
 private object QuickMenuTab {
@@ -362,6 +367,7 @@ fun QuickMenu(
     // broken D8 codegen path).
     val bfgMenu = remember(container?.id) { container?.let { BfgMenuState.createIfAvailable(it) } }
     val inviteMenu = remember(container?.id) { SteamInviteState.createIfAvailable(container) }
+    val containerSettings = remember(container?.id) { container?.let { InGameContainerSettings(it) } }
 
     var selectedTab by rememberSaveable {
         mutableIntStateOf(
@@ -618,6 +624,23 @@ fun QuickMenu(
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)),
                             )
 
+                            QuickMenuTabButton(
+                                icon = Icons.Default.Tune,
+                                contentDescriptionResId = R.string.quick_menu_container_settings,
+                                selected = false,
+                                accentColor = PluviaTheme.colors.accentPurple,
+                                onSelected = {
+                                    containerSettings?.let { settings ->
+                                        settings.open()
+                                        onDismiss()
+                                    }
+                                },
+                                activateOnFocus = false,
+                                modifier = Modifier.width(56.dp),
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
                             QuickMenuRailActionButton(
                                 item = exitGameItem,
                                 onClick = {
@@ -804,6 +827,19 @@ fun QuickMenu(
                 }
             }
         }
+    }
+
+    if (containerSettings != null) {
+        InGameContainerSettingsOverlay(
+            state = containerSettings,
+            renderer = renderer,
+            glRenderer = glRenderer,
+            onRestart = {
+                if (onItemSelected(QuickMenuAction.CONTAINER_RESTART)) {
+                    onDismiss()
+                }
+            },
+        )
     }
 
     LaunchedEffect(isVisible, selectedTab) {
@@ -1620,6 +1656,7 @@ private fun QuickMenuTabButton(
     onSelected: () -> Unit,
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
+    activateOnFocus: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -1645,7 +1682,7 @@ private fun QuickMenuTabButton(
                 }
             )
             .onFocusChanged {
-                if (it.isFocused && !selected) {
+                if (activateOnFocus && it.isFocused && !selected) {
                     onSelected()
                 }
             }

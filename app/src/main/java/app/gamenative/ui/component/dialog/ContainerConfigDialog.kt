@@ -38,10 +38,12 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
 import app.gamenative.ui.component.NoExtractOutlinedTextField
+import app.gamenative.ui.component.ConsoleIconButton
+import app.gamenative.ui.component.SettingsSearchToggle
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.CircularProgressIndicator
@@ -172,6 +174,14 @@ internal fun calculateAspectRatio(width: Int, height: Int): String {
         ratioWidth == 43 && ratioHeight == 18 -> "21.5:9"
         else -> "$ratioWidth:$ratioHeight"
     }
+}
+
+internal fun matchesContainerConfigTab(label: String, keywords: String, query: String): Boolean {
+    val normalizedQuery = query.trim().lowercase()
+    return normalizedQuery.isNotBlank() && (
+        label.lowercase().contains(normalizedQuery) ||
+            keywords.lowercase().contains(normalizedQuery)
+        )
 }
 
 private data class ContainerConfigDialogStaticData(
@@ -1277,6 +1287,47 @@ fun ContainerConfigDialog(
             ),
             content = {
                 val scrollState = rememberScrollState()
+                var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+                var searchActive by rememberSaveable { mutableStateOf(false) }
+                var searchQuery by rememberSaveable { mutableStateOf("") }
+                val closeSearch: () -> Unit = {
+                    searchActive = false
+                    searchQuery = ""
+                }
+                BackHandler(enabled = searchActive, onBack = closeSearch)
+                val tabs = listOf(
+                    stringResource(R.string.container_config_tab_general),
+                    stringResource(R.string.container_config_tab_presets),
+                    stringResource(R.string.container_config_tab_graphics),
+                    stringResource(R.string.container_config_tab_emulation),
+                    stringResource(R.string.container_config_tab_controller),
+                    stringResource(R.string.container_config_tab_wine),
+                    stringResource(R.string.container_config_tab_win_components),
+                    stringResource(R.string.container_config_tab_environment),
+                    stringResource(R.string.container_config_tab_drives),
+                    stringResource(R.string.container_config_tab_media),
+                    stringResource(R.string.container_config_tab_advanced),
+                )
+                val tabKeywords = listOf(
+                    "resolution display screen",
+                    "compatibility performance preset",
+                    "graphics driver vulkan opengl dxvk vkd3d",
+                    "box64 fex cpu emulator",
+                    "controller gamepad touch input",
+                    "wine proton runtime",
+                    "directx dll vcredist component",
+                    "environment variable env",
+                    "drive storage path",
+                    "artwork icon header hero media",
+                    "debug launch experimental",
+                )
+                val filteredTabIndices = tabs.indices.filter { index ->
+                    matchesContainerConfigTab(tabs[index], tabKeywords[index], searchQuery)
+                }
+                val visibleTabIndices = filteredTabIndices.ifEmpty { tabs.indices.toList() }
+                LaunchedEffect(visibleTabIndices) {
+                    if (selectedTab !in visibleTabIndices) selectedTab = visibleTabIndices.first()
+                }
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -1290,35 +1341,30 @@ fun ContainerConfigDialog(
                                 )
                             },
                             navigationIcon = {
-                                IconButton(
+                                ConsoleIconButton(
                                     onClick = onDismissCheck,
-                                    content = { Icon(Icons.Default.Close, null) },
+                                    icon = Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.close),
                                 )
                             },
                             actions = {
-                                IconButton(
+                                SettingsSearchToggle(
+                                    active = searchActive,
+                                    query = searchQuery,
+                                    onQueryChange = { searchQuery = it },
+                                    onOpen = { searchActive = true },
+                                    onClose = closeSearch,
+                                    fieldWidth = 220.dp,
+                                )
+                                ConsoleIconButton(
                                     onClick = { onSave(config) },
-                                    content = { Icon(Icons.Default.Save, null) },
+                                    icon = Icons.Default.Save,
+                                    contentDescription = stringResource(R.string.save),
                                 )
                             },
                         )
                     },
                 ) { paddingValues ->
-                    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-                    val tabs = listOf(
-                        stringResource(R.string.container_config_tab_general),
-                        stringResource(R.string.container_config_tab_presets),
-                        stringResource(R.string.container_config_tab_graphics),
-                        stringResource(R.string.container_config_tab_emulation),
-                        stringResource(R.string.container_config_tab_controller),
-                        stringResource(R.string.container_config_tab_wine),
-                        stringResource(R.string.container_config_tab_win_components),
-                        stringResource(R.string.container_config_tab_environment),
-                        stringResource(R.string.container_config_tab_drives),
-                        stringResource(R.string.container_config_tab_media),
-                        stringResource(R.string.container_config_tab_advanced)
-                    )
-
                     // Let controller shoulder buttons cycle through the tabs: R1/R2
                     // forward, L1/L2 back (both wrap). The handler lives on the content
                     // container (not a focusable wrapper, which would break up/down
@@ -1330,13 +1376,14 @@ fun ContainerConfigDialog(
                         modifier = Modifier
                             .onPreviewKeyEvent { event ->
                                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                val currentIndex = visibleTabIndices.indexOf(selectedTab).coerceAtLeast(0)
                                 when (event.key) {
                                     Key.ButtonR1, Key.ButtonR2 -> {
-                                        selectedTab = (selectedTab + 1) % tabs.size
+                                        selectedTab = visibleTabIndices[(currentIndex + 1) % visibleTabIndices.size]
                                         true
                                     }
                                     Key.ButtonL1, Key.ButtonL2 -> {
-                                        selectedTab = (selectedTab - 1 + tabs.size) % tabs.size
+                                        selectedTab = visibleTabIndices[(currentIndex - 1 + visibleTabIndices.size) % visibleTabIndices.size]
                                         true
                                     }
                                     else -> false
@@ -1351,7 +1398,7 @@ fun ContainerConfigDialog(
                             .fillMaxSize(),
                     ) {
                         ConsoleCategoryRail(
-                            items = tabs.indices.toList(),
+                            items = visibleTabIndices,
                             selectedItem = selectedTab,
                             label = { tabs[it] },
                             onSelected = { selectedTab = it },
@@ -1367,27 +1414,35 @@ fun ContainerConfigDialog(
                                 .verticalScroll(scrollState)
                                 .weight(1f),
                         ) {
-                            if (selectedTab == 0) GeneralTabContent(state, nonzeroResolutionError, aspectResolutionError)
-                            if (selectedTab == 1) CompatPresetsTabContent(state)
-                            if (selectedTab == 2) GraphicsTabContent(state, default)
-                            if (selectedTab == 3) EmulationTabContent(state)
-                            if (selectedTab == 4) ControllerTabContent(state, default)
-                            if (selectedTab == 5) WineTabContent(state)
-                            if (selectedTab == 6) WinComponentsTabContent(state)
-                            if (selectedTab == 7) EnvironmentTabContent(state)
-                            if (selectedTab == 8) DrivesTabContent(state)
-                            if (selectedTab == 9) {
-                                MediaTabContent(
-                                    gameId = gameId,
-                                    appId = appId,
-                                    mediaHeroUrl = mediaHeroUrl,
-                                    mediaLogoUrl = mediaLogoUrl,
-                                    mediaCapsuleUrl = mediaCapsuleUrl,
-                                    mediaHeaderUrl = mediaHeaderUrl,
-                                    mediaIconUrl = mediaIconUrl,
+                            if (searchQuery.isNotBlank() && filteredTabIndices.isEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.settings_search_no_results),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                            } else {
+                                if (selectedTab == 0) GeneralTabContent(state, nonzeroResolutionError, aspectResolutionError)
+                                if (selectedTab == 1) CompatPresetsTabContent(state)
+                                if (selectedTab == 2) GraphicsTabContent(state, default)
+                                if (selectedTab == 3) EmulationTabContent(state)
+                                if (selectedTab == 4) ControllerTabContent(state, default)
+                                if (selectedTab == 5) WineTabContent(state)
+                                if (selectedTab == 6) WinComponentsTabContent(state)
+                                if (selectedTab == 7) EnvironmentTabContent(state)
+                                if (selectedTab == 8) DrivesTabContent(state)
+                                if (selectedTab == 9) {
+                                    MediaTabContent(
+                                        gameId = gameId,
+                                        appId = appId,
+                                        mediaHeroUrl = mediaHeroUrl,
+                                        mediaLogoUrl = mediaLogoUrl,
+                                        mediaCapsuleUrl = mediaCapsuleUrl,
+                                        mediaHeaderUrl = mediaHeaderUrl,
+                                        mediaIconUrl = mediaIconUrl,
+                                    )
+                                }
+                                if (selectedTab == 10) AdvancedTabContent(state)
                             }
-                            if (selectedTab == 10) AdvancedTabContent(state)
                         }
                     }
                 }

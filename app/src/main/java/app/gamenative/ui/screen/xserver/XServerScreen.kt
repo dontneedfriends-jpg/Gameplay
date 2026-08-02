@@ -136,6 +136,7 @@ import app.gamenative.utils.WfmInstaller
 import com.posthog.PostHog
 import com.winlator.alsaserver.ALSAClient
 import com.winlator.container.Container
+import com.winlator.container.ContainerData
 import com.winlator.container.ContainerManager
 import com.winlator.contents.AdrenotoolsManager
 import com.winlator.contents.ContentProfile
@@ -1327,6 +1328,23 @@ fun XServerScreen(
             QuickMenuAction.RADIAL_MENU -> {
                 if (PrefManager.usageAnalyticsEnabled) PostHog.capture(event = "edit_radial_menu_from_menu")
                 PluviaApp.radialMenuCoordinator?.showSettingsDialog() == true
+            }
+
+            QuickMenuAction.CONTAINER_RESTART -> {
+                keepPausedForEditor = false
+                imeInputReceiver?.hideKeyboard()
+                clearOverlayPauseState()
+                restartForConfigChange(
+                    container,
+                    appId,
+                    frameRating,
+                    currentAppInfo,
+                    xServerView,
+                    neverSuspend,
+                    onExit,
+                    navigateBack,
+                )
+                true
             }
 
             QuickMenuAction.PERFORMANCE_HUD -> {
@@ -2684,15 +2702,15 @@ fun XServerScreen(
             onFpsLimiterEnabledChanged = ::applyFpsLimiterEnabled,
             onFpsLimiterChanged = ::applyFpsLimiterTarget,
             hasPhysicalController = hasPhysicalController,
-            isTouchscreenModeActive = isTouchscreenModeActive,
+            isTouchscreenModeActive = container.isTouchscreenMode,
             onTouchGestureSettingsClick = { showTouchGestureDialog = true },
-            isShooterModeActive = isShooterModeActive,
+            isShooterModeActive = container.isShooterMode,
             onShooterModeSettingsClick = { showShooterModeDialog = true },
             activeToggleIds = buildSet {
                 if (areControlsVisible) add(QuickMenuAction.INPUT_CONTROLS)
-                if (isTouchscreenModeActive) add(QuickMenuAction.TOUCHSCREEN_MODE)
-                if (isShooterModeActive) add(QuickMenuAction.SHOOTER_MODE)
-                if (isDisableMouseInput) add(QuickMenuAction.DISABLE_MOUSE)
+                if (container.isTouchscreenMode) add(QuickMenuAction.TOUCHSCREEN_MODE)
+                if (container.isShooterMode) add(QuickMenuAction.SHOOTER_MODE)
+                if (container.isDisableMouseInput) add(QuickMenuAction.DISABLE_MOUSE)
             },
             // LSFG hot-reload (tab only visible when enabled in container settings)
             isLsfgAvailable = isLsfgAvailable,
@@ -2710,7 +2728,9 @@ fun XServerScreen(
                     if (!SteamInviteState.openedForGameRequest) pauseForOverlayIfAllowed()
                 } else {
                     SteamInviteState.openedForGameRequest = false
-                    if (shouldForceResumeOnMenuClose) {
+                    if (InGameContainerSettings.overlayActive) {
+                        // Container settings overlay owns the pause until it closes.
+                    } else if (shouldForceResumeOnMenuClose) {
                         forceResumeIfSuspended()
                         shouldForceResumeOnMenuClose = false
                     } else if (!keepPausedForEditor) {
@@ -4567,7 +4587,7 @@ private fun getSteamlessTarget(
     return "$drive:\\${executablePath}"
 }
 
-private fun exit(
+internal fun exit(
     winHandler: WinHandler?,
     frameRating: FrameRating?,
     appInfo: SteamApp?,

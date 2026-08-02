@@ -313,6 +313,12 @@
     <string name="screen_effects_close">Close</string>
     <string name="quick_menu_tab_general">General</string>
     <string name="quick_menu_tab_controller">Controller</string>
+    <string name="quick_menu_container_settings">Container settings</string>
+    <string name="container_config_restart_required_title">Restart required</string>
+    <string name="container_config_restart_required_message">Some changes only take effect after the game restarts. Everything has been saved. Restart now to apply them?</string>
+    <string name="container_config_apply_and_restart">Apply and restart</string>
+    <string name="container_config_save_and_continue">Continue</string>
+    <string name="console_hint_select_back">A  Select   ·   B  Back</string>
     <string name="tools_wine_processes_running_hint">%1$d running, tap/click a process to close</string>
     <string name="tools_wine_processes_empty">No running EXEs detected.</string>
     <string name="performance_hud">Performance HUD</string>
@@ -754,6 +760,7 @@
     <string name="connection_login_failed">Login failed</string>
     <string name="connection_session_ended">Session ended</string>
     <string name="connection_offline_mode">Offline mode</string>
+    <string name="connection_auth_required">Steam authentication required</string>
     <string name="connection_retry">Retry</string>
 
 
@@ -1291,7 +1298,7 @@
     <string name="main_thank_you_message">Support open-source PC gaming on Android by sharing the app with your friends or becoming a member on Ko-fi.</string>
     <string name="main_join_kofi">Join on Ko-fi</string>
     <string name="main_share">Share</string>
-    <string name="main_share_text">Check out Gameplay - play your PC Steam games on Android, with full support for cloud saves!\nhttps://gamenative.app\nJoin the community: https://discord.gg/2hKv4VfZfE</string>
+    <string name="main_share_text">Check out Gameplay - play your PC Steam games on Android, with full support for cloud saves!\nhttps://github.com/dontneedfriends-jpg/Gameplay\nJoin the community: https://discord.gg/2hKv4VfZfE</string>
     <string name="main_discord_support_title">Did the game work?</string>
     <string name="main_discord_support_message">Join the Discord to get support to fix your game or improve performance.</string>
     <string name="main_open_discord">Open Discord</string>
@@ -1453,7 +1460,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">GameNative version</string>
+    <string name="community_config_app_version">Gameplay version</string>
     <string name="community_config_submitted">Submitted</string>
     <string name="community_config_session_length">Session length</string>
     <string name="community_config_game_store">Game store</string>
@@ -1504,6 +1511,11 @@
     <string name="library_source_not_logged_in_epic">Sign in to Epic to see your library</string>
     <string name="library_source_not_logged_in_amazon">Sign in to Amazon to see your library</string>
     <string name="library_source_no_custom_games">No custom games added yet</string>
+    <string name="library_load_error">Could not load library. Try again.</string>
+    <string name="library_offline_no_games">No cached Steam games are available offline.</string>
+    <string name="library_no_results">No games match current filters.</string>
+    <string name="library_search_no_results">No games match your search.</string>
+    <string name="library_clear_search">Clear search</string>
     <string name="library_layout_title">Layout</string>
     <string name="library_options">Options</string>
     <string name="back">Back</string>
@@ -1597,6 +1609,8 @@
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
     <string name="settings_subtitle">Customize your experience</string>
+    <string name="settings_search">Search settings</string>
+    <string name="settings_search_no_results">No settings match your search.</string>
     <string name="settings_app_theme_title">Screen theme</string>
     <string name="settings_app_theme_system">Use system setting</string>
     <string name="settings_app_theme_light">Light</string>
@@ -1606,6 +1620,9 @@
     <string name="settings_custom_theme_enabled">Use custom theme</string>
     <string name="settings_custom_theme_edit">Edit or create theme</string>
     <string name="settings_custom_theme_edit_subtitle">Change every semantic color with a visual preview</string>
+    <string name="settings_custom_theme_duplicate">Duplicate custom theme</string>
+    <string name="settings_custom_theme_duplicate_subtitle">Create editable copy with new name</string>
+    <string name="settings_custom_theme_duplicate_name">%1$s copy</string>
     <string name="settings_custom_theme_saved">Saved and applied theme: %1$s</string>
     <string name="settings_custom_theme_not_imported">No custom theme imported</string>
     <string name="settings_custom_theme_import">Import theme</string>
@@ -2279,7 +2296,7 @@
     <string name="game_launch_tip_7">Tip: Use Turnip drivers to play DirectX 12 games. DirectX 12 support for devices that don\'t support Turnip is currently limited.</string>
     <string name="game_launch_tip_8">Tip: If controls don\'t work, enable Steam Input and check that your app isn\'t installed to a private space.</string>
     <string name="game_launch_tip_9">Tip: To add files to the game, place them in your device\'s Downloads folder, hit \"%s\" and they will be in D: drive.</string>
-    <string name="game_launch_tip_10">Tip: Import a config from gamenative.app/compatibility for your GPU or GPU family if you can\'t get your game working.</string>
+    <string name="game_launch_tip_10">Tip: Check Gameplay issues for GPU-specific compatibility help if you can\'t get your game working.</string>
     <string name="game_launch_tip_11">Tip: Use the quick menu performance HUD when you want FPS stats in-game.</string>
     <string name="game_launch_tip_12">Tip: If your game has no audio, use Proton 10 to automatically extract XAudio DLLs.</string>
     <string name="game_launch_tip_13">Tip: You can enable or disable the onscreen controller with your device\'s back key.</string>
