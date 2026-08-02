@@ -41,6 +41,9 @@ data class LibraryState(
 
     // Loading state for skeleton loaders
     val isLoading: Boolean = false,
+
+    /** True once the first filter pass has produced data (or timed out). */
+    val hasCompletedInitialLoad: Boolean = false,
     val loadError: Boolean = false,
 
     // Refresh counter that increments when custom game images are fetched

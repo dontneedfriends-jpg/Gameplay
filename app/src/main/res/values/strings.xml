@@ -107,6 +107,12 @@
     <string name="settings_shortcut_opens_page_title">Shortcuts open the game page</string>
     <string name="settings_shortcut_opens_page_subtitle">Off: pinned home-screen shortcuts launch the game directly.</string>
     <string name="action_add_to_home">Add to Home screen</string>
+    <string name="achievements_unlocked_by_percent">Unlocked by %1$.1f%% of players</string>
+    <string name="achievements_rarity_short">%1$.0f%%</string>
+    <string name="game_players_now">%1$s playing now</string>
+    <string name="game_updates_title">Updates</string>
+    <string name="ds_home_icon_size_action">Icon size</string>
+    <string name="hint_categories">Categories</string>
     <string name="downloads_overview_subtitle">Track active, paused, and resumable downloads</string>
     <string name="downloads_cancel_confirm">Cancel download and delete files for %1$s?</string>
 

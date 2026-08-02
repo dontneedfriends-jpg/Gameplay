@@ -96,6 +96,11 @@ class PluviaApp : SplitCompatApplication() {
             ContainerFilesDownloader.preloadAllContainerFiles(applicationContext)
         }
 
+        // Sweep redist self-extractor leftovers (random hex dirs) from Downloads
+        appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { app.gamenative.utils.DriveDTempCleanup.sweep() }
+        }
+
         // Clear any stale temporary config overrides from previous app sessions
         try {
             IntentLaunchManager.clearAllTemporaryOverrides()

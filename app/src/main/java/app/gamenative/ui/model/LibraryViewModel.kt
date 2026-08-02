@@ -87,6 +87,8 @@ import timber.log.Timber
 
 private const val PLAYABLE_FPS_THRESHOLD = 30
 private const val PROVEN_RUNS_THRESHOLD = 5
+private const val INITIAL_LOAD_GRACE_MS = 3_000L
+private const val CUSTOM_SCAN_CACHE_TTL_MS = 5_000L
 
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
@@ -110,6 +112,7 @@ class LibraryViewModel @Inject constructor(
     }
 
     private val onCustomGameImagesFetched: (AndroidEvent.CustomGameImagesFetched) -> Unit = {
+        customScanCacheTimeMs = 0L
         // Increment refresh counter and refresh the library list to pick up newly fetched images
         _state.update { it.copy(imageRefreshCounter = it.imageRefreshCounter + 1) }
         onFilterApps(paginationCurrentPage)
@@ -121,6 +124,14 @@ class LibraryViewModel @Inject constructor(
 
     // Depot size calculation is expensive and stable until Steam metadata changes.
     private val steamSizeCache = ConcurrentHashMap<String, Long>()
+
+    // First-load grace: suppress the empty-state flash while store DAOs settle
+    private val initialLoadStartMs = System.currentTimeMillis()
+
+    // Short-TTL cache for the expensive custom-games disk scan (each filter
+    // pass used to rescan the whole storage, which took seconds)
+    private var customScanCache: List<LibraryItem> = emptyList()
+    private var customScanCacheTimeMs = 0L
 
     // Complete and unfiltered app list
     private var appList: List<SteamApp> = emptyList()
@@ -670,7 +681,15 @@ class LibraryViewModel @Inject constructor(
                 return status == GameCompatibilityStatus.COMPATIBLE || status == GameCompatibilityStatus.GPU_COMPATIBLE
             }
 
-            val allCustomGameItems = CustomGameScanner.scanAsLibraryItems()
+            val nowMs = System.currentTimeMillis()
+            val allCustomGameItems = if (nowMs - customScanCacheTimeMs < CUSTOM_SCAN_CACHE_TTL_MS) {
+                customScanCache
+            } else {
+                CustomGameScanner.scanAsLibraryItems().also {
+                    customScanCache = it
+                    customScanCacheTimeMs = nowMs
+                }
+            }
             val allOwnedItems = buildList {
                 appList.forEach { game ->
                     add(
@@ -1178,13 +1197,20 @@ class LibraryViewModel @Inject constructor(
             // Fetch compatibility for current page games
             fetchCompatibilityForPage(pagedList.map { it.name })
 
+            // The first filter pass can complete while the store DAOs have not
+            // emitted yet (empty list -> "no results" flash). Hold the loading
+            // flag until data arrives or the grace period elapses.
+            val completesInitialLoad = pagedList.isNotEmpty() ||
+                System.currentTimeMillis() - initialLoadStartMs > INITIAL_LOAD_GRACE_MS
+
             _state.update {
                 it.copy(
                     appInfoList = pagedList,
                     currentPaginationPage = paginationPage + 1, // visual display is not 0 indexed
                     lastPaginationPage = lastPageInCurrentFilter + 1,
                     totalAppsInFilter = totalFound,
-                    isLoading = false, // Loading complete
+                    isLoading = if (it.hasCompletedInitialLoad || completesInitialLoad) false else true,
+                    hasCompletedInitialLoad = it.hasCompletedInitialLoad || completesInitialLoad,
                     // Per-source counts for tab badges
                     // Use user prefs + auth state only (not current tab) so badges stay stable across tab switches
                     allCount = (if (currentState.showSteamInLibrary) stableSteamCount else 0) +
