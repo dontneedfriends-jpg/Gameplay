@@ -54,10 +54,10 @@ import app.gamenative.R
 import app.gamenative.enums.AppTheme
 import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.component.ConsoleIconButton
+import app.gamenative.ui.component.ConsoleListRow
 import app.gamenative.ui.component.SettingsSearchToggle
 import app.gamenative.ui.theme.PluviaTheme
 import com.materialkolor.PaletteStyle
-import com.alorma.compose.settings.ui.SettingsMenuLink
 
 internal enum class SettingsCategory(val titleRes: Int, val icon: ImageVector) {
     INTERFACE(R.string.settings_interface_title, Icons.Default.Palette),
@@ -233,13 +233,13 @@ private fun SettingsScreenContent(
                             )
                         } else {
                             results.forEach { result ->
-                                SettingsMenuLink(
-                                    title = { Text(stringResource(result.titleRes)) },
-                                    subtitle = { Text(stringResource(result.category.titleRes)) },
-                                     onClick = {
-                                         selectedCategory = result.category
-                                         closeSearch()
-                                     },
+                                ConsoleListRow(
+                                    title = stringResource(result.titleRes),
+                                    subtitle = stringResource(result.category.titleRes),
+                                    onClick = {
+                                        selectedCategory = result.category
+                                        closeSearch()
+                                    },
                                 )
                             }
                         }

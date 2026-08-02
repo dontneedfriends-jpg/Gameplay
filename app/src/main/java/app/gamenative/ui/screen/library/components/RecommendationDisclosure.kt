@@ -1,8 +1,8 @@
 package app.gamenative.ui.screen.library.components
 
-import androidx.compose.material3.AlertDialog
+import app.gamenative.ui.component.dialog.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.gamenative.ui.component.dialog.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.res.stringResource

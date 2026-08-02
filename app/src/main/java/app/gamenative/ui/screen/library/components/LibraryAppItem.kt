@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import app.gamenative.R
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.OutlinedButton
+import app.gamenative.ui.component.OutlinedButton
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items

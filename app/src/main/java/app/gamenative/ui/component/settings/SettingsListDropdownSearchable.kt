@@ -1,6 +1,10 @@
 package app.gamenative.ui.component.settings
 
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +15,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import app.gamenative.ui.component.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.ListItemDefaults
@@ -26,8 +30,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -49,6 +55,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.stringResource
 import app.gamenative.R
+import app.gamenative.ui.component.focusRing
 
 @Composable
 fun SettingsListDropdownSearchable(
@@ -88,13 +95,28 @@ fun SettingsListDropdownSearchable(
             .filter { it.second.contains(query, ignoreCase = true) }
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val tileShape = RoundedCornerShape(10.dp)
+
     val selectedText =
         if (value >= 0 && value < items.size) items[value] else fallbackDisplay
 
     SettingsTileScaffold(
         modifier = Modifier
             .focusRequester(focusRequester)
+            .clip(tileShape)
+            .background(
+                if (isFocused) {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                } else {
+                    Color.Transparent
+                },
+            )
+            .focusRing(interactionSource, tileShape, width = 2.dp)
             .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
                 enabled = enabled,
                 onClick = {
                     isDropdownExpanded = true

@@ -1,16 +1,25 @@
 package app.gamenative.ui.component.dialog
 
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Gamepad
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -18,7 +27,11 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import app.gamenative.R
+import app.gamenative.ui.component.ConsoleDialogButton
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.ui.util.shouldShowGamepadUI
 
 @Composable
 fun MessageDialog(
@@ -37,51 +50,83 @@ fun MessageDialog(
 ) {
     when {
         visible -> {
+            val confirmFocusRequester = remember { FocusRequester() }
+            val dismissFocusRequester = remember { FocusRequester() }
+
+            // Controller lands on the safe choice first: dismiss when there is
+            // one, confirm otherwise (single-button info dialogs).
+            LaunchedEffect(Unit) {
+                runCatching {
+                    if (onDismissClick != null) {
+                        dismissFocusRequester.requestFocus()
+                    } else {
+                        confirmFocusRequester.requestFocus()
+                    }
+                }
+            }
+
             AlertDialog(
+                shape = RoundedCornerShape(16.dp),
                 icon = icon?.let { { Icon(imageVector = icon, contentDescription = null) } },
                 title = title?.let { { Text(it) } },
-                text = message?.let {
-                    {
-                        if (useHtmlInMsg) {
-                            Text(
-                                text = AnnotatedString.fromHtml(
-                                    htmlString = it,
-                                    linkStyles = TextLinkStyles(
-                                        style = SpanStyle(
-                                            textDecoration = TextDecoration.Underline,
-                                            fontStyle = FontStyle.Italic,
-                                            color = Color.Blue,
+                text = {
+                    Column {
+                        if (message != null) {
+                            if (useHtmlInMsg) {
+                                Text(
+                                    text = AnnotatedString.fromHtml(
+                                        htmlString = message,
+                                        linkStyles = TextLinkStyles(
+                                            style = SpanStyle(
+                                                textDecoration = TextDecoration.Underline,
+                                                fontStyle = FontStyle.Italic,
+                                                color = Color.Blue,
+                                            ),
                                         ),
                                     ),
-                                ),
+                                )
+                            } else {
+                                Text(message)
+                            }
+                        }
+                        if (shouldShowGamepadUI()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = stringResource(R.string.console_hint_select_back),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                        } else {
-                            Text(it)
                         }
                     }
                 },
                 onDismissRequest = { onDismissRequest?.invoke() },
                 dismissButton = onDismissClick?.let {
                     {
-                        TextButton(onClick = it) {
-                            Text(dismissBtnText)
-                        }
+                        ConsoleDialogButton(
+                            text = dismissBtnText,
+                            onClick = it,
+                            focusRequester = dismissFocusRequester,
+                        )
                     }
                 },
                 confirmButton = {
-                    Row {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // Action button (displayed first if available)
                         if (actionBtnText != null && onActionClick != null) {
-                            TextButton(onClick = onActionClick) {
-                                Text(actionBtnText)
-                            }
+                            ConsoleDialogButton(
+                                text = actionBtnText,
+                                onClick = onActionClick,
+                            )
                         }
 
                         // Confirm button
                         onConfirmClick?.let {
-                            TextButton(onClick = it) {
-                                Text(confirmBtnText)
-                            }
+                            ConsoleDialogButton(
+                                text = confirmBtnText,
+                                onClick = it,
+                                focusRequester = confirmFocusRequester,
+                                isPrimary = true,
+                            )
                         }
                     }
                 },

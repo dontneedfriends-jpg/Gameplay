@@ -41,7 +41,7 @@ import app.gamenative.ui.component.ConsoleCategoryRail
 import app.gamenative.ui.component.settings.SettingsListDropdown
 import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
-import com.alorma.compose.settings.ui.SettingsSwitch
+import app.gamenative.ui.component.settings.SettingsSwitch
 import java.util.Locale
 import kotlin.math.roundToInt
 

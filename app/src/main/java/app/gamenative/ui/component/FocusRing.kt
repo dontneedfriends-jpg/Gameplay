@@ -28,6 +28,20 @@ fun Modifier.focusRing(
     @Suppress("UNUSED_PARAMETER") durationMillis: Int = 5000,
 ): Modifier {
     val focused by interactionSource.collectIsFocusedAsState()
+    return focusRing(focused, shape, width)
+}
+
+/**
+ * Same ring driven by an explicit focus flag, for components whose
+ * InteractionSource is not exposed (e.g. library settings tiles). Pair with
+ * `Modifier.onFocusChanged`.
+ */
+@Composable
+fun Modifier.focusRing(
+    focused: Boolean,
+    shape: Shape,
+    width: Dp = 4.dp,
+): Modifier {
     if (!focused) return this
 
     val color = MaterialTheme.colorScheme.tertiary

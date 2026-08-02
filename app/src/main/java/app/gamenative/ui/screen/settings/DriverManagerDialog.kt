@@ -17,8 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Divider
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DropdownMenuItem
+import app.gamenative.ui.component.dialog.AlertDialog
+import app.gamenative.ui.component.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -27,7 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import app.gamenative.ui.component.NoExtractOutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import app.gamenative.ui.component.dialog.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -40,7 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import app.gamenative.R
 import app.gamenative.ui.theme.settingsTileColors
 import com.alorma.compose.settings.ui.SettingsGroup
-import com.alorma.compose.settings.ui.SettingsMenuLink
+import app.gamenative.ui.component.settings.SettingsMenuLink
 import com.winlator.contents.AdrenotoolsManager
 import java.io.File
 import androidx.compose.material.icons.Icons

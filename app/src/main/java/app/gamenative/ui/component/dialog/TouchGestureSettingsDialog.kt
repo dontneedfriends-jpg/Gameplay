@@ -55,7 +55,7 @@ import app.gamenative.ui.theme.settingsTileColorsAlt
 import app.gamenative.ui.theme.PluviaBorder
 import app.gamenative.ui.theme.PluviaSurface
 import app.gamenative.ui.theme.PluviaSurfaceElevated
-import com.alorma.compose.settings.ui.SettingsSwitch
+import app.gamenative.ui.component.settings.SettingsSwitch
 import com.winlator.inputcontrols.Binding
 
 /**

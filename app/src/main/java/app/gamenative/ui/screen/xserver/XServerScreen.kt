@@ -352,23 +352,16 @@ private fun PlayingBlockedDialog(
     onPlayAnyway: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    if (!visible) return
-
     val displayName = remoteName ?: stringResource(R.string.main_app_running_unknown_game)
-    androidx.compose.material3.AlertDialog(
+    app.gamenative.ui.component.dialog.MessageDialog(
+        visible = visible,
+        title = stringResource(R.string.main_app_running_title),
+        message = stringResource(R.string.main_app_running_message, displayName),
+        confirmBtnText = stringResource(R.string.main_play_anyway),
+        dismissBtnText = stringResource(R.string.cancel),
         onDismissRequest = {},
-        title = { Text(text = stringResource(R.string.main_app_running_title)) },
-        text = { Text(text = stringResource(R.string.main_app_running_message, displayName)) },
-        confirmButton = {
-            TextButton(onClick = onPlayAnyway) {
-                Text(text = stringResource(R.string.main_play_anyway))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onCancel) {
-                Text(text = stringResource(R.string.cancel))
-            }
-        },
+        onConfirmClick = onPlayAnyway,
+        onDismissClick = onCancel,
     )
 }
 
