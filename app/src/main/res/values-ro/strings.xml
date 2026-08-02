@@ -1092,7 +1092,7 @@
 	<string name="main_thank_you_message">Susține gaming-ul open‑source pe Android distribuind aplicația prietenilor sau devenind membru pe Ko‑fi.</string>
 	<string name="main_join_kofi">Alătură-te pe Ko‑fi</string>
 	<string name="main_share">Distribuie</string>
-	<string name="main_share_text">Descoperă Gameplay - joacă jocurile tale Steam pe PC pe Android, cu suport complet pentru salvări în cloud!\nhttps://gamenative.app\nAlătură-te comunității: https://discord.gg/2hKv4VfZfE</string>
+    <string name="main_share_text">Descoperă Gameplay - joacă jocurile tale Steam pe PC pe Android, cu suport complet pentru salvări în cloud!\nhttps://github.com/dontneedfriends-jpg/Gameplay\nAlătură-te comunității: https://discord.gg/2hKv4VfZfE</string>
 	<string name="main_discord_support_title">A funcționat jocul?</string>
 	<string name="main_discord_support_message">Alătură-te serverului de Discord pentru suport și optimizare.</string>
 	<string name="main_open_discord">Deschide Discord</string>
@@ -1240,7 +1240,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">Versiunea GameNative</string>
+    <string name="community_config_app_version">Versiunea Gameplay</string>
     <string name="community_config_submitted">Trimis</string>
     <string name="community_config_session_length">Durata sesiunii</string>
     <string name="community_config_game_store">Magazinul jocului</string>
@@ -1601,7 +1601,7 @@
 	<string name="game_launch_tip_7">Sfat: Utilizați driverele Turnip pentru a juca jocuri DirectX 12. Suportul DirectX 12 pentru dispozitivele care nu acceptă Turnip este în prezent limitat.</string>
 	<string name="game_launch_tip_8">Sfat: Dacă controalele nu funcționează, activați Steam Input și verificați că aplicația dvs. nu este instalată într-un spațiu privat.</string>
 	<string name="game_launch_tip_9">Sfat: Pentru a adăuga fișiere în joc, plasați-le în folderul Downloads al dispozitivului, apăsați \"%s\" și vor fi în D: drive.</string>
-	<string name="game_launch_tip_10">Sfat: Importați o configurație de pe gamenative.app/compatibility pentru GPU-ul dvs. sau familia de GPU dacă nu reușiți să porniți jocul.</string>
+    <string name="game_launch_tip_10">Sfat: Consultați Issues Gameplay pentru ajutor privind compatibilitatea GPU dacă jocul nu pornește.</string>
 	<string name="game_launch_tip_11">Sfat: Utilizați HUD-ul de performanță din meniul rapid când doriți statistici FPS în joc.</string>
 	<string name="game_launch_tip_12">Sfat: Dacă jocul dvs. nu are sunet, utilizați Proton 10 pentru a extrage automat XAudio DLLs.</string>
 	<string name="game_launch_tip_13">Sfat: Puteți activa sau dezactiva controllerul pe ecran cu tasta de revenire a dispozitivului dvs.</string>

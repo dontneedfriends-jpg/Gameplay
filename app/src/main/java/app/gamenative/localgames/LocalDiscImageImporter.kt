@@ -45,7 +45,7 @@ object LocalDiscImageImporter {
     ): LocalInstallerImporter.ImportResult = withContext(Dispatchers.IO) {
         val destinationFolder = LocalInstallerImporter.createDestinationFolder(sourceName, suffix = " disc")
             ?: return@withContext LocalInstallerImporter.ImportResult.Failed(
-                reason = "GameNative could not create a disc-image workspace",
+                reason = "Gameplay could not create a disc-image workspace",
                 cause = IOException("Could not allocate a unique CustomGames folder"),
             )
 
@@ -58,7 +58,7 @@ object LocalDiscImageImporter {
         } catch (error: Exception) {
             destinationFolder.deleteRecursively()
             return@withContext LocalInstallerImporter.ImportResult.Failed(
-                "GameNative could not copy the disc image",
+                "Gameplay could not copy the disc image",
                 error,
             )
         }
@@ -71,7 +71,7 @@ object LocalDiscImageImporter {
         } catch (error: Exception) {
             destinationFolder.deleteRecursively()
             return@withContext LocalInstallerImporter.ImportResult.Failed(
-                "GameNative could not read the disc image (only ISO9660 discs are supported)",
+                "Gameplay could not read the disc image (only ISO9660 discs are supported)",
                 error,
             )
         } finally {

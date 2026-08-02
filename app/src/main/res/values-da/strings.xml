@@ -915,7 +915,7 @@
     <string name="main_thank_you_message">Støt open-source PC-gaming på Android ved at dele appen med dine venner eller ved at blive medlem på Ko-fi.</string>
     <string name="main_join_kofi">Tilmeld dig på Ko-fi</string>
     <string name="main_share">Del</string>
-    <string name="main_share_text">Prøv Gameplay - spil dine PC Steam-spil på Android med fuld understøttelse af cloud-gemmer!\nhttps://gamenative.app\nTilmeld dig fællesskabet: https://discord.gg/2hKv4VfZfE</string>
+    <string name="main_share_text">Prøv Gameplay - spil dine PC Steam-spil på Android med fuld understøttelse af cloud-gemmer!\nhttps://github.com/dontneedfriends-jpg/Gameplay\nTilmeld dig fællesskabet: https://discord.gg/2hKv4VfZfE</string>
     <string name="main_discord_support_title">Virkede spillet?</string>
     <string name="main_discord_support_message">Tilmeld dig Discord for at få support til at rette dit spil eller forbedre ydelsen.</string>
     <string name="main_open_discord">Åbn Discord</string>
@@ -1062,7 +1062,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">GameNative-version</string>
+    <string name="community_config_app_version">Gameplay-version</string>
     <string name="community_config_submitted">Indsendt</string>
     <string name="community_config_session_length">Sessionslængde</string>
     <string name="community_config_game_store">Spilbutik</string>
@@ -1469,7 +1469,7 @@
     <string name="game_launch_tip_7">Tip: Brug Turnip-drivere til at spille DirectX 12 spil. DirectX 12-understøttelse til enheder, der ikke understøtter Turnip, er i øjeblikket begrænset.</string>
     <string name="game_launch_tip_8">Tip: Hvis controllere ikke virker, så aktivér Steam Input og kontrollér, at din app ikke er installeret i et privat rum.</string>
     <string name="game_launch_tip_9">Tip: For at tilføje filer til spillet skal du placere dem i din enheds Downloads-mappe, trykke på \"%s\", så vil de være på D: drive.</string>
-    <string name="game_launch_tip_10">Tip: Importer en konfiguration fra gamenative.app/compatibility til din GPU eller GPU-familie, hvis du ikke kan få dit spil til at virke.</string>
+    <string name="game_launch_tip_10">Tip: Se Gameplay Issues for GPU-specifik hjælp til kompatibilitet, hvis spillet ikke virker.</string>
     <string name="game_launch_tip_11">Tip: Brug performance HUD i hurtigmenuen, når du vil have FPS-statistik i spillet.</string>
     <string name="game_launch_tip_12">Tip: Hvis dit spil ikke har nogen lyd, så brug Proton 10 til automatisk at udpakke XAudio-DLLs.</string>
     <string name="game_launch_tip_13">Tip: Du kan aktivere eller deaktivere skærmcontrolleren med din enheds tilbage-knap.</string>

@@ -106,6 +106,7 @@ import app.gamenative.ui.util.PlatformAuthUiHelpers
 import app.gamenative.ui.util.SnackbarManager
 import app.gamenative.ui.theme.GameplayThemeCodec
 import app.gamenative.ui.theme.GameplayThemeDecodeResult
+import app.gamenative.ui.theme.GameplayThemeDocument
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 
@@ -242,6 +243,7 @@ fun SettingsGroupInterface(
     var openAppPaletteDialog by rememberSaveable { mutableStateOf(false) }
     var showClearThemeDialog by rememberSaveable { mutableStateOf(false) }
     var showThemeEditor by rememberSaveable { mutableStateOf(false) }
+    var themeEditorDocument by remember { mutableStateOf<GameplayThemeDocument?>(null) }
 
     val customThemeDocument = remember(customThemeJson) {
         when (val result = GameplayThemeCodec.decode(customThemeJson)) {
@@ -441,8 +443,29 @@ fun SettingsGroupInterface(
             colors = settingsTileColorsAlt(),
             title = { Text(text = stringResource(R.string.settings_custom_theme_edit)) },
             subtitle = { Text(text = stringResource(R.string.settings_custom_theme_edit_subtitle)) },
-            onClick = { showThemeEditor = true },
+            onClick = {
+                themeEditorDocument = customThemeDocument ?: GameplayThemeCodec.safeDocument()
+                showThemeEditor = true
+            },
         )
+        if (customThemeDocument != null) {
+            SettingsMenuLink(
+                colors = settingsTileColorsAlt(),
+                title = { Text(text = stringResource(R.string.settings_custom_theme_duplicate)) },
+                subtitle = { Text(text = stringResource(R.string.settings_custom_theme_duplicate_subtitle)) },
+                onClick = {
+                    customThemeDocument?.let { document ->
+                        themeEditorDocument = document.copy(
+                            name = context.getString(
+                                R.string.settings_custom_theme_duplicate_name,
+                                document.name,
+                            ).take(48),
+                        )
+                        showThemeEditor = true
+                    }
+                },
+            )
+        }
         SettingsMenuLink(
             colors = settingsTileColorsAlt(),
             title = { Text(text = stringResource(R.string.settings_custom_theme_import)) },
@@ -916,13 +939,17 @@ fun SettingsGroupInterface(
 
     ThemeEditorPage(
         visible = showThemeEditor,
-        initialDocument = customThemeDocument ?: GameplayThemeCodec.safeDocument(),
+        initialDocument = themeEditorDocument ?: customThemeDocument ?: GameplayThemeCodec.safeDocument(),
         onSave = { document ->
             onCustomTheme(GameplayThemeCodec.encode(document))
             showThemeEditor = false
+            themeEditorDocument = null
             SnackbarManager.show(context.getString(R.string.settings_custom_theme_saved, document.name))
         },
-        onDismiss = { showThemeEditor = false },
+        onDismiss = {
+            showThemeEditor = false
+            themeEditorDocument = null
+        },
     )
 
     val paletteEntries = paletteProfiles.map { it.style }

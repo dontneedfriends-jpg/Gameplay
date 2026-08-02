@@ -34,7 +34,7 @@ object Constants {
     }
 
     object Misc {
-        const val GITHUB_LINK = "https://github.com/utkarshdalal/GameNative"
-        const val PRIVACY_LINK = "https://github.com/utkarshdalal/GameNative/tree/master/PrivacyPolicy"
+        const val GITHUB_LINK = "https://github.com/dontneedfriends-jpg/Gameplay"
+        const val PRIVACY_LINK = "https://github.com/dontneedfriends-jpg/Gameplay/tree/master/PrivacyPolicy"
     }
 }

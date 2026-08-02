@@ -1119,7 +1119,7 @@
     <string name="main_thank_you_message">アプリを友達と共有するか、Ko-fi のメンバーになることで、Android でのオープンソース PC ゲームをサポートします。</string>
     <string name="main_join_kofi">Ko-fi に参加する</string>
     <string name="main_share">共有</string>
-    <string name="main_share_text">Gameplay をチェックしてください - クラウド セーブを完全にサポートし、Android で PC Steam ゲームをプレイしましょう!\nhttps://gamenative.app\nコミュニティに参加してください: https://discord.gg/2hKv4VfZfE</string>
+    <string name="main_share_text">Gameplay をチェックしてください - クラウド セーブを完全にサポートし、Android で PC Steam ゲームをプレイしましょう!\nhttps://github.com/dontneedfriends-jpg/Gameplay\nコミュニティに参加してください: https://discord.gg/2hKv4VfZfE</string>
     <string name="main_discord_support_title">ゲームはうまくいきましたか？</string>
     <string name="main_discord_support_message">Discord に参加して、ゲームを修正したりパフォーマンスを向上させるためのサポートを受けてください。</string>
     <string name="main_open_discord">Discordを開く</string>
@@ -1266,7 +1266,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">GameNative バージョン</string>
+    <string name="community_config_app_version">Gameplay バージョン</string>
     <string name="community_config_submitted">送信日時</string>
     <string name="community_config_session_length">セッション時間</string>
     <string name="community_config_game_store">ゲームストア</string>
@@ -1607,7 +1607,7 @@
     <string name="game_launch_tip_7">ヒント: DirectX 12 ゲームをプレイするには Turnip ドライバーを使用してください。Turnip をサポートしていないデバイスに対する DirectX 12 のサポートは現在制限されています。</string>
     <string name="game_launch_tip_8">ヒント: コントロールが動作しない場合は、Steam Input を有効にし、アプリがプライベート スペースにインストールされていないことを確認してください。</string>
     <string name="game_launch_tip_9">ヒント: ゲームにファイルを追加するには、デバイスの Downloads フォルダーにファイルを置き、\"%s\" を押すと D: drive に表示されます。</string>
-    <string name="game_launch_tip_10">ヒント: ゲームが動作しない場合は、お使いの GPU または GPU ファミリー向けの設定を gamenative.app/compatibility からインポートしてください。</string>
+    <string name="game_launch_tip_10">ヒント: ゲームが動作しない場合は、Gameplay Issues で GPU の互換性に関する情報を確認してください。</string>
     <string name="game_launch_tip_11">ヒント: ゲーム内で FPS 統計が必要な場合は、クイック メニュー パフォーマンス HUD を使用してください。</string>
     <string name="game_launch_tip_12">ヒント: ゲームに音声がない場合は、Proton 10 を使用して XAudio DLLs を自動的に展開してください。</string>
     <string name="game_launch_tip_13">ヒント: device\' の戻るキーを使用して、オンスクリーン コントローラーを有効または無効にできます。</string>

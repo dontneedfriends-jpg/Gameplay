@@ -149,7 +149,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">Версия GameNative</string>
+    <string name="community_config_app_version">Версия Gameplay</string>
     <string name="community_config_submitted">Отправлено</string>
     <string name="community_config_session_length">Длительность сеанса</string>
     <string name="community_config_game_store">Магазин игры</string>
@@ -814,7 +814,7 @@ Ubuntu RootFs - releases.ubuntu.com/focal</string>
     <string name="main_save_conflict_upgrade_v1_message">Мы исправили обработку путей облачных сохранений для этой игры и обнаружили различия между локальным и облачным сохранением.\n\nЛокальное сохранение:\n\t%1$s\nОблачное сохранение:\n\t%2$s</string>
     <string name="main_share">Поделиться</string>
     <string name="main_share_text">Проверьте Gameplay - играйте в ваши ПК игры Steam на Android, с полной поддержкой облачных сохранений!
-https://gamenative.app
+    https://github.com/dontneedfriends-jpg/Gameplay
 Присоединитесь к сообществу: https://discord.gg/2hKv4VfZfE</string>
     <string name="main_sync_failed">Ошибка синхронизации файлов сохранений: %s.</string>
     <string name="main_sync_in_progress">Синхронизация в процессе. Пожалуйста, попробуйте снова через момент.</string>
@@ -1614,7 +1614,7 @@ https://gamenative.app
     <string name="game_launch_tip_7">Совет: Используйте драйверы Turnip для игр DirectX 12. Поддержка DirectX 12 для устройств, не поддерживающих Turnip, в настоящее время ограничена.</string>
     <string name="game_launch_tip_8">Совет: Если управление не работает, включите Steam Input и убедитесь, что приложение не установлено в приватное пространство.</string>
     <string name="game_launch_tip_9">Совет: Чтобы добавить файлы в игру, поместите их в папку «Загрузки» вашего устройства, нажмите \"%s\", и они появятся на диске D:.</string>
-    <string name="game_launch_tip_10">Совет: Импортируйте конфигурацию с gamenative.app/compatibility для вашего GPU или семейства GPU, если у вас не получается запустить игру.</string>
+    <string name="game_launch_tip_10">Совет: Проверьте раздел Issues Gameplay для помощи с совместимостью GPU, если игру не удаётся запустить.</string>
     <string name="game_launch_tip_11">Совет: Используйте HUD производительности в быстром меню, когда хотите видеть статистику FPS в игре.</string>
     <string name="game_launch_tip_12">Совет: Если в игре нет звука, используйте Proton 10 для автоматического извлечения DLL XAudio.</string>
     <string name="game_launch_tip_13">Совет: Вы можете включить или отключить экранный контроллер с помощью кнопки «Назад» на устройстве.</string>

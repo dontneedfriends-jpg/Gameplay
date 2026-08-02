@@ -633,6 +633,8 @@ class LibraryViewModel @Inject constructor(
         Timber.tag("LibraryViewModel").d("onFilterApps - appList.size: ${appList.size}, isFirstLoad: $isFirstLoad")
         val requestGeneration = filterRequestGeneration.incrementAndGet()
         return viewModelScope.launch(Dispatchers.IO) {
+            _state.update { it.copy(loadError = false, isLoading = it.appInfoList.isEmpty()) }
+            try {
             val currentState = _state.value
             val currentFilter = AppFilter.getAppType(currentState.appInfoSortType)
 
@@ -1197,6 +1199,12 @@ class LibraryViewModel @Inject constructor(
                     localCount = if (currentState.showCustomGamesInLibrary) customEntries.size else 0,
                     steamCollectionCounts = steamCollectionCounts,
                 )
+            }
+            } catch (error: Exception) {
+                Timber.tag("LibraryViewModel").e(error, "Failed to filter library")
+                if (filterRequestGeneration.get() == requestGeneration) {
+                    _state.update { it.copy(isLoading = false, loadError = true) }
+                }
             }
         }
     }

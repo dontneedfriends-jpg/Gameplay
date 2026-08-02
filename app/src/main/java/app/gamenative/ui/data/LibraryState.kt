@@ -41,6 +41,7 @@ data class LibraryState(
 
     // Loading state for skeleton loaders
     val isLoading: Boolean = false,
+    val loadError: Boolean = false,
 
     // Refresh counter that increments when custom game images are fetched
     // Used to trigger UI recomposition to show newly downloaded images
@@ -72,6 +73,27 @@ data class LibraryState(
     val amazonCount: Int = 0,
     val localCount: Int = 0,
 )
+
+internal enum class LibraryContentState {
+    LOADING,
+    ERROR,
+    SEARCH_NO_RESULTS,
+    NO_RESULTS,
+    CONTENT,
+}
+
+internal fun libraryContentState(
+    isLoading: Boolean,
+    hasItems: Boolean,
+    loadError: Boolean,
+    isSearching: Boolean,
+): LibraryContentState = when {
+    isLoading && !hasItems -> LibraryContentState.LOADING
+    loadError -> LibraryContentState.ERROR
+    !hasItems && isSearching -> LibraryContentState.SEARCH_NO_RESULTS
+    !hasItems -> LibraryContentState.NO_RESULTS
+    else -> LibraryContentState.CONTENT
+}
 
 /**
  * Stats shown on a library card. Runs and 5-star reviews are counts that default to 0 when their

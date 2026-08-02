@@ -49,7 +49,7 @@ object LocalInstallerImporter {
 
             val destinationFolder = createDestinationFolder(sourceName)
                 ?: return@withContext ImportResult.Failed(
-                    reason = "GameNative could not create an installer workspace",
+                    reason = "Gameplay could not create an installer workspace",
                     cause = IOException("Could not allocate a unique CustomGames folder"),
                 )
             val installerName = sanitizeFileName(sourceName)
@@ -62,7 +62,7 @@ object LocalInstallerImporter {
                 throw error
             } catch (error: Exception) {
                 destinationFolder.deleteRecursively()
-                return@withContext ImportResult.Failed("GameNative could not copy the installer", error)
+                return@withContext ImportResult.Failed("Gameplay could not copy the installer", error)
             }
 
             stageInstallerSession(
@@ -96,7 +96,7 @@ object LocalInstallerImporter {
             FileInputStream(installerFile).use(WindowsExecutableInspector::inspect)
         }.getOrElse { error ->
             if (cleanupOnFailure) destinationFolder.deleteRecursively()
-            return ImportResult.Failed("GameNative could not inspect the installer", error)
+            return ImportResult.Failed("Gameplay could not inspect the installer", error)
         }
         val rejection = validateInstaller(installerType, inspection)
         if (rejection != null) {
@@ -169,7 +169,7 @@ object LocalInstallerImporter {
             }
             runCatching { store.save(failed) }
             return ImportResult.Failed(
-                reason = "GameNative could not prepare the installer container",
+                reason = "Gameplay could not prepare the installer container",
                 cause = error,
                 session = failed,
             )

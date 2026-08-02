@@ -1099,7 +1099,7 @@
     <string name="main_thank_you_message">Apoya el proyecto de código abierto para juegos de PC en Android compartiendo la aplicación con tus amigos o haciéndote miembro en Ko-fi.</string>
     <string name="main_join_kofi">Apoyar en Ko-fi</string>
     <string name="main_share">Compartir</string>
-    <string name="main_share_text">Descubre Gameplay: juega a tus juegos Steam de PC en Android, con soporte completo de guardados en la nube.\nhttps://gamenative.app\nÚnete a la comunidad: https://discord.gg/2hKv4VfZfE</string>
+    <string name="main_share_text">Descubre Gameplay: juega a tus juegos Steam de PC en Android, con soporte completo de guardados en la nube.\nhttps://github.com/dontneedfriends-jpg/Gameplay\nÚnete a la comunidad: https://discord.gg/2hKv4VfZfE</string>
     <string name="main_discord_support_title">¿Ha funcionado el juego?</string>
     <string name="main_discord_support_message">Únete a nuestro Discord para obtener ayuda, solucionar problemas con tu juego o mejorar el rendimiento.</string>
     <string name="main_open_discord">Abrir Discord</string>
@@ -1247,7 +1247,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">Versión de GameNative</string>
+    <string name="community_config_app_version">Versión de Gameplay</string>
     <string name="community_config_submitted">Enviada</string>
     <string name="community_config_session_length">Duración de la sesión</string>
     <string name="community_config_game_store">Tienda del juego</string>
@@ -1597,7 +1597,7 @@
     <string name="game_launch_tip_7">Consejo: Usa los controladores Turnip para jugar juegos de DirectX 12. El soporte de DirectX 12 para dispositivos que no soportan Turnip es actualmente limitado.</string>
     <string name="game_launch_tip_8">Consejo: Si los controles no funcionan, activa Steam Input y comprueba que tu aplicación no esté instalada en un espacio privado.</string>
     <string name="game_launch_tip_9">Consejo: Para añadir archivos al juego, colócalos en la carpeta Downloads de tu dispositivo, pulsa \"%s\" y aparecerán en la D: drive.</string>
-    <string name="game_launch_tip_10">Consejo: Importa una configuración desde gamenative.app/compatibility para tu GPU o familia de GPU si no consigues que tu juego funcione.</string>
+    <string name="game_launch_tip_10">Consejo: Consulta los Issues de Gameplay para obtener ayuda de compatibilidad específica de tu GPU.</string>
     <string name="game_launch_tip_11">Consejo: Usa el HUD de rendimiento del menú rápido cuando quieras estadísticas de FPS en el juego.</string>
     <string name="game_launch_tip_12">Consejo: Si tu juego no tiene audio, usa Proton 10 para extraer automáticamente las DLLs de XAudio.</string>
     <string name="game_launch_tip_13">Consejo: Puedes activar o desactivar el controlador en pantalla con la tecla de retroceso de tu dispositivo.</string>

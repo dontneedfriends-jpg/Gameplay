@@ -103,6 +103,7 @@ import app.gamenative.ui.screen.library.components.RecommendationDisclosureDialo
 import app.gamenative.ui.screen.library.components.LibraryOptionsPanel
 import app.gamenative.ui.screen.library.components.LibrarySearchBar
 import app.gamenative.ui.screen.library.components.LibrarySourceNotLoggedInSplash
+import app.gamenative.ui.screen.library.components.LibraryStateSplash
 import app.gamenative.ui.screen.library.components.LibraryTabBar
 import app.gamenative.ui.screen.auth.AmazonOAuthActivity
 import app.gamenative.ui.screen.auth.EpicOAuthActivity
@@ -124,6 +125,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.os.SystemClock
+
+internal enum class LibraryFocusTarget {
+    CONTENT,
+    ROOT,
+}
+
+internal fun libraryFocusTarget(itemCount: Int): LibraryFocusTarget =
+    if (itemCount > 0) LibraryFocusTarget.CONTENT else LibraryFocusTarget.ROOT
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -613,12 +622,15 @@ private fun LibraryScreenContent(
         // The user may have moved focus up into the tab bar during the delay; don't yank it back.
         if (tabBarHasFocus) return@LaunchedEffect
 
-        if (isListFocusable()) {
-            // Empty tab - focus root so bumpers still work
-            requestRootFocusSafe()
-        } else {
-            // Tab has content - focus the first content item/container
-            requestContentFocusOrDefer(targetListIndex = 0)
+        when (libraryFocusTarget(state.appInfoList.size)) {
+            LibraryFocusTarget.CONTENT -> {
+                // Tab has content - focus the first content item/container.
+                requestContentFocusOrDefer(targetListIndex = 0)
+            }
+            LibraryFocusTarget.ROOT -> {
+                // Empty tab - focus root so bumper navigation still works.
+                requestRootFocusSafe()
+            }
         }
     }
 
@@ -1030,6 +1042,39 @@ private fun LibraryScreenContent(
                         messageResId = messageResId,
                         signInButtonLabelResId = buttonResId,
                         onSignInClick = onAction,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (state.loadError) {
+                    LibraryStateSplash(
+                        messageResId = R.string.library_load_error,
+                        actionResId = R.string.connection_retry,
+                        onAction = onRefresh,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (isOffline && state.currentTab == LibraryTab.STEAM && state.appInfoList.isEmpty()) {
+                    LibraryStateSplash(
+                        messageResId = R.string.library_offline_no_games,
+                        actionResId = R.string.go_online,
+                        onAction = onGoOnline,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (!state.isLoading && state.appInfoList.isEmpty()) {
+                    LibraryStateSplash(
+                        messageResId = if (state.isSearching) {
+                            R.string.library_search_no_results
+                        } else {
+                            R.string.library_no_results
+                        },
+                        actionResId = if (state.isSearching) {
+                            R.string.library_clear_search
+                        } else {
+                            R.string.connection_retry
+                        },
+                        onAction = if (state.isSearching) {
+                            { onSearchQuery("") }
+                        } else {
+                            onRefresh
+                        },
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {

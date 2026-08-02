@@ -209,7 +209,7 @@ private fun YouTubeHero(
                         }
                     }
                     loadDataWithBaseURL(
-                        "https://www.gamenative.app",
+                        "https://github.com/dontneedfriends-jpg/Gameplay",
                         youTubeEmbedHtml(videoId),
                         "text/html",
                         "utf-8",

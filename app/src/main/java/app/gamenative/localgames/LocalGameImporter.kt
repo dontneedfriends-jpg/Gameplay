@@ -58,7 +58,7 @@ object LocalGameImporter {
 
             val destinationFolder = createDestinationFolder(sourceName)
                 ?: return@withContext ImportResult.Failed(
-                    "GameNative could not create an import folder",
+                    "Gameplay could not create an import folder",
                     IOException("Could not create a unique CustomGames destination"),
                 )
             val destinationExecutable = File(destinationFolder, sanitizeFileName(sourceName))
@@ -77,7 +77,7 @@ object LocalGameImporter {
                     }
                 } ?: return@withContext cleanupAndReject(
                     destinationFolder,
-                    "GameNative could not read the selected file",
+                    "Gameplay could not read the selected file",
                 )
 
                 when (
@@ -103,7 +103,7 @@ object LocalGameImporter {
                 cleanupDestination(destinationFolder)
                 throw error
             } catch (error: Exception) {
-                cleanupAndFail(destinationFolder, "GameNative could not import the selected file", error)
+                cleanupAndFail(destinationFolder, "Gameplay could not import the selected file", error)
             }
         }
 

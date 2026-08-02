@@ -1073,7 +1073,7 @@
     <string name="main_thank_you_message">透過與朋友分享應用程式或在Ko-fi成為會員，支持Android平台的開源PC遊戲</string>
     <string name="main_join_kofi">加入Ko-fi</string>
     <string name="main_share">分享</string>
-    <string name="main_share_text">試試 Gameplay - 在 Android 上暢玩您的 PC Steam 遊戲，完整支援雲端存檔！\nhttps://gamenative.app\n加入社群：https://discord.gg/2hKv4VfZfE</string>
+    <string name="main_share_text">試試 Gameplay - 在 Android 上暢玩您的 PC Steam 遊戲，完整支援雲端存檔！\nhttps://github.com/dontneedfriends-jpg/Gameplay\n加入社群：https://discord.gg/2hKv4VfZfE</string>
     <string name="main_discord_support_title">遊戲運作正常嗎?</string>
     <string name="main_discord_support_message">加入 Discord 社群, 獲取遊戲修復與效能優化的支援</string>
     <string name="main_open_discord">開啟 Discord</string>
@@ -1216,7 +1216,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">GameNative 版本</string>
+    <string name="community_config_app_version">Gameplay 版本</string>
     <string name="community_config_submitted">提交時間</string>
     <string name="community_config_session_length">遊戲時長</string>
     <string name="community_config_game_store">遊戲商店</string>
@@ -1639,7 +1639,7 @@
     <string name="game_launch_tip_7">提示：使用 Turnip 驅動來執行 DirectX 12 遊戲。不支援 Turnip 的裝置對 DirectX 12 的支援目前有限。</string>
     <string name="game_launch_tip_8">提示：如果控制器無法運作，請啟用 Steam Input 並檢查你的應用程式沒有安裝到私人空間。</string>
     <string name="game_launch_tip_9">提示：若要將檔案加入遊戲，請將它們放在裝置的 Downloads 資料夾中，點擊「%s」，它們就會出現在 D: drive 中。</string>
-    <string name="game_launch_tip_10">提示：如果無法讓遊戲運作，請從 gamenative.app/compatibility 匯入適合你的 GPU 或 GPU 系列的設定。</string>
+    <string name="game_launch_tip_10">提示：如果遊戲無法運作，請查看 Gameplay Issues 取得 GPU 相容性協助。</string>
     <string name="game_launch_tip_11">提示：在遊戲中使用快速選單的效能 HUD 檢視 FPS 統計資訊。</string>
     <string name="game_launch_tip_12">提示：如果遊戲沒有聲音，請使用 Proton 10 來自動擷取 XAudio DLLs。</string>
     <string name="game_launch_tip_13">提示：你可以透過裝置的返回鍵啟用或停用螢幕手把。</string>

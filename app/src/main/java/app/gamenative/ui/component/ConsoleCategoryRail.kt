@@ -24,6 +24,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.gamenative.ui.util.rememberControllerConnectionState
 
 /** Shared controller-first category navigation for complex settings surfaces. */
 @Composable
@@ -38,7 +39,8 @@ fun <T> ConsoleCategoryRail(
     compact: Boolean = false,
 ) {
     val initialFocusRequester = remember { FocusRequester() }
-    LaunchedEffect(requestInitialFocus, items) {
+    val controllerConnection = rememberControllerConnectionState()
+    LaunchedEffect(requestInitialFocus, items, controllerConnection.generation) {
         if (requestInitialFocus && items.isNotEmpty()) runCatching { initialFocusRequester.requestFocus() }
     }
     Column(

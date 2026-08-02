@@ -1086,7 +1086,7 @@
     <string name="main_thank_you_message">Підтримайте open-source ПК-ігри на Android, поділившись застосунком із друзями або ставши учасником на Ko-fi.</string>
     <string name="main_join_kofi">Стати учасником на Ko-fi</string>
     <string name="main_share">Поділитися</string>
-    <string name="main_share_text">Спробуй Gameplay — грай у свої Steam-ігри з ПК на Android з повною підтримкою хмарних збережень!\nhttps://gamenative.app\nПриєднуйся до спільноти: https://discord.gg/2hKv4VfZfE</string>
+    <string name="main_share_text">Спробуй Gameplay — грай у свої Steam-ігри з ПК на Android з повною підтримкою хмарних збережень!\nhttps://github.com/dontneedfriends-jpg/Gameplay\nПриєднуйся до спільноти: https://discord.gg/2hKv4VfZfE</string>
     <string name="main_discord_support_title">Чи працювала гра?</string>
     <string name="main_discord_support_message">Долучайтесь до нашого Discord, щоб отримати підтримку у виправленні чи покращенні роботи ігор.</string>
     <string name="main_open_discord">Відкрити Discord</string>
@@ -1235,7 +1235,7 @@
     <string name="community_config_gpu">GPU</string>
     <string name="community_config_android">Android</string>
     <string name="community_config_soc">SoC</string>
-    <string name="community_config_app_version">Версія GameNative</string>
+    <string name="community_config_app_version">Версія Gameplay</string>
     <string name="community_config_submitted">Надіслано</string>
     <string name="community_config_session_length">Тривалість сеансу</string>
     <string name="community_config_game_store">Магазин гри</string>
@@ -1595,7 +1595,7 @@
     <string name="game_launch_tip_7">Порада: Використовуйте драйвери Turnip, щоб грати в ігри DirectX 12. Підтримка DirectX 12 для пристроїв, які не підтримують Turnip, наразі обмежена.</string>
     <string name="game_launch_tip_8">Порада: Якщо керування не працює, увімкніть Steam Input та перевірте, що ваш застосунок не встановлено у приватний простір.</string>
     <string name="game_launch_tip_9">Порада: Щоб додати файли до гри, помістіть їх у папку Downloads вашого пристрою, натисніть \"%s\" — і вони з\'являться на D: drive.</string>
-    <string name="game_launch_tip_10">Порада: Імпортуйте конфігурацію з gamenative.app/compatibility для вашого GPU або сімейства GPU, якщо не вдається запустити гру.</string>
+    <string name="game_launch_tip_10">Порада: Перегляньте Issues Gameplay для допомоги із сумісністю GPU, якщо гру не вдається запустити.</string>
     <string name="game_launch_tip_11">Порада: Використовуйте HUD продуктивності в швидкому меню, коли хочете бачити статистику FPS у грі.</string>
     <string name="game_launch_tip_12">Порада: Якщо у вашій грі немає звуку, використовуйте Proton 10 для автоматичного видобування XAudio DLLs.</string>
     <string name="game_launch_tip_13">Порада: Ви можете ввімкнути або вимкнути екранний контролер за допомогою кнопки «Назад» на вашому пристрої.</string>

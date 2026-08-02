@@ -107,7 +107,7 @@ object CustomGameContainerCoordinator {
             rollbackRegistrationIfNeeded(
                 root = root,
                 wasAlreadyRegistered = wasAlreadyRegistered,
-                reason = "GameNative could not create a container for the selected game",
+                reason = "Gameplay could not create a container for the selected game",
                 cause = exception,
             )
         }

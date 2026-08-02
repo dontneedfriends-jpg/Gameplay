@@ -19,6 +19,11 @@ enum class ControllerFamily {
     PLAYSTATION,
 }
 
+data class ControllerConnectionState(
+    val connected: Boolean,
+    val generation: Int = 0,
+)
+
 private const val VENDOR_MICROSOFT = 0x045E
 private const val VENDOR_SONY = 0x054C
 
@@ -57,6 +62,47 @@ fun detectControllerFamily(): ControllerFamily {
         if (playStationNameMarkers.any { it in name }) return ControllerFamily.PLAYSTATION
     }
     return ControllerFamily.XBOX
+}
+
+fun hasConnectedController(): Boolean = InputDevice.getDeviceIds().any { id ->
+    val device = InputDevice.getDevice(id) ?: return@any false
+    if (device.isVirtual) return@any false
+    val sources = device.sources
+    sources and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD ||
+        sources and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
+}
+
+fun controllerConnectionChanged(
+    previous: ControllerConnectionState,
+    connected: Boolean,
+): ControllerConnectionState = previous.copy(
+    connected = connected,
+    generation = previous.generation + 1,
+)
+
+/** Observes controller hot-plug and exposes generation for focus restoration effects. */
+@Composable
+fun rememberControllerConnectionState(): ControllerConnectionState {
+    val context = LocalContext.current
+    var state by remember { mutableStateOf(ControllerConnectionState(hasConnectedController())) }
+
+    DisposableEffect(context) {
+        val inputManager = context.getSystemService(Context.INPUT_SERVICE) as? InputManager
+            ?: return@DisposableEffect onDispose {}
+        val listener = object : InputManager.InputDeviceListener {
+            private fun update() {
+                state = controllerConnectionChanged(state, hasConnectedController())
+            }
+
+            override fun onInputDeviceAdded(deviceId: Int) = update()
+            override fun onInputDeviceRemoved(deviceId: Int) = update()
+            override fun onInputDeviceChanged(deviceId: Int) = update()
+        }
+        inputManager.registerInputDeviceListener(listener, Handler(Looper.getMainLooper()))
+        onDispose { inputManager.unregisterInputDeviceListener(listener) }
+    }
+
+    return state
 }
 
 /** Observes controller (dis)connections and reports the current [ControllerFamily]. */

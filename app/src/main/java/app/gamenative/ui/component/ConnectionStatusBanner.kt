@@ -52,6 +52,9 @@ import app.gamenative.ui.theme.isReduceMotionEnabled
 // shared with SteamUtils.awaitSteamLogin so banner UI and intent-launch await fall back to offline together.
 const val TIMEOUT_SHOW_OFFLINE_OPTION_SECONDS = 5
 
+internal fun shouldShowConnectionBanner(connectionState: ConnectionState): Boolean =
+    connectionState != ConnectionState.CONNECTED
+
 @Composable
 fun ConnectionStatusBanner(
     connectionState: ConnectionState,
@@ -62,8 +65,7 @@ fun ConnectionStatusBanner(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isVisible = connectionState == ConnectionState.CONNECTING ||
-                    connectionState == ConnectionState.DISCONNECTED
+    val isVisible = shouldShowConnectionBanner(connectionState)
 
     AnimatedVisibility(
         visible = isVisible,
@@ -106,6 +108,8 @@ fun ConnectionStatusBanner(
                             ConnectionState.DISCONNECTED -> {
                                 connectionMessage ?: stringResource(R.string.connection_disconnected)
                             }
+                            ConnectionState.OFFLINE_MODE -> stringResource(R.string.connection_offline_mode)
+                            ConnectionState.LOGGED_OUT -> stringResource(R.string.connection_auth_required)
                             else -> ""
                         },
                         style = MaterialTheme.typography.bodyMedium,
@@ -148,6 +152,26 @@ fun ConnectionStatusBanner(
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        ConnectionState.OFFLINE_MODE -> {
+                            TextButton(onClick = onRetry, modifier = Modifier.padding(start = 8.dp)) {
+                                Text(
+                                    text = stringResource(R.string.go_online),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                        ConnectionState.LOGGED_OUT -> {
+                            TextButton(onClick = onRetry, modifier = Modifier.padding(start = 8.dp)) {
+                                Text(
+                                    text = stringResource(R.string.steam_sign_in),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                             }
                         }
@@ -210,7 +234,10 @@ private fun ConnectionIcon(connectionState: ConnectionState) {
                 )
             }
         }
-        ConnectionState.DISCONNECTED -> {
+        ConnectionState.DISCONNECTED,
+        ConnectionState.OFFLINE_MODE,
+        ConnectionState.LOGGED_OUT,
+        -> {
             Box(
                 modifier = Modifier
                     .size(32.dp)

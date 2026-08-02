@@ -78,7 +78,7 @@ class NexusApiClientTest {
         val request = server.takeRequest()
         assertEquals("Bearer test-access-token", request.headers["Authorization"])
         assertEquals(null, request.headers["APIKEY"])
-        assertEquals("GameNative", request.headers["Application-Name"])
+            assertEquals("Gameplay", request.headers["Application-Name"])
     }
 
     @Test

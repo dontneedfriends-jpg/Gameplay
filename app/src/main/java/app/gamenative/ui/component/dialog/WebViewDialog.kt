@@ -37,7 +37,7 @@ fun WebViewDialog(
     onDismissRequest: () -> Unit,
 ) {
     if (isVisible) {
-        var topBarTitle by rememberSaveable { mutableStateOf("GameNative Web View") }
+        var topBarTitle by rememberSaveable { mutableStateOf("Gameplay Web View") }
         val startingUrl by rememberSaveable(url) { mutableStateOf(url) }
         var webView: WebView? = remember { null } // WebView class.
         val webViewState = rememberSaveable { Bundle() } // WebView state for lifecycle events.
@@ -122,7 +122,7 @@ private fun Preview_WebView() {
     PluviaTheme {
         WebViewDialog(
             isVisible = true,
-            url = "https://github.com/utkarshdalal/GameNative",
+            url = "https://github.com/dontneedfriends-jpg/Gameplay",
             onDismissRequest = {
                 println("WE CAN GO BACK!")
             },

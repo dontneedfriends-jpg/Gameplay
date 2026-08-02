@@ -421,7 +421,8 @@ class MainViewModel @Inject constructor(
      */
     fun retryConnection() {
         if (_state.value.connectionState == ConnectionState.OFFLINE_MODE ||
-            _state.value.connectionState == ConnectionState.DISCONNECTED
+            _state.value.connectionState == ConnectionState.DISCONNECTED ||
+            _state.value.connectionState == ConnectionState.LOGGED_OUT
         ) {
             startConnecting()
         }
