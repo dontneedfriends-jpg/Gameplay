@@ -44,6 +44,7 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -97,6 +98,11 @@ import app.gamenative.ui.internal.fakeAppInfo
 import app.gamenative.ui.model.LibraryViewModel
 import app.gamenative.service.SteamService
 import app.gamenative.ui.screen.library.components.LibraryCarouselPane
+import app.gamenative.ui.screen.library.components.LibraryCompactRowPane
+import app.gamenative.externaldisplay.DsHomePresentationHost
+import app.gamenative.externaldisplay.DsHomeSecondScreen
+import app.gamenative.ui.screen.library.components.DsHeroCard
+import app.gamenative.ui.screen.library.components.LibraryDsHomePane
 import app.gamenative.ui.screen.library.components.LibraryDetailPane
 import app.gamenative.ui.screen.library.components.LibraryListPane
 import app.gamenative.ui.screen.library.components.RecommendationDisclosureDialog
@@ -117,6 +123,7 @@ import app.gamenative.ui.util.PlatformLogoutCallbacks
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
+import app.gamenative.utils.rememberHasExternalDisplay
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.CustomGameScanner
 import app.gamenative.utils.PlatformOAuthHandlers
@@ -138,6 +145,7 @@ internal fun libraryFocusTarget(itemCount: Int): LibraryFocusTarget =
 @Composable
 fun HomeLibraryScreen(
     viewModel: LibraryViewModel = hiltViewModel(),
+    mainViewModel: app.gamenative.ui.model.MainViewModel = hiltViewModel(),
     onClickPlay: (String, Boolean) -> Unit,
     onTestGraphics: (String) -> Unit,
     onPlayWithDiagnostics: (String) -> Unit,
@@ -149,10 +157,13 @@ fun HomeLibraryScreen(
     isSteamConnected: Boolean = false,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val requestedLibraryAppId by mainViewModel.requestedLibraryAppId.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LibraryScreenContent(
         state = state,
+        requestedAppId = requestedLibraryAppId,
+        onRequestedAppIdHandled = { mainViewModel.setRequestedLibraryAppId(null) },
         listState = viewModel.listState,
         sheetState = sheetState,
         onFilterChanged = viewModel::onFilterChanged,
@@ -198,6 +209,8 @@ private fun isGameControllerConnected(): Boolean =
 @Composable
 private fun LibraryScreenContent(
     state: LibraryState,
+    requestedAppId: String? = null,
+    onRequestedAppIdHandled: () -> Unit = {},
     listState: LazyGridState,
     sheetState: SheetState,
     onFilterChanged: (AppFilter) -> Unit,
@@ -338,6 +351,15 @@ private fun LibraryScreenContent(
     }
 
     var selectedAppId by remember { mutableStateOf<String?>(null) }
+
+    // Pinned shortcut in "open game page" mode: select the requested game.
+    LaunchedEffect(requestedAppId) {
+        if (requestedAppId != null) {
+            selectedAppId = requestedAppId
+            onRequestedAppIdHandled()
+        }
+    }
+
     val carouselListState = rememberLazyListState()
     val isViewWide = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     var currentPaneType by remember { mutableStateOf(PrefManager.libraryLayout) }
@@ -1094,6 +1116,67 @@ private fun LibraryScreenContent(
                             focusTargetListIndex = currentCarouselFocusTargetIndex(),
                             onFocusedIndexChanged = { carouselFocusTargetListIndex = it },
                         )
+                    } else if (currentPaneType == PaneType.DS_HOME) {
+                        if (rememberHasExternalDisplay()) {
+                            // Dual-screen: hero stays on the main display, the
+                            // icon grid renders on the second display.
+                            val focusedItem = state.appInfoList.getOrNull(gridFocusTargetListIndex)
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                DsHeroCard(
+                                    item = focusedItem,
+                                    onClick = {
+                                        focusedItem?.let { item ->
+                                            selectedAppId = item.appId
+                                            selectedLibraryItem = item
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f),
+                                )
+                            }
+                            SideEffect {
+                                DsHomeSecondScreen.model = DsHomeSecondScreen.Model(
+                                    items = state.appInfoList,
+                                    onNavigate = { appId ->
+                                        selectedAppId = appId
+                                        selectedLibraryItem = state.appInfoList.find { it.appId == appId }
+                                    },
+                                    onFocused = { gridFocusTargetListIndex = it },
+                                )
+                            }
+                            DisposableEffect(Unit) {
+                                onDispose { DsHomeSecondScreen.model = null }
+                            }
+                        } else {
+                            LibraryDsHomePane(
+                                state = state,
+                                listState = listState,
+                                firstItemFocusRequester = gridFirstItemFocusRequester,
+                                focusTargetListIndex = gridFocusTargetListIndex,
+                                onFocusedIndexChanged = { gridFocusTargetListIndex = it },
+                                onPageChange = onPageChange,
+                                onNavigate = { appId ->
+                                    selectedAppId = appId
+                                    selectedLibraryItem = state.appInfoList.find { it.appId == appId }
+                                },
+                                onRefresh = onRefresh,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    } else if (currentPaneType == PaneType.INSTALLED_COMPACT) {
+                        LibraryCompactRowPane(
+                            state = state,
+                            isInstalledTab = state.currentTab == LibraryTab.INSTALLED,
+                            firstItemFocusRequester = gridFirstItemFocusRequester,
+                            focusTargetListIndex = gridFocusTargetListIndex,
+                            onFocusedIndexChanged = { gridFocusTargetListIndex = it },
+                            onNavigate = { appId ->
+                                selectedAppId = appId
+                                selectedLibraryItem = state.appInfoList.find { it.appId == appId }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     } else {
                         LibraryListPane(
                             state = state,
@@ -1269,6 +1352,8 @@ private fun LibraryScreenContent(
 
         // Options panel (SELECT) - renders on top of everything
         if (selectedAppId == null) {
+            DsHomePresentationHost()
+
             LibraryOptionsPanel(
                 isOpen = state.isOptionsPanelOpen,
                 onDismiss = { onOptionsPanelToggle(false) },
@@ -1377,6 +1462,25 @@ private fun LibraryScreenContent(
                             SnackbarManager.show(context.getString(R.string.quick_action_no_achievements))
                         } else {
                             quickAchievements = item to list
+                        }
+                    }
+                },
+                onAddToHome = { item ->
+                    isQuickActionsOpen = false
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        try {
+                            app.gamenative.utils.createPinnedShortcut(
+                                context = context,
+                                gameId = item.gameId,
+                                label = item.name,
+                                gameSource = item.gameSource,
+                                iconUrl = item.capsuleImageUrl.ifEmpty { item.iconHash },
+                            )
+                            SnackbarManager.show(context.getString(R.string.base_app_shortcut_created))
+                        } catch (e: Exception) {
+                            SnackbarManager.show(
+                                context.getString(R.string.base_app_shortcut_failed, e.message ?: ""),
+                            )
                         }
                     }
                 },

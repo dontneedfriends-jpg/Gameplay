@@ -498,6 +498,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private val _requestedLibraryAppId = MutableStateFlow<String?>(null)
+    val requestedLibraryAppId = _requestedLibraryAppId.asStateFlow()
+
+    /** Set when a pinned shortcut/external launch should open the game page instead of launching. */
+    fun setRequestedLibraryAppId(value: String?) {
+        _requestedLibraryAppId.value = value
+    }
+
     fun setBootToContainer(value: Boolean) {
         _state.update { it.copy(bootToContainer = value) }
     }
@@ -794,13 +802,37 @@ class MainViewModel @Inject constructor(
                 it.state == InstallationState.CANDIDATE_SELECTION && it.candidateExecutablePaths.isNotEmpty()
             }
             if (pendingSelection != null) {
-                _uiEvent.send(
-                    MainUiEvent.SelectInstallerExecutable(
-                        sessionId = pendingSelection.id,
-                        title = pendingSelection.title,
-                        candidates = pendingSelection.candidateExecutablePaths,
-                    ),
-                )
+                // A stale session whose container (or every candidate exe) is gone
+                // must not prompt on every launch: fail it once with a retry path.
+                val container = pendingSelection.appId
+                    ?.let { runCatching { ContainerUtils.getContainer(context, it) }.getOrNull() }
+                val driveC = container?.rootDir?.let { java.io.File(it, ".wine/drive_c") }
+                val anyCandidateExists = driveC != null && pendingSelection.candidateExecutablePaths.any { rel ->
+                    java.io.File(driveC, rel.replace('\\', '/').trimStart('/')).isFile
+                }
+                if (container == null || !anyCandidateExists) {
+                    val store = InstallationSessionStore(context)
+                    val failed = pendingSelection.transitionTo(
+                        InstallationState.FAILED,
+                        error = "Installed files are no longer available. Run the installer again to reinstall.",
+                    )
+                    store.save(failed)
+                    _uiEvent.send(
+                        MainUiEvent.InstallerCompletionFailed(
+                            title = failed.title,
+                            reason = requireNotNull(failed.lastError),
+                            sessionId = failed.id,
+                        ),
+                    )
+                } else {
+                    _uiEvent.send(
+                        MainUiEvent.SelectInstallerExecutable(
+                            sessionId = pendingSelection.id,
+                            title = pendingSelection.title,
+                            candidates = pendingSelection.candidateExecutablePaths,
+                        ),
+                    )
+                }
                 return@launch
             }
 

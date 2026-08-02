@@ -22,7 +22,7 @@ import app.gamenative.ui.theme.isReduceMotionEnabled
 @Composable
 fun GameSkeletonLoader(
     modifier: Modifier = Modifier,
-    paneType: PaneType = PaneType.LIST,
+    paneType: PaneType = PaneType.GRID_CAPSULE,
 ) {
     val alpha = if (isReduceMotionEnabled()) {
         0.2f
@@ -51,70 +51,12 @@ fun GameSkeletonLoader(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         ),
     ) {
-        val outerPadding = if (paneType == PaneType.LIST) {
-            16.dp
-        } else {
-            0.dp
-        }
-
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(outerPadding),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             when (paneType) {
-                PaneType.LIST -> {
-                    // List view: icon + text + button
-                    Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(skeletonColor)
-                    )
-                    
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Title
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.7f)
-                                .height(20.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(skeletonColor)
-                        )
-                        // Status line
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.5f)
-                                .height(16.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(skeletonColor)
-                        )
-                    }
-                    
-                    // Button skeleton
-                    Box(
-                        modifier = Modifier
-                            .width(80.dp)
-                            .height(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(skeletonColor)
-                    )
-                }
-                PaneType.GRID_CAPSULE -> {
-                    // Capsule view: vertical image (2:3 aspect ratio)
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(2f / 3f)
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(skeletonColor)
-                    )
-                }
                 PaneType.GRID_HERO -> {
                     // Hero view: horizontal image (460:215 aspect ratio)
                     Box(
@@ -126,11 +68,13 @@ fun GameSkeletonLoader(
                     )
                 }
                 else -> {
-                    // Default to list view
+                    // Capsule view: vertical image (2:3 aspect ratio).
+                    // Legacy PaneType.LIST migrates here as well.
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .aspectRatio(2f / 3f)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(3.dp))
                             .background(skeletonColor)
                     )
                 }
@@ -138,4 +82,3 @@ fun GameSkeletonLoader(
         }
     }
 }
-

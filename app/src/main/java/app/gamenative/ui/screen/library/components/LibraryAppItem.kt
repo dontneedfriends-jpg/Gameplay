@@ -55,18 +55,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 
 /**
- * Library app item that displays a game in either list or grid view.
+ * Library app item that displays a game as a grid card.
  *
  * This is the main entry point for displaying library items. It delegates to:
- * - [ListViewCard] for list view (PaneType.LIST)
  * - [GridViewCard] for grid views (PaneType.GRID_HERO, PaneType.GRID_CAPSULE)
+ *   (the old PaneType.LIST list view was removed and migrates to GRID_CAPSULE)
  */
 @Composable
 internal fun AppItem(
     modifier: Modifier = Modifier,
     appInfo: LibraryItem,
     onClick: () -> Unit,
-    paneType: PaneType = PaneType.LIST,
+    paneType: PaneType = PaneType.GRID_CAPSULE,
     onFocus: () -> Unit = {},
     isRefreshing: Boolean = false,
     imageRefreshCounter: Long = 0L,
@@ -86,18 +86,15 @@ internal fun AppItem(
     }
 
     LaunchedEffect(imageRefreshCounter) {
-        if (paneType != PaneType.LIST) {
-            hideText = true
-            alpha = 1f
-        }
+        hideText = true
+        alpha = 1f
     }
 
     var isFocused by remember { mutableStateOf(false) }
 
-    // More subtle scale for list view, slightly larger for grid views
+    // Slightly larger scale when the controller focuses the card
     val targetScale = when {
         !enableFocusScale || !isFocused -> 1f
-        paneType == PaneType.LIST -> 1.015f
         else -> 1.03f
     }
 
@@ -115,19 +112,6 @@ internal fun AppItem(
     }
 
     when (paneType) {
-        PaneType.LIST -> ListViewCard(
-            modifier = modifier,
-            appInfo = appInfo,
-            onClick = onClick,
-            onFocus = onFocus,
-            isFocused = isFocused,
-            onFocusChanged = { isFocused = it },
-            isRefreshing = isRefreshing,
-            compatibilityStatus = compatibilityStatus,
-            gameStats = gameStats,
-            context = context,
-        )
-
         else -> GridViewCard(
             modifier = modifier,
             appInfo = appInfo,

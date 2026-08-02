@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Info
@@ -33,6 +34,7 @@ fun LibraryQuickActionsPanel(
     onDetails: (LibraryItem) -> Unit,
     onContainerSettings: (LibraryItem) -> Unit,
     onAchievements: (LibraryItem) -> Unit,
+    onAddToHome: (LibraryItem) -> Unit = {},
     onLibraryOptions: () -> Unit,
     onSearch: () -> Unit,
     onAddGame: () -> Unit,
@@ -82,6 +84,13 @@ fun LibraryQuickActionsPanel(
                     icon = Icons.Default.EmojiEvents,
                     label = stringResource(R.string.achievements),
                     onClick = { onAchievements(item) },
+                )
+            }
+            if (!item.isRecommended) {
+                ConsoleMenuActionItem(
+                    icon = Icons.Default.AddToHomeScreen,
+                    label = stringResource(R.string.action_add_to_home),
+                    onClick = { onAddToHome(item) },
                 )
             }
         }

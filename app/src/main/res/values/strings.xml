@@ -102,6 +102,11 @@
     <string name="destination_downloads">Downloads &amp; Storage</string>
     <string name="downloads_section_title">Downloads</string>
     <string name="downloads_empty">No active downloads</string>
+    <string name="library_empty_installed">No installed games yet</string>
+    <string name="settings_shortcuts_group_title">Launcher shortcuts</string>
+    <string name="settings_shortcut_opens_page_title">Shortcuts open the game page</string>
+    <string name="settings_shortcut_opens_page_subtitle">Off: pinned home-screen shortcuts launch the game directly.</string>
+    <string name="action_add_to_home">Add to Home screen</string>
     <string name="downloads_overview_subtitle">Track active, paused, and resumable downloads</string>
     <string name="downloads_cancel_confirm">Cancel download and delete files for %1$s?</string>
 

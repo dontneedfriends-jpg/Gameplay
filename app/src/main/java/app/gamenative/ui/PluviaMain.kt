@@ -361,6 +361,14 @@ fun PluviaMain(
     // shared intent-launch path. resolves isOffline at the call site because intent launches can
     // arrive pre-login (cold-boot via stored creds) and downstream cloud-sync needs a settled answer.
     val launchIntentApp: (resolvedAppId: String, hasTemporaryOverride: Boolean) -> Unit = { resolvedAppId, hasTemporaryOverride ->
+        if (PrefManager.shortcutOpensGamePage) {
+            // Pinned launcher shortcut in "open game page" mode: land on the
+            // library with this game selected instead of booting the container.
+            viewModel.setRequestedLibraryAppId(resolvedAppId)
+            if (navController.currentDestination?.route?.startsWith(PluviaScreen.Home.route) != true) {
+                navController.navigate(PluviaScreen.Home.route + "?offline=false")
+            }
+        } else {
         val requestedGameId = runCatching { ContainerUtils.extractGameIdFromContainerId(resolvedAppId) }.getOrNull()
         if (SteamService.keepAlive && requestedGameId != null && ActiveGameRegistry.get()?.appId == requestedGameId) {
             Timber.i("[PluviaMain]: Game $resolvedAppId already running; bringing XServer screen forward")
@@ -399,6 +407,7 @@ fun PluviaMain(
                     isOffline = isOffline,
                 )
             }
+        }
         }
     }
 

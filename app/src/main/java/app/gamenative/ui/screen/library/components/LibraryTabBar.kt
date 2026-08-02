@@ -27,7 +27,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.PhotoAlbum
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.PhotoSizeSelectActual
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -63,6 +65,7 @@ import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.enums.LibraryTab
 import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.utils.rememberIsDualScreenDevice
 import app.gamenative.ui.util.WindowWidthClass
 import app.gamenative.ui.util.rememberWindowWidthClass
 
@@ -270,10 +273,11 @@ private fun CompactLibraryTabBar(
                 }
             }
 
+            val isDualScreenDevice = rememberIsDualScreenDevice()
             CompactIconButton(
                 icon = currentView.libraryViewIcon(),
                 contentDescription = stringResource(R.string.library_layout_title),
-                onClick = { onViewChanged(currentView.nextLibraryView()) },
+                onClick = { onViewChanged(currentView.nextLibraryView(isDualScreen = isDualScreenDevice)) },
             )
             CompactIconButton(
                 icon = Icons.Default.Search,
@@ -341,18 +345,20 @@ private fun CompactIconButton(
     }
 }
 
-private fun PaneType.nextLibraryView(): PaneType = when (this) {
-    PaneType.LIST -> PaneType.GRID_CAPSULE
-    PaneType.GRID_CAPSULE -> PaneType.GRID_HERO
-    PaneType.GRID_HERO -> PaneType.CAROUSEL
-    PaneType.CAROUSEL, PaneType.UNDECIDED -> PaneType.LIST
+private fun PaneType.nextLibraryView(isDualScreen: Boolean = false): PaneType = when (this) {
+    PaneType.LIST, PaneType.CAROUSEL, PaneType.UNDECIDED -> PaneType.GRID_CAPSULE
+    PaneType.GRID_CAPSULE -> PaneType.INSTALLED_COMPACT
+    PaneType.INSTALLED_COMPACT -> PaneType.GRID_HERO
+    PaneType.GRID_HERO -> if (isDualScreen) PaneType.DS_HOME else PaneType.CAROUSEL
+    PaneType.DS_HOME -> PaneType.CAROUSEL
 }
 
 private fun PaneType.libraryViewIcon(): ImageVector = when (this) {
-    PaneType.LIST, PaneType.UNDECIDED -> Icons.AutoMirrored.Filled.List
-    PaneType.GRID_CAPSULE -> Icons.Default.PhotoAlbum
+    PaneType.LIST, PaneType.UNDECIDED, PaneType.GRID_CAPSULE -> Icons.Default.PhotoAlbum
+    PaneType.INSTALLED_COMPACT -> Icons.Default.Apps
     PaneType.GRID_HERO -> Icons.Default.PhotoSizeSelectActual
     PaneType.CAROUSEL -> Icons.Default.ViewCarousel
+    PaneType.DS_HOME -> Icons.Default.Gamepad
 }
 
 /**
@@ -479,10 +485,11 @@ private fun ExpandedLibraryTabBar(
                 }
             }
 
+            val isDualScreenDevice = rememberIsDualScreenDevice()
             IconActionButton(
                 icon = currentView.libraryViewIcon(),
                 contentDescription = stringResource(R.string.library_layout_title),
-                onClick = { onViewChanged(currentView.nextLibraryView()) },
+                onClick = { onViewChanged(currentView.nextLibraryView(isDualScreen = isDualScreenDevice)) },
             )
 
             IconActionButton(

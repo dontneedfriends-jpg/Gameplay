@@ -736,7 +736,17 @@ object PrefManager {
     // External display input mode (off|touchpad|keyboard|hybrid)
     private val EXTERNAL_DISPLAY_INPUT_MODE = stringPreferencesKey("external_display_input_mode")
     var externalDisplayInputMode: String
-        get() = getPref(EXTERNAL_DISPLAY_INPUT_MODE, Container.DEFAULT_EXTERNAL_DISPLAY_MODE)
+        get() {
+            val value = getPref(EXTERNAL_DISPLAY_INPUT_MODE, Container.DEFAULT_EXTERNAL_DISPLAY_MODE)
+            // Dual-screen handhelds (AYN Thor) default the second screen to touchpad.
+            return if (value == Container.DEFAULT_EXTERNAL_DISPLAY_MODE &&
+                app.gamenative.utils.DualScreenDevice.isKnownDualScreenModel()
+            ) {
+                "touchpad"
+            } else {
+                value
+            }
+        }
         set(value) { setPref(EXTERNAL_DISPLAY_INPUT_MODE, value) }
 
     private val EXTERNAL_DISPLAY_SWAP = booleanPreferencesKey("external_display_swap")
@@ -861,11 +871,25 @@ object PrefManager {
     var libraryLayout: PaneType
         get() {
             val value = getPref(LIBRARY_LAYOUT, PaneType.UNDECIDED.ordinal)
-            return PaneType.entries.getOrNull(value) ?: PaneType.UNDECIDED
+            val paneType = PaneType.entries.getOrNull(value) ?: PaneType.UNDECIDED
+            // LIST mode was removed; fall back to the compact grid instead.
+            return if (paneType == PaneType.LIST) PaneType.GRID_CAPSULE else paneType
         }
         set(value) {
             setPref(LIBRARY_LAYOUT, value.ordinal)
         }
+
+    private val DS_HOME_ICON_SCALE = intPreferencesKey("ds_home_icon_scale")
+    /** 0 = small, 1 = medium (default), 2 = large. */
+    var dsHomeIconScale: Int
+        get() = getPref(DS_HOME_ICON_SCALE, 1).coerceIn(0, 2)
+        set(value) = setPref(DS_HOME_ICON_SCALE, value.coerceIn(0, 2))
+
+    private val SHORTCUT_OPENS_GAME_PAGE = booleanPreferencesKey("shortcut_opens_game_page")
+    /** false (default): pinned launcher shortcuts launch the game directly. true: open the game page. */
+    var shortcutOpensGamePage: Boolean
+        get() = getPref(SHORTCUT_OPENS_GAME_PAGE, false)
+        set(value) = setPref(SHORTCUT_OPENS_GAME_PAGE, value)
 
     private val LIBRARY_FILTER = intPreferencesKey("library_filter")
     var libraryFilter: EnumSet<AppFilter>

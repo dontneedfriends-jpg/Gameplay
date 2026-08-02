@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,6 +124,7 @@ internal fun LibraryListPane(
     onNavigate: (String) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.background,
 ) {
     val context = LocalContext.current
     val snackBarHost = remember { SnackbarHostState() }
@@ -163,6 +165,15 @@ internal fun LibraryListPane(
                 GridCells.Adaptive(minSize = minSize)
             }
 
+            PaneType.INSTALLED_COMPACT -> {
+                val minSize = when (windowWidthClass) {
+                    WindowWidthClass.COMPACT -> 96.dp
+                    WindowWidthClass.MEDIUM -> 104.dp
+                    WindowWidthClass.EXPANDED -> 120.dp
+                }
+                GridCells.Adaptive(minSize = minSize)
+            }
+
             else -> GridCells.Fixed(1)
         }
     }
@@ -192,6 +203,7 @@ internal fun LibraryListPane(
 
     Scaffold(
         modifier = modifier,
+        containerColor = containerColor,
         snackbarHost = { SnackbarHost(snackBarHost) },
     ) { paddingValues ->
         Box(
@@ -286,9 +298,6 @@ internal fun LibraryListPane(
                                         Modifier
                                     }
 
-                                    if (item.index > 0 && currentLayout == PaneType.LIST) {
-                                        HorizontalDivider()
-                                    }
                                     AppItem(
                                         modifier = appItemModifier,
                                         appInfo = item,
@@ -342,9 +351,6 @@ internal fun LibraryListPane(
                         ),
                     ) {
                         items(totalSkeletonCount) { index ->
-                            if (index > 0 && currentLayout == PaneType.LIST) {
-                                HorizontalDivider()
-                            }
                             GameSkeletonLoader(
                                 paneType = currentLayout,
                             )

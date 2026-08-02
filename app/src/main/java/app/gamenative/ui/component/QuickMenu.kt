@@ -48,6 +48,7 @@ import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Keyboard
@@ -90,13 +91,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
+import app.gamenative.data.GameSource
 import app.gamenative.R
 import app.gamenative.ui.data.PerformanceHudConfig
 import app.gamenative.ui.data.PerformanceHudSize
+import app.gamenative.ui.screen.xserver.InGameAchievements
+import app.gamenative.ui.screen.xserver.InGameAchievementsOverlay
 import app.gamenative.ui.screen.xserver.InGameContainerSettings
 import app.gamenative.ui.screen.xserver.InGameContainerSettingsOverlay
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.theme.motionSpec
+import app.gamenative.utils.ContainerUtils
 import app.gamenative.ui.util.adaptivePanelWidth
 import app.gamenative.utils.MathUtils.normalizedProgress
 import com.winlator.container.Container
@@ -368,6 +373,15 @@ fun QuickMenu(
     val bfgMenu = remember(container?.id) { container?.let { BfgMenuState.createIfAvailable(it) } }
     val inviteMenu = remember(container?.id) { SteamInviteState.createIfAvailable(container) }
     val containerSettings = remember(container?.id) { container?.let { InGameContainerSettings(it) } }
+    val inGameAchievements = remember(container?.id) {
+        container
+            ?.takeIf {
+                runCatching {
+                    ContainerUtils.extractGameSourceFromContainerId(it.id) == GameSource.STEAM
+                }.getOrDefault(false)
+            }
+            ?.let { InGameAchievements(it) }
+    }
 
     var selectedTab by rememberSaveable {
         mutableIntStateOf(
@@ -624,6 +638,23 @@ fun QuickMenu(
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)),
                             )
 
+                            if (inGameAchievements != null) {
+                                QuickMenuTabButton(
+                                    icon = Icons.Default.EmojiEvents,
+                                    contentDescriptionResId = R.string.achievements,
+                                    selected = false,
+                                    accentColor = PluviaTheme.colors.accentPurple,
+                                    onSelected = {
+                                        inGameAchievements.open()
+                                        onDismiss()
+                                    },
+                                    activateOnFocus = false,
+                                    modifier = Modifier.width(56.dp),
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
                             QuickMenuTabButton(
                                 icon = Icons.Default.Tune,
                                 contentDescriptionResId = R.string.quick_menu_container_settings,
@@ -840,6 +871,10 @@ fun QuickMenu(
                 }
             },
         )
+    }
+
+    if (inGameAchievements != null) {
+        InGameAchievementsOverlay(state = inGameAchievements)
     }
 
     LaunchedEffect(isVisible, selectedTab) {

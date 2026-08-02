@@ -688,6 +688,23 @@ fun SettingsGroupInterface(
         )
     }
 
+    if (section == InterfaceSettingsSection.LIBRARY) SettingsGroup(
+        modifier = Modifier.background(Color.Transparent),
+        title = { Text(text = stringResource(R.string.settings_shortcuts_group_title)) },
+    ) {
+        var shortcutOpensGamePage by rememberSaveable { mutableStateOf(PrefManager.shortcutOpensGamePage) }
+        SettingsSwitch(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_shortcut_opens_page_title)) },
+            subtitle = { Text(text = stringResource(R.string.settings_shortcut_opens_page_subtitle)) },
+            state = shortcutOpensGamePage,
+            onCheckedChange = {
+                shortcutOpensGamePage = it
+                PrefManager.shortcutOpensGamePage = it
+            },
+        )
+    }
+
     // Platform integrations now live in the System Menu. The detailed
     // integration tiles and logout flows have been removed from Settings
     // to avoid duplication.

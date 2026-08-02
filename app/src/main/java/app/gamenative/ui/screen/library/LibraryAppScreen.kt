@@ -53,9 +53,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -131,6 +133,7 @@ import app.gamenative.ui.screen.library.appscreen.GOGAppScreen
 import app.gamenative.ui.screen.library.appscreen.SteamAppScreen
 import app.gamenative.ui.screen.library.components.GameOptionsPanel
 import app.gamenative.ui.screen.library.components.GameSourceIcon
+import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.HltbService
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.theme.isReduceMotionEnabled
@@ -143,6 +146,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -893,6 +897,7 @@ internal fun AppScreenContent(
     val context = LocalContext.current
     // reactive — recomposes when network state changes
     val runtime = remember { AppScreenRuntimeState() }
+    val scope = rememberCoroutineScope()
     var achievementsVisible by rememberSaveable(displayInfo.appId) { mutableStateOf(false) }
     val network = rememberAppScreenNetworkState(downloadInfo)
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
@@ -1139,6 +1144,39 @@ internal fun AppScreenContent(
                             icon = Icons.Default.Settings,
                             contentDescription = stringResource(R.string.options),
                             onClick = { runtime.optionsMenuVisible = true },
+                        )
+
+                        if (!achievements.isNullOrEmpty()) {
+                            ActionIconButton(
+                                icon = Icons.Default.EmojiEvents,
+                                contentDescription = stringResource(R.string.achievements),
+                                onClick = { achievementsVisible = true },
+                            )
+                        }
+
+                        ActionIconButton(
+                            icon = Icons.Default.AddToHomeScreen,
+                            contentDescription = stringResource(R.string.action_add_to_home),
+                            onClick = {
+                                scope.launch(Dispatchers.IO) {
+                                    try {
+                                        app.gamenative.utils.createPinnedShortcut(
+                                            context = context,
+                                            gameId = displayInfo.gameId,
+                                            label = displayInfo.name,
+                                            gameSource = ContainerUtils.extractGameSourceFromContainerId(displayInfo.appId),
+                                            iconUrl = displayInfo.capsuleUrl ?: displayInfo.iconUrl,
+                                        )
+                                        app.gamenative.ui.util.SnackbarManager.show(
+                                            context.getString(R.string.base_app_shortcut_created),
+                                        )
+                                    } catch (e: Exception) {
+                                        app.gamenative.ui.util.SnackbarManager.show(
+                                            context.getString(R.string.base_app_shortcut_failed, e.message ?: ""),
+                                        )
+                                    }
+                                }
+                            },
                         )
 
                         if (isInstalled || hasPartialDownload || hasLeftoverInstall) {

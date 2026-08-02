@@ -96,8 +96,8 @@ internal fun GridViewCard(
     context: Context,
     animateStats: Boolean = true,
 ) {
-    val aspectRatio = if (paneType == PaneType.GRID_CAPSULE) 2f / 3f else 460f / 215f
-    val isCapsule = paneType == PaneType.GRID_CAPSULE
+    val aspectRatio = if (paneType == PaneType.GRID_CAPSULE || paneType == PaneType.INSTALLED_COMPACT) 2f / 3f else 460f / 215f
+    val isCapsule = (paneType == PaneType.GRID_CAPSULE || paneType == PaneType.INSTALLED_COMPACT)
     val topOverlayPadding = if (isCapsule) 8.dp else 4.dp
     val cardContentBottomPadding = if (isCapsule) 12.dp else 8.dp
     val topIconPadding = if (isCapsule) 10.dp else 8.dp
@@ -252,7 +252,7 @@ internal fun GridViewCard(
                                 fontWeight = FontWeight.SemiBold,
                             ),
                             color = Color.White,
-                            maxLines = if (paneType == PaneType.GRID_CAPSULE) 2 else 1,
+                            maxLines = if ((paneType == PaneType.GRID_CAPSULE || paneType == PaneType.INSTALLED_COMPACT)) 2 else 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
@@ -542,7 +542,7 @@ private fun getGridContentScale(paneType: PaneType): ContentScale {
         // Hero and capsule both show cover art that should fill the slot. Capsule art is
         // close to but not always exactly 2:3 (e.g. GOG covers are ~0.71), so cropping the
         // overflow looks better than letterboxing it against the blurred backdrop.
-        PaneType.GRID_HERO, PaneType.GRID_CAPSULE -> ContentScale.Crop
+        PaneType.GRID_HERO, PaneType.GRID_CAPSULE, PaneType.INSTALLED_COMPACT -> ContentScale.Crop
         else -> ContentScale.Fit
     }
 }
@@ -578,7 +578,7 @@ internal fun getGridImageUrl(
     // Custom media (user-picked artwork) takes priority over every other source.
     val customMediaUri = if (appInfo.gameId != 0) {
         when (paneType) {
-            PaneType.GRID_CAPSULE -> CustomMediaUtils.getCustomCapsuleUri(appInfo.gameId)
+            PaneType.GRID_CAPSULE, PaneType.INSTALLED_COMPACT -> CustomMediaUtils.getCustomCapsuleUri(appInfo.gameId)
             PaneType.GRID_HERO -> CustomMediaUtils.getCustomHeroUri(appInfo.gameId)
             else -> CustomMediaUtils.getCustomHeaderUri(appInfo.gameId)
         }
@@ -589,7 +589,7 @@ internal fun getGridImageUrl(
     val baseUrls = when (appInfo.gameSource) {
         GameSource.CUSTOM_GAME -> {
             val primary = when (paneType) {
-                PaneType.GRID_CAPSULE ->
+                PaneType.GRID_CAPSULE, PaneType.INSTALLED_COMPACT ->
                     // Capsule (vertical): user "coverv"/"cover" wins over SteamGridDB capsule.
                     CustomGameScanner.findCapsuleCoverForCustomGame(appInfo.appId)
                         ?: findSteamGridDBImage("grid_capsule")
@@ -624,13 +624,13 @@ internal fun getGridImageUrl(
 
         GameSource.GOG, GameSource.EPIC, GameSource.AMAZON -> {
             val primary = when (paneType) {
-                PaneType.GRID_CAPSULE -> appInfo.capsuleImageUrl.ifEmpty { appInfo.iconHash }
+                PaneType.GRID_CAPSULE, PaneType.INSTALLED_COMPACT -> appInfo.capsuleImageUrl.ifEmpty { appInfo.iconHash }
                 else -> appInfo.headerImageUrl.ifEmpty {
                     appInfo.heroImageUrl.ifEmpty { appInfo.iconHash }
                 }
             }
             val fallback = when {
-                paneType == PaneType.GRID_CAPSULE ->
+                paneType == PaneType.GRID_CAPSULE || paneType == PaneType.INSTALLED_COMPACT ->
                     appInfo.iconHash.takeIf { it.isNotEmpty() && it != primary } ?: ""
                 appInfo.heroImageUrl.isNotEmpty() && appInfo.heroImageUrl != primary ->
                     appInfo.heroImageUrl
@@ -642,7 +642,7 @@ internal fun getGridImageUrl(
         }
 
         GameSource.STEAM -> when (paneType) {
-            PaneType.GRID_CAPSULE ->
+            PaneType.GRID_CAPSULE, PaneType.INSTALLED_COMPACT ->
                 GridImageUrls(primary = appInfo.capsuleImageUrl)
             else ->
                 GridImageUrls(
