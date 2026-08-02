@@ -4,7 +4,6 @@ import android.content.Context
 import app.gamenative.utils.ContainerUtils
 import com.winlator.container.Container
 import java.io.File
-import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -206,7 +205,12 @@ object LocalInstallerCompletionCoordinator {
         val driveC = File(container.rootDir, ".wine/drive_c").canonicalFile
         val executable = File(driveC, normalized).canonicalFile
         if (!executable.isFile || !executable.path.startsWith(driveC.path + File.separator)) {
-            throw IOException("Selected executable is missing or outside drive C:")
+            val failed = session.transitionTo(
+                InstallationState.FAILED,
+                error = "Selected executable is missing or outside drive C: $normalized",
+            )
+            store.save(failed)
+            return Result.Failed(failed, requireNotNull(failed.lastError))
         }
 
         container.executablePath = normalized

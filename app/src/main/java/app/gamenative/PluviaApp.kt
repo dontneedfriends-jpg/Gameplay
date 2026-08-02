@@ -17,17 +17,12 @@ import app.gamenative.sync.FrontendSyncManager
 import app.gamenative.ui.screen.xserver.RadialMenuCoordinator
 import app.gamenative.utils.ContainerMigrator
 import app.gamenative.utils.IntentLaunchManager
-import app.gamenative.utils.PlayIntegrity
 import app.gamenative.utils.downloader.ContainerFilesDownloader
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.runBlocking
 import com.google.android.play.core.splitcompat.SplitCompatApplication
-import com.posthog.PersonProfiles
 
-// Add PostHog imports
-import com.posthog.android.PostHogAndroid
-import com.posthog.android.PostHogAndroidConfig
 import com.winlator.container.Container
 import com.winlator.inputcontrols.InputControlsManager
 import com.winlator.widget.InputControlsView
@@ -108,29 +103,6 @@ class PluviaApp : SplitCompatApplication() {
         } catch (e: Exception) {
             Timber.e(e, "[PluviaApp]: Failed to clear temporary config overrides")
         }
-
-        // Initialize PostHog Analytics
-        val postHogConfig = PostHogAndroidConfig(
-            apiKey = BuildConfig.POSTHOG_API_KEY,
-            host = BuildConfig.POSTHOG_HOST,
-        ).apply {
-            /* turn every event into an identified one */
-            personProfiles = PersonProfiles.ALWAYS
-        }
-        PostHogAndroid.setup(this, postHogConfig)
-        com.posthog.PostHog.register("build_flavor", BuildConfig.FLAVOR)
-
-        if (PrefManager.usageAnalyticsEnabled) {
-            com.posthog.PostHog.capture(
-                event = "\$set",
-                properties = mapOf(
-                    "\$set" to mapOf("recommendation_enabled" to PrefManager.showRecommendations),
-                ),
-            )
-        }
-
-        PlayIntegrity.warmUp(this)
-
     }
 
     /**

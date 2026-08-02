@@ -43,7 +43,7 @@ import app.gamenative.ui.component.ConsoleIconButton
 import app.gamenative.ui.component.SettingsSearchToggle
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
+import app.gamenative.ui.component.Slider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable

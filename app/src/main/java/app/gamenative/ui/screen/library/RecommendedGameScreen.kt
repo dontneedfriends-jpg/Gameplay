@@ -24,11 +24,11 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
+import app.gamenative.ui.component.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import app.gamenative.ui.component.IconButton
 import androidx.compose.material3.MaterialTheme
 import app.gamenative.ui.component.OutlinedButton
 import androidx.compose.material3.Text
@@ -53,7 +53,7 @@ import app.gamenative.R
 import app.gamenative.data.RecommendedGame
 import app.gamenative.ui.screen.library.components.VideoHero
 import app.gamenative.PrefManager
-import com.posthog.PostHog
+import app.gamenative.utils.PostHog
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
 

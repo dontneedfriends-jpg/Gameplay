@@ -66,7 +66,7 @@ import app.gamenative.events.AndroidEvent
 import app.gamenative.service.ActiveGameRegistry
 import app.gamenative.service.SteamService
 import app.gamenative.service.amazon.AmazonService
-import com.posthog.PostHog
+import app.gamenative.utils.PostHog
 import app.gamenative.ui.component.AchievementOverlay
 import app.gamenative.ui.component.ConnectionStatusBanner
 import app.gamenative.ui.component.GameInviteOverlay
@@ -277,7 +277,6 @@ private fun trackGameLaunched(appId: String) {
             "game_name" to gameName,
             "game_store" to gameSource.name,
             "key_attestation_available" to PrefManager.keyAttestationAvailable,
-            "play_integrity_available" to PrefManager.playIntegrityAvailable,
         ),
     )
 }

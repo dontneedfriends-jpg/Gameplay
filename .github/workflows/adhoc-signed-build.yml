@@ -70,13 +70,13 @@ jobs:
         EOF
 
     - name: Inject credentials
+      env:
+        STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
       run: |
-        cat <<EOF > local.properties
-        POSTHOG_API_KEY=${{ secrets.POSTHOG_API_KEY }}
-        POSTHOG_HOST=${{ secrets.POSTHOG_HOST }}
-        STEAMGRIDDB_API_KEY=${{ secrets.STEAMGRIDDB_API_KEY }}
-        CLOUD_PROJECT_NUMBER=${{ secrets.CLOUD_PROJECT_NUMBER }}
-        EOF
+        # Empty values must not land in local.properties: the secrets-gradle
+        # plugin injects them into BuildConfig unquoted, breaking compilation.
+        : > local.properties
+        [ -n "$STEAMGRIDDB_API_KEY" ] && echo "STEAMGRIDDB_API_KEY=$STEAMGRIDDB_API_KEY" >> local.properties
 
     - name: Install Android SDK Build Tools
       run: |

@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
+import app.gamenative.ui.component.ConsoleIconButton
 import app.gamenative.ui.component.GamepadAction
 import app.gamenative.ui.component.GamepadActionBar
 import app.gamenative.ui.component.GamepadButton
@@ -235,21 +236,16 @@ private fun AchievementHeader(
     total: Int,
     onBack: () -> Unit,
 ) {
-    val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .focusRing(interactionSource, RoundedCornerShape(8.dp), width = 2.dp)
-                .selectable(false, interactionSource, null, onClick = onBack),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
-        }
+        ConsoleIconButton(
+            onClick = onBack,
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = stringResource(R.string.back),
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = stringResource(R.string.achievements),
@@ -278,7 +274,6 @@ private fun AchievementFilters(
     filter: AchievementFilter,
     onFilter: (AchievementFilter) -> Unit,
 ) {
-    val firstFocus = remember { FocusRequester() }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp).focusGroup(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -292,7 +287,6 @@ private fun AchievementFilters(
             }
             Box(
                 modifier = Modifier
-                    .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier)
                     .clip(RoundedCornerShape(8.dp))
                     .background(
                         if (filter == item) MaterialTheme.colorScheme.primaryContainer
@@ -306,7 +300,6 @@ private fun AchievementFilters(
             }
         }
     }
-    LaunchedEffect(Unit) { firstFocus.requestFocus() }
 }
 
 @Composable
@@ -319,6 +312,20 @@ private fun AchievementList(
     modifier: Modifier = Modifier,
     showDescriptions: Boolean = false,
 ) {
+    val firstRowFocus = remember { FocusRequester() }
+    LaunchedEffect(achievements.isNotEmpty()) {
+        if (achievements.isNotEmpty()) {
+            repeat(3) {
+                try {
+                    firstRowFocus.requestFocus()
+                    return@LaunchedEffect
+                } catch (_: Exception) {
+                    kotlinx.coroutines.delay(80)
+                }
+            }
+        }
+    }
+
     LazyColumn(
         modifier = modifier.padding(horizontal = 22.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -329,6 +336,7 @@ private fun AchievementList(
                 selected = achievement == selected,
                 showDescription = showDescriptions,
                 onClick = { onSelected(achievement) },
+                focusRequester = if (achievement == achievements.first()) firstRowFocus else null,
             )
         }
         if (hiddenCount > 0) {
@@ -346,11 +354,19 @@ private fun AchievementListRow(
     selected: Boolean,
     showDescription: Boolean,
     onClick: () -> Unit,
+    focusRequester: FocusRequester? = null,
 ) {
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                },
+            )
             .clip(RoundedCornerShape(9.dp))
             .background(
                 if (selected) MaterialTheme.colorScheme.surfaceContainerHigh

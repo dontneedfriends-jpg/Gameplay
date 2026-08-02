@@ -133,7 +133,7 @@ import app.gamenative.utils.SteamUtils
 import app.gamenative.utils.downloader.WinComponentDownloader
 import app.gamenative.utils.WineProcessSnapshotHelper
 import app.gamenative.utils.WfmInstaller
-import com.posthog.PostHog
+import app.gamenative.utils.PostHog
 import com.winlator.alsaserver.ALSAClient
 import com.winlator.container.Container
 import com.winlator.container.ContainerData

@@ -1405,11 +1405,6 @@ object PrefManager {
         get() = getPref(KEY_ATTESTATION_AVAILABLE, false)
         set(value) = setPref(KEY_ATTESTATION_AVAILABLE, value)
 
-    private val PLAY_INTEGRITY_AVAILABLE = booleanPreferencesKey("play_integrity_available")
-    var playIntegrityAvailable: Boolean
-        get() = getPref(PLAY_INTEGRITY_AVAILABLE, false)
-        set(value) = setPref(PLAY_INTEGRITY_AVAILABLE, value)
-
     private val GOG_AMAZON_PATH_MIGRATED = booleanPreferencesKey("gog_amazon_path_migrated")
     var gogAmazonPathMigrated: Boolean
         get() = getPref(GOG_AMAZON_PATH_MIGRATED, false)

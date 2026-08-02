@@ -32,7 +32,7 @@ import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.model.GogRecommendationsViewModel
 import app.gamenative.ui.screen.library.components.LibraryCarouselPane
 import app.gamenative.ui.screen.library.components.LibraryListPane
-import com.posthog.PostHog
+import app.gamenative.utils.PostHog
 import java.util.EnumSet
 
 @Composable

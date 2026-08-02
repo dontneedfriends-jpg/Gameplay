@@ -60,7 +60,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import app.gamenative.ui.component.dialog.AlertDialog
-import androidx.compose.material3.Button
+import app.gamenative.ui.component.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -81,6 +81,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -133,6 +134,7 @@ import app.gamenative.ui.screen.library.components.GameSourceIcon
 import app.gamenative.utils.HltbService
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.theme.isReduceMotionEnabled
+import app.gamenative.ui.util.shouldShowGamepadUI
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
 import com.winlator.container.ContainerData
@@ -807,36 +809,39 @@ private fun BoxScope.GameHeroBackdrop(
         } else {
             GameHeroFallback()
         }
+        // Gradients live inside the parallax layer so the shading stays glued
+        // to the image while it drifts (previously they were pinned and the
+        // shadow appeared to slide off the picture on scroll).
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.3f),
+                            Color.Black.copy(alpha = 0.85f),
+                        ),
+                        endY = Float.POSITIVE_INFINITY,
+                    ),
+                ),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.5f),
+                            Color.Black.copy(alpha = 0.15f),
+                            Color.Transparent,
+                        ),
+                        endY = Float.POSITIVE_INFINITY,
+                    ),
+                ),
+        )
     }
-    Box(
-        modifier = Modifier
-            .matchParentSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.3f),
-                        Color.Black.copy(alpha = 0.85f),
-                    ),
-                    endY = Float.POSITIVE_INFINITY,
-                ),
-            ),
-    )
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = 0.5f),
-                        Color.Black.copy(alpha = 0.15f),
-                        Color.Transparent,
-                    ),
-                    endY = Float.POSITIVE_INFINITY,
-                ),
-            ),
-    )
 }
 
 @Composable
@@ -933,41 +938,48 @@ internal fun AppScreenContent(
                 }
             }
             .onKeyEvent {
-                if (achievementsVisible) return@onKeyEvent true
-                if (it.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
-                    runtime.ambientInteractionCounter++
-                }
-                runtime.handleKeyEvent(
-                    event = it.nativeKeyEvent,
-                    startActionEnabled = runtime.startActionEnabled(
-                        isInstalled,
-                        isValidToDownload,
-                        isDownloading,
-                        hasPartialDownload,
-                        network,
-                    ),
-                    onStartAction = {
-                        runtime.performStartAction(
+                if (achievementsVisible) {
+                    false
+                } else {
+                    if (it.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
+                        runtime.ambientInteractionCounter++
+                    }
+                    runtime.handleKeyEvent(
+                        event = it.nativeKeyEvent,
+                        startActionEnabled = runtime.startActionEnabled(
+                            isInstalled,
+                            isValidToDownload,
                             isDownloading,
                             hasPartialDownload,
-                            onPauseResumeClick,
-                            onDownloadInstallClick,
-                        )
-                    },
-                    onBack = onBack,
-                )
+                            network,
+                        ),
+                        onStartAction = {
+                            runtime.performStartAction(
+                                isDownloading,
+                                hasPartialDownload,
+                                onPauseResumeClick,
+                                onDownloadInstallClick,
+                            )
+                        },
+                        onBack = onBack,
+                    )
+                }
             },
         ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // Room for the gamepad action bar overlaying the bottom edge,
+                // so it never covers the last content row (achievements etc.).
+                .padding(bottom = if (shouldShowGamepadUI()) 56.dp else 0.dp)
                 .verticalScroll(runtime.scrollState),
         ) {
             // Hero Section (Parallax)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = if (isPortrait) 390.dp else 440.dp),
+                    .heightIn(min = if (isPortrait) 390.dp else 440.dp)
+                    .clipToBounds(),
             ) {
                 GameHeroBackdrop(
                     displayInfo = displayInfo,
@@ -1395,10 +1407,19 @@ internal fun AppScreenContent(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         otherSources.forEach { source ->
+                            val chipInteractionSource = remember { MutableInteractionSource() }
+                            val chipFocused by chipInteractionSource.collectIsFocusedAsState()
+                            val chipShape = RoundedCornerShape(8.dp)
                             Surface(
                                 onClick = { onSourceClick(source) },
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = chipShape,
+                                color = if (chipFocused) {
+                                    MaterialTheme.colorScheme.surfaceContainerHighest
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                },
+                                modifier = Modifier.focusRing(chipInteractionSource, chipShape, width = 2.dp),
+                                interactionSource = chipInteractionSource,
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),

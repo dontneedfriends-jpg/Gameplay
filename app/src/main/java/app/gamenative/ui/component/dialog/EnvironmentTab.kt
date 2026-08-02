@@ -11,7 +11,7 @@ import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material3.DropdownMenu
 import app.gamenative.ui.component.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import app.gamenative.ui.component.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
