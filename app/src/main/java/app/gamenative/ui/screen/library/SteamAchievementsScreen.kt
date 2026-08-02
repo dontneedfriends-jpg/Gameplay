@@ -47,6 +47,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -137,6 +142,7 @@ internal fun SteamAchievementsPage(
     gameName: String,
     achievements: List<Achievement>,
     onBack: () -> Unit,
+    rarity: Map<String, Float> = emptyMap(),
 ) {
     var filter by rememberSaveable { mutableStateOf(AchievementFilter.ALL) }
     var revealSecrets by rememberSaveable { mutableStateOf(false) }
@@ -163,7 +169,18 @@ internal fun SteamAchievementsPage(
     BackHandler(onBack = onBack)
 
     Surface(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.ButtonB || event.key == Key.Escape)
+                ) {
+                    onBack()
+                    true
+                } else {
+                    false
+                }
+            },
         color = MaterialTheme.colorScheme.background,
     ) {
         Box(
@@ -191,6 +208,7 @@ internal fun SteamAchievementsPage(
                                 onRevealSecrets = { revealSecrets = true },
                                 selected = selectedAchievement,
                                 onSelected = { selectedAchievement = it },
+                                rarity = rarity,
                                 modifier = Modifier.weight(0.58f).fillMaxHeight(),
                             )
                             Box(
@@ -201,6 +219,7 @@ internal fun SteamAchievementsPage(
                             )
                             AchievementDetails(
                                 achievement = selectedAchievement,
+                                rarity = selectedAchievement?.name?.let { rarity[it] },
                                 modifier = Modifier.weight(0.42f).fillMaxHeight(),
                             )
                         }
@@ -211,6 +230,7 @@ internal fun SteamAchievementsPage(
                             onRevealSecrets = { revealSecrets = true },
                             selected = selectedAchievement,
                             onSelected = { selectedAchievement = it },
+                            rarity = rarity,
                             showDescriptions = true,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -310,6 +330,7 @@ private fun AchievementList(
     selected: Achievement?,
     onSelected: (Achievement) -> Unit,
     modifier: Modifier = Modifier,
+    rarity: Map<String, Float> = emptyMap(),
     showDescriptions: Boolean = false,
 ) {
     val firstRowFocus = remember { FocusRequester() }
@@ -336,6 +357,7 @@ private fun AchievementList(
                 selected = achievement == selected,
                 showDescription = showDescriptions,
                 onClick = { onSelected(achievement) },
+                rarityPercent = achievement.name?.let { rarity[it] },
                 focusRequester = if (achievement == achievements.first()) firstRowFocus else null,
             )
         }
@@ -354,6 +376,7 @@ private fun AchievementListRow(
     selected: Boolean,
     showDescription: Boolean,
     onClick: () -> Unit,
+    rarityPercent: Float? = null,
     focusRequester: FocusRequester? = null,
 ) {
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -400,18 +423,28 @@ private fun AchievementListRow(
                 AchievementProgress(achievement, compact = true)
             }
         }
-        Icon(
-            imageVector = if (achievement.isUnlocked) Icons.Default.EmojiEvents else Icons.Default.Lock,
-            contentDescription = null,
-            tint = if (achievement.isUnlocked) PluviaTheme.colors.statusInstalled else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = if (achievement.isUnlocked) Icons.Default.EmojiEvents else Icons.Default.Lock,
+                contentDescription = null,
+                tint = if (achievement.isUnlocked) PluviaTheme.colors.statusInstalled else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            if (rarityPercent != null) {
+                Text(
+                    text = stringResource(R.string.achievements_rarity_short, rarityPercent),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun AchievementDetails(
     achievement: Achievement?,
+    rarity: Float? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -452,6 +485,14 @@ private fun AchievementDetails(
             style = MaterialTheme.typography.labelLarge,
             color = if (achievement.isUnlocked) PluviaTheme.colors.statusInstalled else MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (rarity != null) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.achievements_unlocked_by_percent, rarity),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

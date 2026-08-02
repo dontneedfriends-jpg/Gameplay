@@ -51,11 +51,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
+import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
 import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.data.LibraryState
 import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.theme.motionSpec
+import app.gamenative.utils.SteamGridDBIconProvider
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
 import kotlinx.coroutines.Dispatchers
@@ -271,15 +273,20 @@ private fun DsGameCell(
         label = "dsCellScale",
     )
 
-    val imageUrls by produceState(
-        initialValue = GridImageUrls("", ""),
+    val imageUrl by produceState(
+        initialValue = "",
         key1 = item.appId,
     ) {
         value = withContext(Dispatchers.IO) {
-            getGridImageUrl(context, item, PaneType.GRID_CAPSULE)
+            val sgdbIcon = if (item.gameSource == GameSource.STEAM) {
+                SteamGridDBIconProvider.iconForSteamApp(item.gameId)
+            } else {
+                null
+            }
+            sgdbIcon ?: getGridImageUrl(context, item, PaneType.GRID_CAPSULE)
+                .let { it.primary.ifEmpty { it.fallback } }
         }
     }
-    val imageUrl = imageUrls.primary.ifEmpty { imageUrls.fallback }
 
     Box(
         modifier = Modifier

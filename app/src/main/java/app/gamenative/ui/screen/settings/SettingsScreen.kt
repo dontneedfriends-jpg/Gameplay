@@ -53,6 +53,8 @@ import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.enums.AppTheme
 import app.gamenative.ui.component.ConsoleCategoryRail
+import app.gamenative.ui.component.GamepadHint
+import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.ConsoleIconButton
 import app.gamenative.ui.component.ConsoleListRow
 import app.gamenative.ui.component.SettingsSearchToggle
@@ -206,6 +208,11 @@ private fun SettingsScreenContent(
                     label = { stringResource(it.titleRes) },
                     onSelected = { selectedCategory = it },
                     footer = stringResource(R.string.container_config_console_controls_hint),
+                    footerHints = listOf(
+                        GamepadHint(listOf(GamepadButton.LB, GamepadButton.RB), R.string.hint_categories),
+                        GamepadHint(GamepadButton.A, R.string.action_select),
+                        GamepadHint(GamepadButton.B, R.string.back),
+                    ),
                     requestInitialFocus = true,
                     modifier = Modifier.width(categoryRailWidth),
                 )

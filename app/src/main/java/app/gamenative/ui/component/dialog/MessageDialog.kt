@@ -30,6 +30,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
 import app.gamenative.ui.component.ConsoleDialogButton
+import app.gamenative.ui.component.GamepadHint
+import app.gamenative.ui.component.GamepadHintRow
+import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.util.shouldShowGamepadUI
 
@@ -91,10 +94,11 @@ fun MessageDialog(
                         }
                         if (shouldShowGamepadUI()) {
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = stringResource(R.string.console_hint_select_back),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            GamepadHintRow(
+                                hints = listOf(
+                                    GamepadHint(GamepadButton.A, R.string.action_select),
+                                    GamepadHint(GamepadButton.B, R.string.back),
+                                ),
                             )
                         }
                     }

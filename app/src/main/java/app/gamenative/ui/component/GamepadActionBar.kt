@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -88,6 +89,65 @@ data class GamepadAction(
     @get:StringRes val labelResId: Int,
     val onClick: (() -> Unit)? = null,
 )
+
+/** A hint made of one or more button glyphs (e.g. "LB/RB") plus a label. */
+data class GamepadHint(
+    val buttons: List<GamepadButton>,
+    @get:StringRes val labelResId: Int,
+) {
+    constructor(button: GamepadButton, labelResId: Int) : this(listOf(button), labelResId)
+}
+
+/**
+ * Inline hint row (glyphs + labels) for rails and dialogs. Full-width bottom
+ * strips use [GamepadActionBar]; this is the same vocabulary in compact form.
+ */
+@Composable
+fun GamepadHintRow(
+    hints: List<GamepadHint>,
+    modifier: Modifier = Modifier,
+) {
+    val swapFaceButtons = PrefManager.swapFaceButtons
+    val controllerFamily = rememberControllerFamily()
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        hints.forEach { hint ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                hint.buttons.forEach { button ->
+                    val effectiveButton = if (swapFaceButtons) {
+                        when (button) {
+                            GamepadButton.A -> GamepadButton.B
+                            GamepadButton.B -> GamepadButton.A
+                            GamepadButton.X -> GamepadButton.Y
+                            GamepadButton.Y -> GamepadButton.X
+                            else -> button
+                        }
+                    } else {
+                        button
+                    }
+                    Image(
+                        painter = painterResource(effectiveButton.iconFor(controllerFamily)),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Text(
+                    text = stringResource(hint.labelResId),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun GamepadButtonHint(
@@ -162,7 +222,15 @@ fun GamepadActionBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusProperties { canFocus = false }
-                .background(MaterialTheme.colorScheme.surfaceContainer),
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.background.copy(alpha = 0f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                        ),
+                    ),
+                ),
         ) {
             Row(
                 modifier = Modifier

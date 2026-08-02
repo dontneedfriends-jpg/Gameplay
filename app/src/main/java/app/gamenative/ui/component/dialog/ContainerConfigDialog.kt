@@ -91,6 +91,8 @@ import app.gamenative.ui.components.rememberCustomGameFolderPicker
 import app.gamenative.ui.components.requestPermissionsForPath
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.component.ConsoleCategoryRail
+import app.gamenative.ui.component.GamepadHint
+import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.theme.settingsTileColors
 import app.gamenative.ui.theme.settingsTileColorsAlt
 import app.gamenative.utils.CustomGameScanner
@@ -1400,6 +1402,11 @@ fun ContainerConfigDialog(
                             label = { tabs[it] },
                             onSelected = { selectedTab = it },
                             footer = stringResource(R.string.container_config_console_controls_hint),
+                    footerHints = listOf(
+                        GamepadHint(listOf(GamepadButton.LB, GamepadButton.RB), R.string.hint_categories),
+                        GamepadHint(GamepadButton.A, R.string.action_select),
+                        GamepadHint(GamepadButton.B, R.string.back),
+                    ),
                             requestInitialFocus = true,
                             modifier = Modifier
                                 .width(categoryRailWidth)

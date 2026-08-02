@@ -32,6 +32,9 @@ import app.gamenative.data.ShooterModeConfig
 import app.gamenative.data.SteamApp
 import app.gamenative.data.TouchGestureConfig
 import app.gamenative.ui.component.ConsoleDialogButton
+import app.gamenative.ui.component.GamepadHint
+import app.gamenative.ui.component.GamepadHintRow
+import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.dialog.ContainerConfigDialog
 import app.gamenative.utils.ContainerConfigRuntime
 import app.gamenative.utils.ContainerUtils
@@ -291,10 +294,11 @@ private fun RestartRequiredDialog(
                         isPrimary = true,
                     )
                 }
-                Text(
-                    text = stringResource(R.string.console_hint_select_back),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                GamepadHintRow(
+                    hints = listOf(
+                        GamepadHint(GamepadButton.A, R.string.action_select),
+                        GamepadHint(GamepadButton.B, R.string.back),
+                    ),
                 )
             }
         }

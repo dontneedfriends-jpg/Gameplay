@@ -32,7 +32,7 @@ import com.skydoves.landscapist.coil.CoilImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val DYNAMIC_BACKDROP_BLUR_RADIUS = 7.dp
+private val DYNAMIC_BACKDROP_BLUR_RADIUS = 3.dp
 
 @Composable
 internal fun LibraryDynamicBackdrop(

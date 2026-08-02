@@ -11,6 +11,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import app.gamenative.PluviaApp
 import app.gamenative.service.SteamService
 import app.gamenative.ui.data.Achievement
@@ -34,6 +39,8 @@ class InGameAchievements(
     var visible by mutableStateOf(false)
         private set
     var achievements by mutableStateOf<List<Achievement>?>(null)
+        private set
+    var rarity by mutableStateOf<Map<String, Float>>(emptyMap())
         private set
     var loading by mutableStateOf(false)
         private set
@@ -60,6 +67,10 @@ class InGameAchievements(
                         .onFailure { error -> Timber.e(error, "Failed to fetch achievements in game") }
                         .getOrNull()
                 }
+                val rarityMap = gameId?.let {
+                    runCatching { app.gamenative.utils.SteamAchievementRarity.fetch(it) }.getOrNull()
+                }
+                rarity = rarityMap.orEmpty()
                 achievements = list ?: emptyList()
                 loading = false
             }
@@ -89,7 +100,18 @@ fun InGameAchievementsOverlay(
     val currentAchievements = state.achievements
     if (currentAchievements == null) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown &&
+                        (event.key == Key.ButtonB || event.key == Key.Escape)
+                    ) {
+                        state.close()
+                        true
+                    } else {
+                        false
+                    }
+                },
             color = MaterialTheme.colorScheme.background,
         ) {
             Box(
@@ -104,6 +126,7 @@ fun InGameAchievementsOverlay(
             gameName = state.gameName,
             achievements = currentAchievements,
             onBack = state::close,
+            rarity = state.rarity,
         )
     }
 }

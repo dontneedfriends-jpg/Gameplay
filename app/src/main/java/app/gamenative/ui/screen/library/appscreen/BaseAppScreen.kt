@@ -1232,6 +1232,9 @@ abstract class BaseAppScreen {
         var achievementsState by remember(libraryItem.appId) {
             mutableStateOf<List<Achievement>?>(null)
         }
+        var achievementRarityState by remember(libraryItem.appId) {
+            mutableStateOf<Map<String, Float>>(emptyMap())
+        }
 
         val uiScope = rememberCoroutineScope()
 
@@ -1260,6 +1263,12 @@ abstract class BaseAppScreen {
 
         LaunchedEffect(libraryItem.appId) {
             if (getGameSource(libraryItem) != GameSource.STEAM) return@LaunchedEffect
+            launch(Dispatchers.IO) {
+                val rarity = runCatching {
+                    app.gamenative.utils.SteamAchievementRarity.fetch(getGameId(libraryItem))
+                }.getOrNull()
+                if (rarity != null) achievementRarityState = rarity
+            }
             repeat(3) { attempt ->
                 val achievements = try {
                     withContext(Dispatchers.IO) {
@@ -1610,6 +1619,7 @@ abstract class BaseAppScreen {
             onSourceClick = onSourceClick,
             runtimeConfig = containerData.takeIf { containerDataLoaded },
             achievements = achievementsState,
+            achievementRarity = achievementRarityState,
         )
 
         if (showReadiness && launchActivity != null) {

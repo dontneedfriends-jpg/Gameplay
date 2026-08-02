@@ -68,6 +68,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import app.gamenative.R
 import app.gamenative.ui.component.ConsoleCategoryRail
+import app.gamenative.ui.component.GamepadHint
+import app.gamenative.ui.component.GamepadButton
 import app.gamenative.data.LibraryItem
 import app.gamenative.data.ModInstall
 import app.gamenative.data.ModInstallSource
@@ -388,6 +390,11 @@ private fun ManageModsTabs(
         },
         onSelected = onSelect,
         footer = stringResource(R.string.container_config_console_controls_hint),
+                    footerHints = listOf(
+                        GamepadHint(listOf(GamepadButton.LB, GamepadButton.RB), R.string.hint_categories),
+                        GamepadHint(GamepadButton.A, R.string.action_select),
+                        GamepadHint(GamepadButton.B, R.string.back),
+                    ),
         modifier = modifier,
         requestInitialFocus = true,
     )

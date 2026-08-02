@@ -118,6 +118,7 @@ import app.gamenative.ui.data.XServerState
 import app.gamenative.ui.widget.PerformanceHudView
 import app.gamenative.utils.AssetUtils
 import app.gamenative.utils.ContainerUtils
+import app.gamenative.utils.DriveDTempCleanup
 import app.gamenative.utils.downloader.CoreDriverDownloader
 import app.gamenative.utils.CustomGameScanner
 import app.gamenative.utils.ExecutableSelectionUtils
@@ -2744,7 +2745,9 @@ fun XServerScreen(
             )
         }
 
-        if (manualResumeMode && PluviaApp.isOverlayPaused && !showQuickMenu && !keepPausedForEditor) {
+        if (manualResumeMode && PluviaApp.isOverlayPaused && !showQuickMenu && !keepPausedForEditor &&
+            !InGameContainerSettings.overlayActive
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -4658,6 +4661,13 @@ internal fun exit(
         }
     }
     frameRating?.writeSessionSummary()
+
+    // vcredist/DirectX self-extractors leave random hex dirs at the drive-D
+    // root (public Downloads); sweep them after the session.
+    CoroutineScope(Dispatchers.IO).launch {
+        runCatching { DriveDTempCleanup.sweep() }
+            .onFailure { Timber.e(it, "Drive-D temp sweep failed") }
+    }
 
     if (MainActivity.wasLaunchedViaExternalIntent) {
         Timber.i("[IntentLaunch]: Waiting for exit handling before returning to external launcher")

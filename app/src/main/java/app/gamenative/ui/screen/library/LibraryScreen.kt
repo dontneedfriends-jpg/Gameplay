@@ -61,7 +61,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInputModeManager
@@ -392,7 +396,7 @@ private fun LibraryScreenContent(
     var pendingQuickPrimaryAppId by remember { mutableStateOf<String?>(null) }
     // Quick-action overlays: per-game container settings and achievements
     var quickContainerEdit by remember { mutableStateOf<Pair<LibraryItem, ContainerData>?>(null) }
-    var quickAchievements by remember { mutableStateOf<Pair<LibraryItem, List<Achievement>>?>(null) }
+    var quickAchievements by remember { mutableStateOf<Triple<LibraryItem, List<Achievement>, Map<String, Float>>?>(null) }
     var quickAchievementsLoading by remember { mutableStateOf<LibraryItem?>(null) }
     // Track previous overlay states to detect when they close
     var wasSystemMenuOpen by remember { mutableStateOf(false) }
@@ -1171,6 +1175,7 @@ private fun LibraryScreenContent(
                             firstItemFocusRequester = gridFirstItemFocusRequester,
                             focusTargetListIndex = gridFocusTargetListIndex,
                             onFocusedIndexChanged = { gridFocusTargetListIndex = it },
+                            onPageChange = onPageChange,
                             onNavigate = { appId ->
                                 selectedAppId = appId
                                 selectedLibraryItem = state.appInfoList.find { it.appId == appId }
@@ -1330,11 +1335,18 @@ private fun LibraryScreenContent(
                         labelResId = R.string.menu,
                         onClick = { isQuickActionsOpen = true },
                     ),
-                    GamepadAction(
-                        button = GamepadButton.Y,
-                        labelResId = R.string.search,
-                        onClick = { onIsSearching(true) },
-                    ),
+                    if (currentPaneType == PaneType.DS_HOME) {
+                        GamepadAction(
+                            button = GamepadButton.Y,
+                            labelResId = R.string.ds_home_icon_size_action,
+                        )
+                    } else {
+                        GamepadAction(
+                            button = GamepadButton.Y,
+                            labelResId = R.string.search,
+                            onClick = { onIsSearching(true) },
+                        )
+                    },
                     GamepadAction(
                         button = GamepadButton.X,
                         labelResId = R.string.action_add_game,
@@ -1457,11 +1469,14 @@ private fun LibraryScreenContent(
                         val list = withContext(Dispatchers.IO) {
                             runCatching { SteamService.fetchAchievementsForDisplay(item.gameId) }.getOrNull()
                         }
+                        val rarity = withContext(Dispatchers.IO) {
+                            runCatching { app.gamenative.utils.SteamAchievementRarity.fetch(item.gameId) }.getOrNull()
+                        }
                         quickAchievementsLoading = null
                         if (list.isNullOrEmpty()) {
                             SnackbarManager.show(context.getString(R.string.quick_action_no_achievements))
                         } else {
-                            quickAchievements = item to list
+                            quickAchievements = Triple(item, list, rarity.orEmpty())
                         }
                     }
                 },
@@ -1513,15 +1528,27 @@ private fun LibraryScreenContent(
         }
 
         // Quick-action overlays: achievements browser
-        quickAchievements?.let { (item, achievements) ->
+        quickAchievements?.let { (item, achievements, rarity) ->
             Surface(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown &&
+                            (event.key == Key.ButtonB || event.key == Key.Escape)
+                        ) {
+                            quickAchievements = null
+                            true
+                        } else {
+                            false
+                        }
+                    },
                 color = MaterialTheme.colorScheme.background,
             ) {
                 SteamAchievementsPage(
                     gameName = item.name,
                     achievements = achievements,
                     onBack = { quickAchievements = null },
+                    rarity = rarity,
                 )
             }
         }

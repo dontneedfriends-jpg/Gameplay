@@ -15,6 +15,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import app.gamenative.ui.component.ConsoleListRow
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
@@ -135,6 +139,7 @@ import app.gamenative.ui.screen.library.components.GameOptionsPanel
 import app.gamenative.ui.screen.library.components.GameSourceIcon
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.HltbService
+import app.gamenative.ui.screen.library.components.VideoHero
 import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.theme.isReduceMotionEnabled
 import app.gamenative.ui.util.shouldShowGamepadUI
@@ -795,13 +800,23 @@ private fun AppScreenGamepadActions(
 private fun BoxScope.GameHeroBackdrop(
     displayInfo: GameDisplayInfo,
     parallaxOffset: Float,
+    trailerUrl: String? = null,
 ) {
+    // SurfaceView video can't follow the parallax translation: pin the trailer
+    // and only parallax the static image.
     Box(
         modifier = Modifier
             .matchParentSize()
-            .graphicsLayer { translationY = parallaxOffset },
+            .graphicsLayer { translationY = if (trailerUrl != null) 0f else parallaxOffset },
     ) {
-        if (displayInfo.heroImageUrl != null) {
+        if (trailerUrl != null) {
+            VideoHero(
+                videoUrl = trailerUrl,
+                fallbackImageUrl = displayInfo.heroImageUrl ?: "",
+                contentDescription = displayInfo.name,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (displayInfo.heroImageUrl != null) {
             CoilImage(
                 modifier = Modifier.fillMaxSize(),
                 imageModel = { displayInfo.heroImageUrl },
@@ -844,6 +859,99 @@ private fun BoxScope.GameHeroBackdrop(
                         endY = Float.POSITIVE_INFINITY,
                     ),
                 ),
+        )
+    }
+}
+
+@Composable
+private fun GameUpdatesSection(
+    items: List<app.gamenative.utils.SteamNewsService.NewsItem>,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
+    val headerInteractionSource = remember { MutableInteractionSource() }
+    val headerFocused by headerInteractionSource.collectIsFocusedAsState()
+    val headerShape = RoundedCornerShape(10.dp)
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(headerShape)
+                .background(
+                    if (headerFocused) {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    } else {
+                        Color.Transparent
+                    },
+                )
+                .focusRing(headerInteractionSource, headerShape, width = 2.dp)
+                .selectable(
+                    selected = headerFocused,
+                    interactionSource = headerInteractionSource,
+                    indication = null,
+                    onClick = { expanded = !expanded },
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = stringResource(R.string.game_updates_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "${items.size}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (expanded) {
+            items.forEach { item ->
+                val date = remember(item.dateEpochSec) {
+                    if (item.dateEpochSec > 0) {
+                        SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+                            .format(Date(item.dateEpochSec * 1000))
+                    } else {
+                        ""
+                    }
+                }
+                ConsoleListRow(
+                    title = item.title,
+                    subtitle = date.ifBlank { null },
+                    onClick = { uriHandler.openUri(item.url) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommunityStatChip(
+    text: String,
+    color: Color,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.White.copy(alpha = 0.12f))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = color,
+            maxLines = 1,
         )
     }
 }
@@ -893,11 +1001,39 @@ internal fun AppScreenContent(
     onSourceClick: (GameSource) -> Unit = {},
     runtimeConfig: ContainerData? = null,
     achievements: List<Achievement>? = null,
+    achievementRarity: Map<String, Float> = emptyMap(),
 ) {
     val context = LocalContext.current
     // reactive — recomposes when network state changes
     val runtime = remember { AppScreenRuntimeState() }
     val scope = rememberCoroutineScope()
+
+    // Steam-only community stats chips (playing now / review score)
+    val gameSource = remember(displayInfo.appId) {
+        runCatching { ContainerUtils.extractGameSourceFromContainerId(displayInfo.appId) }.getOrNull()
+    }
+    var playerCount by remember(displayInfo.appId) { mutableStateOf<Int?>(null) }
+    var reviewScore by remember(displayInfo.appId) { mutableStateOf<app.gamenative.utils.SteamReviewScore.Score?>(null) }
+    var newsItems by remember(displayInfo.appId) {
+        mutableStateOf<List<app.gamenative.utils.SteamNewsService.NewsItem>>(emptyList())
+    }
+    var trailerUrl by remember(displayInfo.appId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(displayInfo.appId) {
+        if (gameSource == GameSource.STEAM) {
+            launch(Dispatchers.IO) {
+                playerCount = app.gamenative.utils.SteamPlayerCount.fetch(displayInfo.gameId)
+            }
+            launch(Dispatchers.IO) {
+                reviewScore = app.gamenative.utils.SteamReviewScore.fetch(displayInfo.gameId)
+            }
+            launch(Dispatchers.IO) {
+                newsItems = app.gamenative.utils.SteamNewsService.fetch(displayInfo.gameId)
+            }
+            launch(Dispatchers.IO) {
+                trailerUrl = app.gamenative.utils.SteamVideoTrailers.fetchTrailerUrl(displayInfo.gameId)
+            }
+        }
+    }
     var achievementsVisible by rememberSaveable(displayInfo.appId) { mutableStateOf(false) }
     val network = rememberAppScreenNetworkState(downloadInfo)
     val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
@@ -989,6 +1125,7 @@ internal fun AppScreenContent(
                 GameHeroBackdrop(
                     displayInfo = displayInfo,
                     parallaxOffset = runtime.scrollState.value * 0.5f,
+                    trailerUrl = if (isReduceMotionEnabled()) null else trailerUrl,
                 )
 
                 // Back button (top left).
@@ -1021,26 +1158,37 @@ internal fun AppScreenContent(
                             bottom = 24.dp,
                         ),
                 ) {
-                    // Game title
-                    Text(
-                        text = displayInfo.name,
-                        style = (if (isPortrait) {
-                            MaterialTheme.typography.headlineLarge
-                        } else {
-                            MaterialTheme.typography.displaySmall
-                        }).copy(
-                            fontWeight = FontWeight.Bold,
-                            shadow = Shadow(
-                                color = Color.Black.copy(alpha = 0.6f),
-                                offset = Offset(0f, 2f),
-                                blurRadius = 8f,
+                    // Steam-style hero: game logo art instead of a plain text
+                    // title when available (title stays as fallback).
+                    if (!displayInfo.logoUrl.isNullOrBlank()) {
+                        CoilImage(
+                            imageModel = { displayInfo.logoUrl },
+                            imageOptions = ImageOptions(contentScale = ContentScale.Fit),
+                            modifier = Modifier
+                                .widthIn(max = 340.dp)
+                                .heightIn(max = 110.dp),
+                        )
+                    } else {
+                        Text(
+                            text = displayInfo.name,
+                            style = (if (isPortrait) {
+                                MaterialTheme.typography.headlineLarge
+                            } else {
+                                MaterialTheme.typography.displaySmall
+                            }).copy(
+                                fontWeight = FontWeight.Bold,
+                                shadow = Shadow(
+                                    color = Color.Black.copy(alpha = 0.6f),
+                                    offset = Offset(0f, 2f),
+                                    blurRadius = 8f,
+                                ),
                             ),
-                        ),
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(max = 840.dp),
-                    )
+                            color = Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 840.dp),
+                        )
+                    }
 
                     // Developer and year
                     val releaseYear = remember(displayInfo.releaseDate) {
@@ -1236,6 +1384,35 @@ internal fun AppScreenContent(
                             color = Color(displayInfo.compatibilityColor),
                         )
                     }
+
+                    // Community stats chips: review score + playing now (Steam only)
+                    if (reviewScore != null || playerCount != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            reviewScore?.let { score ->
+                                CommunityStatChip(
+                                    text = "${score.description} (${score.percentPositive}%)",
+                                    color = when (score.sentiment) {
+                                        app.gamenative.utils.SteamReviewScore.Sentiment.POSITIVE ->
+                                            PluviaTheme.colors.statusInstalled
+                                        app.gamenative.utils.SteamReviewScore.Sentiment.NEGATIVE ->
+                                            PluviaTheme.colors.accentDanger
+                                        app.gamenative.utils.SteamReviewScore.Sentiment.MIXED ->
+                                            Color.White.copy(alpha = 0.85f)
+                                    },
+                                )
+                            }
+                            playerCount?.let { count ->
+                                CommunityStatChip(
+                                    text = stringResource(
+                                        R.string.game_players_now,
+                                        app.gamenative.utils.SteamPlayerCount.formatCount(count),
+                                    ),
+                                    color = Color.White.copy(alpha = 0.85f),
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1423,15 +1600,6 @@ internal fun AppScreenContent(
                     }
                 }
 
-                if (!achievements.isNullOrEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    AchievementSummaryButton(
-                        achievements = achievements,
-                        onClick = { achievementsVisible = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
                 if (otherSources.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -1481,6 +1649,11 @@ internal fun AppScreenContent(
                     }
                 }
 
+                if (newsItems.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    GameUpdatesSection(newsItems)
+                }
+
             }
         }
 
@@ -1521,6 +1694,7 @@ internal fun AppScreenContent(
                 gameName = displayInfo.name,
                 achievements = achievements,
                 onBack = { achievementsVisible = false },
+                rarity = achievementRarity,
             )
         }
         }

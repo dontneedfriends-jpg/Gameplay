@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -166,7 +167,14 @@ private fun CompactLibraryTabBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
+                        MaterialTheme.colorScheme.background.copy(alpha = 0f),
+                    ),
+                ),
+            )
             .padding(top = 8.dp, bottom = 12.dp, start = 8.dp, end = 8.dp),
     ) {
         Row(
@@ -345,7 +353,7 @@ private fun CompactIconButton(
     }
 }
 
-private fun PaneType.nextLibraryView(isDualScreen: Boolean = false): PaneType = when (this) {
+internal fun PaneType.nextLibraryView(isDualScreen: Boolean = false): PaneType = when (this) {
     PaneType.LIST, PaneType.CAROUSEL, PaneType.UNDECIDED -> PaneType.GRID_CAPSULE
     PaneType.GRID_CAPSULE -> PaneType.INSTALLED_COMPACT
     PaneType.INSTALLED_COMPACT -> PaneType.GRID_HERO
@@ -411,7 +419,14 @@ private fun ExpandedLibraryTabBar(
 
     Box(
         modifier = modifier
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.88f),
+                        MaterialTheme.colorScheme.background.copy(alpha = 0f),
+                    ),
+                ),
+            )
             .padding(vertical = 10.dp),
     ) {
         Row(

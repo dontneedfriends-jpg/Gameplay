@@ -35,6 +35,7 @@ fun <T> ConsoleCategoryRail(
     onSelected: (T) -> Unit,
     footer: String,
     modifier: Modifier = Modifier,
+    footerHints: List<GamepadHint>? = null,
     requestInitialFocus: Boolean = false,
     compact: Boolean = false,
 ) {
@@ -91,14 +92,24 @@ fun <T> ConsoleCategoryRail(
             )
         }
         Spacer(modifier = Modifier.weight(1f))
-        Text(
-            text = footer,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(
-                horizontal = 8.dp,
-                vertical = if (compact) 2.dp else 6.dp,
-            ),
-        )
+        if (footerHints != null) {
+            GamepadHintRow(
+                hints = footerHints,
+                modifier = Modifier.padding(
+                    horizontal = 8.dp,
+                    vertical = if (compact) 2.dp else 6.dp,
+                ),
+            )
+        } else {
+            Text(
+                text = footer,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(
+                    horizontal = 8.dp,
+                    vertical = if (compact) 2.dp else 6.dp,
+                ),
+            )
+        }
     }
 }

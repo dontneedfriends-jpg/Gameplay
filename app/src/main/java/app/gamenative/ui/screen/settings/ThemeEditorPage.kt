@@ -40,6 +40,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.gamenative.R
 import app.gamenative.ui.component.ConsoleCategoryRail
+import app.gamenative.ui.component.GamepadHint
+import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.NoExtractOutlinedTextField
 import app.gamenative.ui.component.dialog.ConsoleSettingsPage
 import app.gamenative.ui.theme.GameplayThemeCodec
@@ -102,6 +104,11 @@ fun ThemeEditorPage(
                     validationError = null
                 },
                 footer = stringResource(R.string.container_config_console_controls_hint),
+                    footerHints = listOf(
+                        GamepadHint(listOf(GamepadButton.LB, GamepadButton.RB), R.string.hint_categories),
+                        GamepadHint(GamepadButton.A, R.string.action_select),
+                        GamepadHint(GamepadButton.B, R.string.back),
+                    ),
                 requestInitialFocus = true,
                 compact = true,
                 modifier = Modifier.width(190.dp),
