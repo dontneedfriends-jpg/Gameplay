@@ -85,6 +85,7 @@ import app.gamenative.ui.enums.ConnectionState
 import app.gamenative.launch.LaunchReadiness
 import app.gamenative.ui.enums.DialogType
 import app.gamenative.ui.enums.Orientation
+import app.gamenative.externaldisplay.DsHomePresentationHost
 import app.gamenative.ui.model.MainViewModel
 import app.gamenative.ui.screen.HomeScreen
 import app.gamenative.ui.screen.PluviaScreen
@@ -1662,6 +1663,7 @@ fun PluviaMain(
 
             AchievementOverlay()
             GameInviteOverlay()
+            DsHomePresentationHost()
         }
     }
 }

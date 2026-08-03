@@ -92,6 +92,7 @@ import app.gamenative.ui.component.dialog.LoadingDialog
 import app.gamenative.ui.components.rememberCustomGameFolderPicker
 import app.gamenative.ui.components.requestPermissionsForPath
 import app.gamenative.ui.data.LibraryState
+import app.gamenative.ui.data.statsFor
 import app.gamenative.ui.data.Achievement
 import com.winlator.container.ContainerData
 import app.gamenative.ui.enums.AppFilter
@@ -103,7 +104,6 @@ import app.gamenative.ui.model.LibraryViewModel
 import app.gamenative.service.SteamService
 import app.gamenative.ui.screen.library.components.LibraryCarouselPane
 import app.gamenative.ui.screen.library.components.LibraryCompactRowPane
-import app.gamenative.externaldisplay.DsHomePresentationHost
 import app.gamenative.externaldisplay.DsHomeSecondScreen
 import app.gamenative.ui.screen.library.components.DsHeroCard
 import app.gamenative.ui.screen.library.components.LibraryDsHomePane
@@ -1024,6 +1024,52 @@ private fun LibraryScreenContent(
                 }
             }
     ) {
+        val hasExternalDisplay = rememberHasExternalDisplay()
+
+        // Publish the second-screen model so the presentation always reflects
+        // the library: grid panes mirror the list, hero/carousel panes show the
+        // focused game's details, and the detail pane shows the opened game.
+        if (hasExternalDisplay) {
+            // Every non-DS pane shows the focused game's details on the second
+            // display; only DS_HOME mirrors the list as an icon grid.
+            val detailsMode = currentPaneType != PaneType.DS_HOME
+            val focusedIndex = if (currentPaneType == PaneType.CAROUSEL) {
+                currentCarouselFocusTargetIndex()
+            } else {
+                gridFocusTargetListIndex.coerceIn(0, state.appInfoList.lastIndex.coerceAtLeast(0))
+            }
+            val focusedItem = if (selectedAppId != null) {
+                selectedLibraryItem
+            } else {
+                state.appInfoList.getOrNull(focusedIndex)
+            }
+            SideEffect {
+                DsHomeSecondScreen.model = DsHomeSecondScreen.Model(
+                    mode = if (selectedAppId != null || detailsMode) {
+                        DsHomeSecondScreen.Mode.DETAILS
+                    } else {
+                        DsHomeSecondScreen.Mode.GRID
+                    },
+                    items = state.appInfoList,
+                    focusedIndex = focusedIndex,
+                    focusedItem = focusedItem,
+                    focusedStats = focusedItem?.let { state.statsFor(it) },
+                    focusedCompat = focusedItem?.let { state.compatibilityMap[it.name] },
+                    onNavigate = { appId ->
+                        selectedAppId = appId
+                        selectedLibraryItem = state.appInfoList.find { it.appId == appId }
+                    },
+                    onFocused = { idx ->
+                        if (currentPaneType == PaneType.CAROUSEL) {
+                            carouselFocusTargetListIndex = idx
+                        } else {
+                            gridFocusTargetListIndex = idx
+                        }
+                    },
+                )
+            }
+        }
+
         if (selectedAppId == null) {
             // Use Box to allow content to scroll behind the tab bar
             Box(modifier = Modifier.fillMaxSize()) {
@@ -1121,7 +1167,7 @@ private fun LibraryScreenContent(
                             onFocusedIndexChanged = { carouselFocusTargetListIndex = it },
                         )
                     } else if (currentPaneType == PaneType.DS_HOME) {
-                        if (rememberHasExternalDisplay()) {
+                        if (hasExternalDisplay) {
                             // Dual-screen: hero stays on the main display, the
                             // icon grid renders on the second display.
                             val focusedItem = state.appInfoList.getOrNull(gridFocusTargetListIndex)
@@ -1138,19 +1184,6 @@ private fun LibraryScreenContent(
                                         .fillMaxWidth()
                                         .weight(1f),
                                 )
-                            }
-                            SideEffect {
-                                DsHomeSecondScreen.model = DsHomeSecondScreen.Model(
-                                    items = state.appInfoList,
-                                    onNavigate = { appId ->
-                                        selectedAppId = appId
-                                        selectedLibraryItem = state.appInfoList.find { it.appId == appId }
-                                    },
-                                    onFocused = { gridFocusTargetListIndex = it },
-                                )
-                            }
-                            DisposableEffect(Unit) {
-                                onDispose { DsHomeSecondScreen.model = null }
                             }
                         } else {
                             LibraryDsHomePane(
@@ -1364,8 +1397,6 @@ private fun LibraryScreenContent(
 
         // Options panel (SELECT) - renders on top of everything
         if (selectedAppId == null) {
-            DsHomePresentationHost()
-
             LibraryOptionsPanel(
                 isOpen = state.isOptionsPanelOpen,
                 onDismiss = { onOptionsPanelToggle(false) },
