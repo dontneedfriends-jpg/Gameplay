@@ -61,6 +61,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
     // Session-scoped: one launcher instance owns one guest process. The static
     // shared PID let one session kill another's process (see production plan).
     private int pid = -1;
+    private String sessionId = java.util.UUID.randomUUID().toString();
     private String[] bindingPaths;
     private EnvVars envVars;
     private WineInfo wineInfo;
@@ -102,6 +103,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
     public void start() {
         synchronized (lock) {
             stop();
+            sessionId = java.util.UUID.randomUUID().toString();
             if (wineInfo.isArm64EC())
                 extractEmulatorsDlls();
             else
@@ -109,7 +111,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
             if (preUnpack != null) preUnpack.run();
             pid = execGuestProgram();
             Log.d("BionicProgramLauncherComponent", "Process " + pid + " started");
-            SteamService.setKeepAlive(true);
+            SteamService.acquireKeepAlive(sessionId);
         }
     }
 
@@ -119,14 +121,38 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
             if (pid != -1) {
                 Process.killProcess(pid);
                 Log.d("BionicProgramLauncherComponent", "Stopped process " + pid);
-                List<ProcessHelper.ProcessInfo> subProcesses = ProcessHelper.listSubProcesses();
-                for (ProcessHelper.ProcessInfo subProcess : subProcesses) {
-                    Process.killProcess(subProcess.pid);
+                // Kill only this session's process tree (recursive PPID walk);
+                // other containers' sessions are left alone.
+                for (int childPid : descendantPids(pid)) {
+                    Process.killProcess(childPid);
                 }
-                SteamService.setKeepAlive(false);
+                SteamService.releaseKeepAlive(sessionId);
             }
+            // wineserver -k is scoped to this container's prefix via the env
+            // built in execShellCommand (HOME/WINEPREFIX are per-container).
             execShellCommand("wineserver -k");
         }
+    }
+
+    /** All PIDs whose ancestor chain leads back to rootPid (inclusive of root). */
+    private static java.util.Set<Integer> descendantPids(int rootPid) {
+        java.util.Map<Integer, Integer> ppidByPid = new java.util.HashMap<>();
+        for (ProcessHelper.ProcessInfo info : ProcessHelper.listSubProcesses()) {
+            ppidByPid.put(info.pid, info.ppid);
+        }
+        java.util.Set<Integer> descendants = new java.util.HashSet<>();
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(rootPid);
+        while (!queue.isEmpty()) {
+            int parent = queue.poll();
+            if (!descendants.add(parent)) continue;
+            for (java.util.Map.Entry<Integer, Integer> entry : ppidByPid.entrySet()) {
+                if (entry.getValue() == parent) {
+                    queue.add(entry.getKey());
+                }
+            }
+        }
+        return descendants;
     }
 
     public Callback<Integer> getTerminationCallback() {
@@ -384,7 +410,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
                 pid = -1;
             }
             if (!environment.isWinetricksRunning()) {
-                SteamService.setKeepAlive(false);
+                SteamService.releaseKeepAlive(sessionId);
                 if (terminationCallback != null)
                     terminationCallback.call(status);
             }

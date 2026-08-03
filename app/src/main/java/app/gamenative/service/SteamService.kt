@@ -436,6 +436,27 @@ class SteamService : Service(), IChallengeUrlChanged {
         @Volatile
         var keepAlive: Boolean = false
 
+        // Ref-counted keepalive: each launch session acquires/releases its own
+        // handle, so one session ending can't drop the service under another.
+        private val keepAliveSessions = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+        @JvmStatic
+        fun acquireKeepAlive(sessionId: String) {
+            keepAliveSessions.add(sessionId)
+            keepAlive = true
+        }
+
+        @JvmStatic
+        fun releaseKeepAlive(sessionId: String) {
+            keepAliveSessions.remove(sessionId)
+            if (keepAliveSessions.isEmpty()) {
+                keepAlive = false
+            }
+        }
+
+        @JvmStatic
+        fun keepAliveSessionCount(): Int = keepAliveSessions.size
+
         @Volatile
         var isImporting: Boolean = false
 
