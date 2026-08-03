@@ -74,3 +74,16 @@ app/src/main/cpp/steambootstrap/steam_bootstrap.c
 
 # Vendored SDL2 headers (fetched for evshim build, not pushed)
 app/src/main/cpp/third_party/SDL2/
+docs/PRODUCTION_PLAN.md
+
+# Docs and markdown (build-independent); keep README, licenses, notices
+docs/
+*.md
+!README.md
+!LICENSE
+!LICENSE.*
+!LICENCE
+!LICENCE.*
+!NOTICE
+!NOTICE.*
+!THIRD_PARTY_NOTICES*
