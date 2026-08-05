@@ -95,8 +95,9 @@ class SteamTokenLogin(
             }
         } while (encoded == "")
 
-        Timber.tag("SteamTokenLogin").d("MTBF: $mtbf")
-        Timber.tag("SteamTokenLogin").d("Encoded: $encoded")
+        // ConnectCache is an obfuscated login credential. Never persist either
+        // the payload or the value required to deobfuscate it in logs.
+        Timber.tag("SteamTokenLogin").d("Generated Steam ConnectCache payload")
 
         return """
             "InstallConfigStore"

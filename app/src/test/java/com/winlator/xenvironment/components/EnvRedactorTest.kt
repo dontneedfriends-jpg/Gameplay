@@ -12,19 +12,67 @@ class EnvRedactorTest {
     fun sensitiveKeysAreMasked() {
         val env = EnvVars()
         env.put("HOME", "/home/user")
-        env.put("SteamUser", "someone")
-        env.put("STEAMID", "76561198000000000")
-        env.put("MY_TOKEN", "abc123")
+        val secrets = linkedMapOf(
+            "SteamUser" to "private-user",
+            "STEAMID" to "private-steam-id",
+            "MY_TOKEN" to "private-token",
+            "LOGIN_PASSWORD" to "private-password",
+            "CLIENT_SECRET" to "private-secret",
+            "AUTH_CODE" to "private-auth",
+            "WEB_COOKIE" to "private-cookie",
+            "LOGIN_SESSION" to "private-session",
+            "API_KEY" to "private-key",
+            "REFRESH_VALUE" to "private-refresh",
+        )
+        secrets.forEach { (key, value) -> env.put(key, value) }
 
         val out = EnvRedactor.redact(env)
 
         assertTrue(out.contains("HOME=/home/user"))
+        secrets.forEach { (key, value) ->
+            assertTrue(out.contains("$key=<redacted>"))
+            assertFalse(out.contains(value))
+        }
+    }
+
+    @Test
+    fun rawExecEnvironmentIsMasked() {
+        val out = EnvRedactor.redact(
+            arrayOf(
+                "HOME=/home/user",
+                "AUTH_TOKEN=raw-token",
+                "SteamUser=private-name",
+                "AMAZON_GAMES_FUEL_ENTITLEMENT_ID=private-entitlement",
+            ),
+        )
+
+        assertTrue(out.contains("HOME=/home/user"))
+        assertTrue(out.contains("AUTH_TOKEN=<redacted>"))
         assertTrue(out.contains("SteamUser=<redacted>"))
-        assertTrue(out.contains("STEAMID=<redacted>"))
-        assertTrue(out.contains("MY_TOKEN=<redacted>"))
-        assertFalse(out.contains("someone"))
-        assertFalse(out.contains("76561198000000000"))
-        assertFalse(out.contains("abc123"))
+        assertTrue(out.contains("AMAZON_GAMES_FUEL_ENTITLEMENT_ID=<redacted>"))
+        assertFalse(out.contains("raw-token"))
+        assertFalse(out.contains("private-name"))
+        assertFalse(out.contains("private-entitlement"))
+    }
+
+    @Test
+    fun commandCredentialsAreMasked() {
+        val command =
+            "winhandler.exe -AUTH_PASSWORD=secret-password " +
+                "-epicovt=ownership-token " +
+                "https://example.test/callback?openid.oa2.authorization_code=oauth-code " +
+                "Bearer bearer-token"
+
+        val out = EnvRedactor.redactText(command)
+
+        assertTrue(out.contains("-AUTH_PASSWORD=<redacted>"))
+        assertTrue(out.contains("-epicovt=<redacted>"))
+        assertTrue(out.contains("authorization_code=<redacted>"))
+        assertTrue(out.contains("Bearer <redacted>"))
+        assertFalse(out.contains("secret-password"))
+        assertFalse(out.contains("ownership-token"))
+        assertFalse(out.contains("oauth-code"))
+        assertFalse(out.contains("bearer-token"))
     }
 
     @Test

@@ -253,7 +253,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         Log.d("GlibcProgramLauncherComponent", "About to execute box64 from: " + box64Path);
 
         String command = box64Path + " " + guestExecutable;
-        Log.d("GlibcProgramLauncherComponent", "Final command: " + command);
+        Log.d("GlibcProgramLauncherComponent", "Final command: " + EnvRedactor.redactText(command));
 
         return ProcessHelper.exec(command, envVars.toStringArray(), workingDir != null ? workingDir : rootDir, (status) -> {
             Log.d("GlibcProgramLauncherComponent", "Process terminated " + pid + " with status " + status);
@@ -359,7 +359,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         String finalCommand = box64Path + " " + command;
 
         // Execute the command and capture its output
-        Log.d("GlibcProgramLauncherComponent", "Shell command is " + finalCommand);
+        Log.d("GlibcProgramLauncherComponent", "Shell command is " + EnvRedactor.redactText(finalCommand));
         return ProcessHelper.execWithOutput(finalCommand, envVars.toStringArray(),
                 workingDir != null ? workingDir : imageFs.getRootDir(), includeStderr);
     }

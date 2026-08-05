@@ -135,6 +135,7 @@ object SteamOverlayClient {
      * answered with an error.
      */
     private suspend fun request(command: String): List<String>? = withContext(Dispatchers.IO) {
+        val operation = command.substringBefore(' ').ifBlank { "unknown" }
         try {
             LocalSocket().use { socket ->
                 socket.connect(LocalSocketAddress(SOCKET_NAME, LocalSocketAddress.Namespace.ABSTRACT))
@@ -150,7 +151,7 @@ object SteamOverlayClient {
                     when {
                         line == "." -> return@withContext out
                         line.startsWith("ERR") -> {
-                            Timber.w("SteamOverlayClient: '$command' -> $line")
+                            Timber.w("SteamOverlayClient: $operation request failed")
                             return@withContext null
                         }
                         else -> {
@@ -165,7 +166,7 @@ object SteamOverlayClient {
                 out
             }
         } catch (e: Exception) {
-            Timber.d("SteamOverlayClient: '$command' failed: ${e.message}")
+            Timber.d("SteamOverlayClient: $operation request failed: ${e.javaClass.simpleName}")
             null
         }
     }

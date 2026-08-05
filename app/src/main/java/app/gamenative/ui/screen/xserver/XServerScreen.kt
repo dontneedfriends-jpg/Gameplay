@@ -185,6 +185,7 @@ import com.winlator.xenvironment.ImageFs
 import com.winlator.xenvironment.XEnvironment
 import com.winlator.xenvironment.components.ALSAServerComponent
 import com.winlator.xenvironment.components.BionicProgramLauncherComponent
+import com.winlator.xenvironment.components.EnvRedactor
 import com.winlator.xenvironment.components.GlibcProgramLauncherComponent
 import com.winlator.xenvironment.components.GuestProgramLauncherComponent
 import com.winlator.xenvironment.components.NetworkInfoUpdateComponent
@@ -4006,9 +4007,9 @@ private fun setupXEnvironment(
         Timber.i("FEXCore Preset: ${container.fexCorePreset}")
         Timber.i("CPU List: ${container.cpuList}")
         Timber.i("CPU List WoW64: ${container.cpuListWoW64}")
-        Timber.i("Env Vars (Container Base): ${container.envVars}") // Log base container vars
-        Timber.i("Env Vars (Final Guest): ${envVars.toString()}")   // Log the actual env vars being passed
-        Timber.i("Guest Executable: ${guestProgramLauncherComponent.guestExecutable}") // Log the command
+        Timber.i("Env Vars (Container Base): ${EnvRedactor.redact(EnvVars(container.envVars))}")
+        Timber.i("Env Vars (Final Guest): ${EnvRedactor.redact(envVars)}")
+        Timber.i("Guest Executable: ${EnvRedactor.redactText(guestProgramLauncherComponent.guestExecutable)}")
         Timber.i("---------------------------")
     }
 
@@ -4188,7 +4189,7 @@ private fun getWineStartCommand(
             gameId = gameId,
         )
 
-        Timber.tag("XServerScreen").i("GOG launch command: $gogCommand")
+        Timber.tag("XServerScreen").i("GOG launch command: ${EnvRedactor.redactText(gogCommand)}")
         return "winhandler.exe $gogCommand"
     } else if (isEpicGame) {
         // For Epic games, get the launch command
@@ -4265,12 +4266,7 @@ private fun getWineStartCommand(
             "winhandler.exe \"$epicCommand\""
         }
 
-        // Log command with sensitive auth tokens redacted
-        // Handle both quoted values (with spaces) and unquoted values
-        val redactedCommand = launchCommand
-            .replace(Regex("-AUTH_PASSWORD=(\"[^\"]*\"|[^ ]+)"), "-AUTH_PASSWORD=[REDACTED]")
-            .replace(Regex("-epicovt=(\"[^\"]*\"|[^ ]+)"), "-epicovt=[REDACTED]")
-        Timber.tag("XServerScreen").i("Epic launch command: $redactedCommand")
+        Timber.tag("XServerScreen").i("Epic launch command: ${EnvRedactor.redactText(launchCommand)}")
 
         return launchCommand
     } else if (gameSource == GameSource.AMAZON) {
@@ -4309,7 +4305,8 @@ private fun getWineStartCommand(
                     }
                 }
                 Timber.tag("XServerScreen").i(
-                    "fuel.json parsed: command=$fuelCommand, args=$fuelArgs, workingDir=$fuelWorkingDir"
+                    "fuel.json parsed: command=${EnvRedactor.redactText(fuelCommand)}, " +
+                        "args=${EnvRedactor.redactText(fuelArgs.toString())}, workingDir=$fuelWorkingDir"
                 )
             } catch (e: Exception) {
                 Timber.tag("XServerScreen").w(e, "Failed to parse fuel.json, falling back to heuristic")
@@ -4382,9 +4379,7 @@ private fun getWineStartCommand(
             if (amazonGame.productSku.isNotEmpty()) {
                 envVars.put("AMAZON_GAMES_FUEL_PRODUCT_SKU", amazonGame.productSku)
             }
-            Timber.tag("XServerScreen").i(
-                "FuelPump env: entitlementId=${amazonGame.entitlementId}, sku=${amazonGame.productSku}"
-            )
+            Timber.tag("XServerScreen").i("FuelPump environment prepared")
         } else {
             Timber.tag("XServerScreen").w("Could not load AmazonGame for appId=$appIdInt — FuelPump env vars incomplete")
         }
@@ -4429,7 +4424,9 @@ private fun getWineStartCommand(
             val argsStr = fuelArgs.joinToString(" ") { arg ->
                 if (arg.contains(" ")) "\"$arg\"" else arg
             }
-            Timber.tag("XServerScreen").i("Amazon launch command: \"$amazonCommand\" $argsStr")
+            Timber.tag("XServerScreen").i(
+                "Amazon launch command: ${EnvRedactor.redactText("\"$amazonCommand\" $argsStr")}",
+            )
             "winhandler.exe \"$amazonCommand\" $argsStr"
         } else {
             Timber.tag("XServerScreen").i("Amazon launch command: \"$amazonCommand\"")

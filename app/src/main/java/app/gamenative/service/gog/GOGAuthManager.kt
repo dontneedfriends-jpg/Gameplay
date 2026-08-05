@@ -84,9 +84,9 @@ object GOGAuthManager {
             }.use { response ->
                 Timber.tag("GOG").d("Received response: HTTP ${response.code}")
                 if (!response.isSuccessful) {
-                    val errorBody = response.body?.string() ?: "Unknown error"
-                    Timber.tag("GOG").e("Failed to authenticate: HTTP ${response.code} - $errorBody")
-                    return Result.failure(Exception("Authentication failed: HTTP ${response.code} - $errorBody"))
+                    response.body?.close()
+                    Timber.tag("GOG").e("Failed to authenticate: HTTP ${response.code}")
+                    return Result.failure(Exception("Authentication failed: HTTP ${response.code}"))
                 }
 
                 val responseBody = response.body?.string() ?: return Result.failure(Exception("Empty response"))
@@ -134,13 +134,12 @@ object GOGAuthManager {
             withContext(Dispatchers.IO) {
                 authFile.writeText(authData.toString(2))
             }
-            Timber.tag("GOG").i("GOG authentication successful for user: $userId")
+            Timber.tag("GOG").i("GOG authentication successful")
 
             Result.success(credentials)
         } catch (e: Exception) {
             val errorMessage = e.message ?: e.javaClass.simpleName
-            Timber.tag("GOG").e(e, "GOG authentication exception: $errorMessage")
-            Timber.tag("GOG").e("Stack trace: ${e.stackTraceToString()}")
+            Timber.tag("GOG").e(e, "GOG authentication exception")
             Result.failure(Exception("Authentication exception: $errorMessage", e))
         }
     }

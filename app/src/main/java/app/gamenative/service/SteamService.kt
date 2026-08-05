@@ -3846,12 +3846,12 @@ class SteamService : Service(), IChallengeUrlChanged {
         if (userSteamId?.isValid == true) {
             if (PrefManager.steamUserAccountId != userSteamId!!.accountID.toInt()) {
                 PrefManager.steamUserAccountId = userSteamId!!.accountID.toInt()
-                Timber.d("Saving logged in Steam accountID ${userSteamId!!.accountID.toInt()}")
+                Timber.d("Saving logged-in Steam account identity")
             }
             val steamId64 = userSteamId!!.convertToUInt64()
             if (PrefManager.steamUserSteamId64 != steamId64) {
                 PrefManager.steamUserSteamId64 = steamId64
-                Timber.d("Saving logged in Steam ID64 $steamId64")
+                Timber.d("Saving logged-in Steam ID64")
             }
         }
 
@@ -4128,7 +4128,7 @@ class SteamService : Service(), IChallengeUrlChanged {
      * overlay's job -- this only surfaces the prompt.
      */
     private fun onGameInvite(callback: GameInviteCallback) {
-        Timber.i("onGameInvite: from=${callback.inviterSteamId} connect=${callback.connectString}")
+        Timber.i("Received Steam game invite; join data present=${callback.connectString.isNotEmpty()}")
         if (callback.connectString.isEmpty()) return
 
         GameInviteNotificationManager.show(callback.inviterSteamId, callback.connectString)

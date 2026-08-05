@@ -4,6 +4,7 @@ import android.os.Process;
 import android.util.Log;
 
 import app.gamenative.BuildConfig;
+import com.winlator.xenvironment.components.EnvRedactor;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -207,7 +208,13 @@ public abstract class ProcessHelper {
             if (BuildConfig.MODERN_ANDROID) command = "/system/bin/linker64 " + command;
 
             if (BuildConfig.DEBUG) {
-                Log.d("ProcessHelper", "Executing with output: " + Arrays.toString(splitCommand(command)) + ", " + Arrays.toString(envp) + ", " + workingDir);
+                Log.d(
+                        "ProcessHelper",
+                        "Executing with output: "
+                                + EnvRedactor.redactText(Arrays.toString(splitCommand(command)))
+                                + ", " + EnvRedactor.redact(envp)
+                                + ", " + workingDir
+                );
             }
 
             ProcessBuilder pb = new ProcessBuilder(splitCommand(command));
@@ -307,7 +314,13 @@ public abstract class ProcessHelper {
             if (BuildConfig.MODERN_ANDROID) command = "/system/bin/linker64 " + command;
 
             if (BuildConfig.DEBUG) {
-                Log.d("ProcessHelper", "Executing: " + Arrays.toString(splitCommand(command)) + ", " + Arrays.toString(envp) + ", " + workingDir);
+                Log.d(
+                        "ProcessHelper",
+                        "Executing: "
+                                + EnvRedactor.redactText(Arrays.toString(splitCommand(command)))
+                                + ", " + EnvRedactor.redact(envp)
+                                + ", " + workingDir
+                );
             }
 
             process = Runtime.getRuntime().exec(splitCommand(command), envp, workingDir);
@@ -340,7 +353,13 @@ public abstract class ProcessHelper {
             if (BuildConfig.MODERN_ANDROID) command = "/system/bin/linker64 " + command;
 
             if (BuildConfig.DEBUG) {
-                Log.d("ProcessHelper", "Executing: " + Arrays.toString(splitCommand(command)) + ", " + Arrays.toString(envp) + ", " + workingDir);
+                Log.d(
+                        "ProcessHelper",
+                        "Executing: "
+                                + EnvRedactor.redactText(Arrays.toString(splitCommand(command)))
+                                + ", " + EnvRedactor.redact(envp)
+                                + ", " + workingDir
+                );
             }
 
             java.lang.Process process = Runtime.getRuntime().exec(splitCommand(command), envp, workingDir);

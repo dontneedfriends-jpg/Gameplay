@@ -733,7 +733,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
             FileUtils.chmod(box64File, 0755);
         }
 
-        Log.d("BionicProgramLauncherComponent", "Shell command is " + finalCommand);
+        Log.d("BionicProgramLauncherComponent", "Shell command is " + EnvRedactor.redactText(finalCommand));
         return ProcessHelper.execWithOutput(finalCommand, envVars.toStringArray(),
                 workingDir != null ? workingDir : imageFs.getRootDir(), includeStderr);
     }

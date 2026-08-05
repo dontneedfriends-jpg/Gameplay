@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import app.gamenative.service.amazon.AmazonAuthManager
 import app.gamenative.ui.component.dialog.AuthWebViewDialog
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.utils.redactUrlForLogging
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -86,25 +87,28 @@ private fun AmazonAuthWebView(
                 if (!isAmazonRedirect(url)) return false
                 val code = extractAuthCode(url)
                 if (code != null && codeCaptured.compareAndSet(false, true)) {
-                    Timber.i("[AmazonOAuth] ✓ Code captured in $source: ${url.take(120)}...")
+                    Timber.i("[AmazonOAuth] ✓ Code captured in $source: ${redactUrlForLogging(url)}")
                     onCodeCaptured(code)
                     return true
                 } else if (code == null) {
-                    Timber.d("[AmazonOAuth] Amazon redirect but no auth code yet ($source): ${url.take(120)}...")
+                    Timber.d(
+                        "[AmazonOAuth] Amazon redirect but no auth code yet ($source): " +
+                            redactUrlForLogging(url),
+                    )
                 }
                 return false
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
-                Timber.d("[AmazonOAuth] shouldOverrideUrlLoading: ${url.take(120)}...")
+                Timber.d("[AmazonOAuth] shouldOverrideUrlLoading: ${redactUrlForLogging(url)}")
                 return tryCapture(url, "shouldOverrideUrlLoading")
             }
 
             @Deprecated("Deprecated in Java")
             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                 if (url == null) return false
-                Timber.d("[AmazonOAuth] shouldOverrideUrlLoading(legacy): ${url.take(120)}...")
+                Timber.d("[AmazonOAuth] shouldOverrideUrlLoading(legacy): ${redactUrlForLogging(url)}")
                 return tryCapture(url, "shouldOverrideUrlLoading(legacy)")
             }
 
@@ -113,7 +117,7 @@ private fun AmazonAuthWebView(
             override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 if (url == null) return
-                Timber.d("[AmazonOAuth] onPageStarted: ${url.take(120)}...")
+                Timber.d("[AmazonOAuth] onPageStarted: ${redactUrlForLogging(url)}")
                 if (tryCapture(url, "onPageStarted")) {
                     // Stop the amazon.com homepage from fully loading after code is captured
                     view?.stopLoading()
