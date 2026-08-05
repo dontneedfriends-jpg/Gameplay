@@ -23,7 +23,8 @@
     },
     {
       "path": "wowbox64.yml",
-      "type": "wowbox64"
+      "type": "wowbox64",
+      "schemaVersion": 2
     },
     {
       "path": "vkd3d.yml",

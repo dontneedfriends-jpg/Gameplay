@@ -58,6 +58,7 @@ ARCHIVE_FORMAT_SUFFIXES = {
     "tar.xz": ".tar.xz",
     "adpkg": ".adpkg",
 }
+LEGACY_DOWNLOAD_HOST = "downloads.gamenative.app"
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,64}$")
 
@@ -126,6 +127,8 @@ def _validate_v2_entry(entry: dict[str, Any], label: str) -> None:
         _validate_https_url(url, label, require_archive=True)
         if not urlparse(url).path.lower().endswith(expected_suffix):
             raise CatalogError(f"{label}: URL does not match archiveFormat {entry['archiveFormat']}")
+    if urlparse(entry["urls"][0]).hostname.lower() == LEGACY_DOWNLOAD_HOST:
+        raise CatalogError(f"{label}: legacy GameNative host may only be used as a fallback URL")
     if not isinstance(entry["sizeBytes"], int) or isinstance(entry["sizeBytes"], bool) or entry["sizeBytes"] <= 0:
         raise CatalogError(f"{label}: sizeBytes must be a positive integer")
     if not isinstance(entry["sha256"], str) or not SHA256_RE.fullmatch(entry["sha256"]):
@@ -173,16 +176,22 @@ def load_and_validate_sources(index_path: Path = DEFAULT_INDEX) -> tuple[dict[st
         raise CatalogError("index sources must be a non-empty list")
 
     groups: dict[str, list[dict[str, Any]]] = {}
+    group_schemas: dict[str, int] = {}
     ids: set[str] = set()
     for source in sources:
-        if not isinstance(source, dict) or set(source) != {"path", "type"}:
-            raise CatalogError("each index source must contain exactly path and type")
+        if not isinstance(source, dict) or not {"path", "type"}.issubset(source) or set(source) - {"path", "type", "schemaVersion"}:
+            raise CatalogError("each index source must contain path, type and optional schemaVersion")
         relative = source["path"]
         expected_type = source["type"]
+        entry_schema = source.get("schemaVersion", source_schema)
         if not isinstance(relative, str) or not isinstance(expected_type, str):
             raise CatalogError("source path and type must be strings")
         if expected_type in groups:
             raise CatalogError(f"duplicate catalog type: {expected_type}")
+        if entry_schema not in {1, 2}:
+            raise CatalogError(f"{relative}: schemaVersion must be 1 or 2")
+        if source_schema == 2 and entry_schema != 2:
+            raise CatalogError(f"{relative}: schema v2 output cannot contain legacy source entries")
         document = load_yaml_subset(_safe_source_path(index_path.parent, relative))
         if not isinstance(document, dict) or set(document) != {"type", "components"}:
             raise CatalogError(f"{relative} must contain exactly type and components")
@@ -197,7 +206,7 @@ def load_and_validate_sources(index_path: Path = DEFAULT_INDEX) -> tuple[dict[st
             label = f"{relative} components[{position}]"
             if not isinstance(entry, dict):
                 raise CatalogError(f"{label}: entry must be an object")
-            if source_schema == 1:
+            if entry_schema == 1:
                 unknown = set(entry) - ENTRY_KEYS
                 missing = {"id", "name", "url"} - set(entry)
                 if unknown or missing:
@@ -212,11 +221,19 @@ def load_and_validate_sources(index_path: Path = DEFAULT_INDEX) -> tuple[dict[st
             ids.add(entry["id"])
             validated.append(entry)
         groups[expected_type] = validated
+        group_schemas[expected_type] = entry_schema
 
-    if source_schema == 2:
+    if 2 in group_schemas.values():
         entries_by_id = {entry["id"]: entry for entries in groups.values() for entry in entries}
+        entry_schemas = {
+            entry["id"]: group_schemas[group]
+            for group, entries in groups.items()
+            for entry in entries
+        }
         stable_keys: set[tuple[Any, ...]] = set()
         for group, entries in groups.items():
+            if group_schemas[group] != 2:
+                continue
             for entry in entries:
                 label = entry["id"]
                 if group not in LEGACY_TYPES:
@@ -230,6 +247,8 @@ def load_and_validate_sources(index_path: Path = DEFAULT_INDEX) -> tuple[dict[st
                     target = entries_by_id.get(dependency)
                     if target is None:
                         raise CatalogError(f"{label}: missing dependency {dependency}")
+                    if entry_schemas[dependency] != 2:
+                        raise CatalogError(f"{label}: dependency {dependency} still has unverified legacy metadata")
                     if entry["channel"] == "stable" and target["channel"] == "experimental":
                         raise CatalogError(f"{label}: stable component depends on experimental component {dependency}")
     return output, groups
@@ -237,6 +256,11 @@ def load_and_validate_sources(index_path: Path = DEFAULT_INDEX) -> tuple[dict[st
 
 def generate_manifest(index_path: Path = DEFAULT_INDEX) -> str:
     output, groups = load_and_validate_sources(index_path)
+    index = load_yaml_subset(index_path)
+    group_schemas = {
+        source["type"]: source.get("schemaVersion", index["sourceSchemaVersion"])
+        for source in index["sources"]
+    }
     if output.get("schemaVersion") == 2:
         components = [dict(entry, type=group) for group, entries in groups.items() for entry in entries]
         return dump_yaml_subset(
@@ -253,7 +277,18 @@ def generate_manifest(index_path: Path = DEFAULT_INDEX) -> str:
             continue
         if group not in LEGACY_TYPES:
             raise CatalogError(f"legacy manifest cannot contain non-empty type: {group}")
-        items[group] = entries
+        if group_schemas[group] == 2:
+            items[group] = [
+                {
+                    "id": entry["id"],
+                    "name": entry["name"],
+                    "url": entry["urls"][0],
+                    **({"variant": entry["variant"]} if "variant" in entry else {}),
+                }
+                for entry in entries
+            ]
+        else:
+            items[group] = entries
     return dump_yaml_subset({"version": 1, "updatedAt": output["updatedAt"], "items": items})
 
 

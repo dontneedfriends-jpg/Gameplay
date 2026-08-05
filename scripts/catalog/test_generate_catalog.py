@@ -116,6 +116,83 @@ class GenerateCatalogTest(unittest.TestCase):
         with self.assertRaisesRegex(CatalogError, "does not match archiveFormat"):
             load_and_validate_sources(index)
 
+    def test_v2_rejects_legacy_host_as_primary_url(self):
+        entry = self.v2_entry()
+        entry["urls"] = ["https://downloads.gamenative.app/fex.wcp"]
+        index = self.write_v2_source([entry])
+
+        with self.assertRaisesRegex(CatalogError, "may only be used as a fallback"):
+            load_and_validate_sources(index)
+
+    def test_v2_allows_legacy_host_as_fallback_url(self):
+        entry = self.v2_entry()
+        entry["urls"].append("https://downloads.gamenative.app/fex.wcp")
+        index = self.write_v2_source([entry])
+
+        load_and_validate_sources(index)
+
+    def test_v1_output_down_converts_a_migrated_source(self):
+        entry = self.v2_entry()
+        (self.catalog_dir / "fex.yml").write_text(
+            json.dumps({"type": "fexcore", "components": [entry]}),
+            encoding="utf-8",
+        )
+        index = {
+            "sourceSchemaVersion": 1,
+            "output": {"version": 1, "updatedAt": "2026-08-05"},
+            "sources": [{"path": "fex.yml", "type": "fexcore", "schemaVersion": 2}],
+        }
+        index_path = self.catalog_dir / "index.yml"
+        index_path.write_text(json.dumps(index), encoding="utf-8")
+
+        generated = json.loads(generate_manifest(index_path))
+
+        self.assertEqual(
+            {
+                "id": entry["id"],
+                "name": entry["name"],
+                "url": entry["urls"][0],
+                "variant": entry["variant"],
+            },
+            generated["items"]["fexcore"][0],
+        )
+
+    def test_migrated_source_rejects_dependency_on_legacy_metadata(self):
+        migrated = self.v2_entry()
+        migrated["requires"] = ["legacy-dxvk"]
+        (self.catalog_dir / "fex.yml").write_text(
+            json.dumps({"type": "fexcore", "components": [migrated]}),
+            encoding="utf-8",
+        )
+        (self.catalog_dir / "dxvk.yml").write_text(
+            json.dumps(
+                {
+                    "type": "dxvk",
+                    "components": [
+                        {
+                            "id": "legacy-dxvk",
+                            "name": "Legacy DXVK",
+                            "url": "https://example.com/dxvk.wcp",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        index = {
+            "sourceSchemaVersion": 1,
+            "output": {"version": 1, "updatedAt": "2026-08-05"},
+            "sources": [
+                {"path": "fex.yml", "type": "fexcore", "schemaVersion": 2},
+                {"path": "dxvk.yml", "type": "dxvk"},
+            ],
+        }
+        index_path = self.catalog_dir / "index.yml"
+        index_path.write_text(json.dumps(index), encoding="utf-8")
+
+        with self.assertRaisesRegex(CatalogError, "unverified legacy metadata"):
+            load_and_validate_sources(index_path)
+
     @staticmethod
     def v2_entry():
         return {
