@@ -42,6 +42,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
@@ -87,6 +89,7 @@ import app.gamenative.ui.component.GamepadAction
 import app.gamenative.ui.component.GamepadActionBar
 import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.LibraryActions
+import app.gamenative.ui.component.DualScreenAmbientStage
 import app.gamenative.ui.component.dialog.ContainerConfigDialog
 import app.gamenative.ui.component.dialog.LoadingDialog
 import app.gamenative.ui.components.rememberCustomGameFolderPicker
@@ -120,6 +123,7 @@ import app.gamenative.ui.screen.auth.AmazonOAuthActivity
 import app.gamenative.ui.screen.auth.EpicOAuthActivity
 import app.gamenative.ui.screen.auth.GOGOAuthActivity
 import app.gamenative.ui.screen.library.components.SystemMenu
+import app.gamenative.ui.screen.library.components.DualSystemMenu
 import app.gamenative.ui.screen.library.components.ConsoleImportPanel
 import app.gamenative.ui.screen.library.components.LibraryQuickActionsPanel
 import app.gamenative.ui.theme.PluviaTheme
@@ -1048,61 +1052,118 @@ private fun LibraryScreenContent(
                 gridFocusTargetListIndex.coerceIn(0, state.appInfoList.lastIndex.coerceAtLeast(0))
             }
             val focusedItem = state.appInfoList.getOrNull(focusedIndex)
+            val gogLoggedIn = app.gamenative.service.gog.GOGAuthManager.hasStoredCredentials(context)
+            val epicLoggedIn = app.gamenative.service.epic.EpicAuthManager.hasStoredCredentials(context)
+            val amazonLoggedIn = app.gamenative.service.amazon.AmazonAuthManager.hasStoredCredentials(context)
+            val systemMenuContent: @Composable () -> Unit = {
+                DualSystemMenu(
+                    onDismiss = { isSystemMenuOpen = false },
+                    onNavigateRoute = onNavigateRoute,
+                    onDownloadsClick = onDownloadsClick,
+                    onLogout = onLogout,
+                    onGoOnline = onGoOnline,
+                    isOffline = isOffline,
+                    gogLoggedIn = gogLoggedIn,
+                    epicLoggedIn = epicLoggedIn,
+                    amazonLoggedIn = amazonLoggedIn,
+                    onGogLoginClick = {
+                        gogOAuthLauncher.launch(Intent(context, GOGOAuthActivity::class.java))
+                    },
+                    onGogLogoutClick = {
+                        PlatformAuthUiHelpers.logoutGog(
+                            context = context,
+                            scope = lifecycleScope,
+                            callbacks = PlatformLogoutCallbacks(),
+                        )
+                    },
+                    onEpicLoginClick = {
+                        epicOAuthLauncher.launch(Intent(context, EpicOAuthActivity::class.java))
+                    },
+                    onEpicLogoutClick = {
+                        PlatformAuthUiHelpers.logoutEpic(
+                            context = context,
+                            scope = lifecycleScope,
+                            callbacks = PlatformLogoutCallbacks(),
+                        )
+                    },
+                    onAmazonLoginClick = {
+                        amazonOAuthLauncher.launch(Intent(context, AmazonOAuthActivity::class.java))
+                    },
+                    onAmazonLogoutClick = {
+                        PlatformAuthUiHelpers.logoutAmazon(
+                            context = context,
+                            scope = lifecycleScope,
+                            callbacks = PlatformLogoutCallbacks(),
+                        )
+                    },
+                )
+            }
             SideEffect {
-                DsHomeSecondScreen.publish(DsHomeSecondScreen.Model(
-                    owner = DsHomeSecondScreen.Owner.LIBRARY,
-                    mode = DsHomeSecondScreen.Mode.GRID,
-                    items = state.appInfoList,
-                    focusedIndex = focusedIndex,
-                    focusedItem = focusedItem,
-                    focusedStats = focusedItem?.let { state.statsFor(it) },
-                    focusedCompat = focusedItem?.let { state.compatibilityMap[it.name] },
-                    libraryLayout = currentPaneType,
-                    currentTab = state.currentTab,
-                    isLoading = state.isLoading,
-                    isSearching = state.isSearching,
-                    searchQuery = state.searchQuery,
-                    onSearchQuery = onSearchQuery,
-                    onSearchToggle = {
-                        if (state.isSearching) {
-                            onIsSearching(false)
-                            onSearchQuery("")
-                        } else {
-                            onIsSearching(true)
-                        }
+                DsHomeSecondScreen.publish(
+                    if (isSystemMenuOpen) {
+                        DsHomeSecondScreen.Model(
+                            owner = DsHomeSecondScreen.Owner.LIBRARY,
+                            mode = DsHomeSecondScreen.Mode.SETTINGS,
+                            onBack = { isSystemMenuOpen = false },
+                            settingsContent = systemMenuContent,
+                        )
+                    } else {
+                        DsHomeSecondScreen.Model(
+                            owner = DsHomeSecondScreen.Owner.LIBRARY,
+                            mode = DsHomeSecondScreen.Mode.GRID,
+                            items = state.appInfoList,
+                            focusedIndex = focusedIndex,
+                            focusedItem = focusedItem,
+                            focusedStats = focusedItem?.let { state.statsFor(it) },
+                            focusedCompat = focusedItem?.let { state.compatibilityMap[it.name] },
+                            libraryLayout = currentPaneType,
+                            currentTab = state.currentTab,
+                            isLoading = state.isLoading,
+                            isSearching = state.isSearching,
+                            searchQuery = state.searchQuery,
+                            onSearchQuery = onSearchQuery,
+                            onSearchToggle = {
+                                if (state.isSearching) {
+                                    onIsSearching(false)
+                                    onSearchQuery("")
+                                } else {
+                                    onIsSearching(true)
+                                }
+                            },
+                            onPreviousTab = onPreviousTab,
+                            onNextTab = onNextTab,
+                            onOptions = { onOptionsPanelToggle(true) },
+                            onSystemMenu = { isSystemMenuOpen = true },
+                            onOpenSettings = { onNavigateRoute(PluviaScreen.Settings.route) },
+                            onAddGame = onAddCustomGameClick,
+                            onQuickActions = { isQuickActionsOpen = true },
+                            onLayoutCycle = {
+                                val newLayout = if (
+                                    currentPaneType == PaneType.LIST ||
+                                    currentPaneType == PaneType.INSTALLED_COMPACT
+                                ) {
+                                    PaneType.GRID_CAPSULE
+                                } else {
+                                    PaneType.LIST
+                                }
+                                currentPaneType = newLayout
+                                PrefManager.libraryLayout = newLayout
+                            },
+                            onRefresh = onRefresh,
+                            onNavigate = { appId ->
+                                selectedAppId = appId
+                                selectedLibraryItem = state.appInfoList.find { it.appId == appId }
+                            },
+                            onFocused = { idx ->
+                                if (currentPaneType == PaneType.CAROUSEL) {
+                                    carouselFocusTargetListIndex = idx
+                                } else {
+                                    gridFocusTargetListIndex = idx
+                                }
+                            },
+                        )
                     },
-                    onPreviousTab = onPreviousTab,
-                    onNextTab = onNextTab,
-                    onOptions = { onOptionsPanelToggle(true) },
-                    onSystemMenu = { isSystemMenuOpen = true },
-                    onOpenSettings = { onNavigateRoute(PluviaScreen.Settings.route) },
-                    onAddGame = onAddCustomGameClick,
-                    onQuickActions = { isQuickActionsOpen = true },
-                    onLayoutCycle = {
-                        val newLayout = if (
-                            currentPaneType == PaneType.LIST ||
-                            currentPaneType == PaneType.INSTALLED_COMPACT
-                        ) {
-                            PaneType.GRID_CAPSULE
-                        } else {
-                            PaneType.LIST
-                        }
-                        currentPaneType = newLayout
-                        PrefManager.libraryLayout = newLayout
-                    },
-                    onRefresh = onRefresh,
-                    onNavigate = { appId ->
-                        selectedAppId = appId
-                        selectedLibraryItem = state.appInfoList.find { it.appId == appId }
-                    },
-                    onFocused = { idx ->
-                        if (currentPaneType == PaneType.CAROUSEL) {
-                            carouselFocusTargetListIndex = idx
-                        } else {
-                            gridFocusTargetListIndex = idx
-                        }
-                    },
-                ))
+                )
             }
         }
 
@@ -1190,17 +1251,27 @@ private fun LibraryScreenContent(
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else if (hasExternalDisplay) {
-                    val focusedIndex = if (currentPaneType == PaneType.CAROUSEL) {
-                        currentCarouselFocusTargetIndex()
+                    if (isSystemMenuOpen) {
+                        DualScreenAmbientStage(
+                            icon = Icons.Default.AccountCircle,
+                            label = stringResource(R.string.app_name),
+                            title = stringResource(R.string.system_hub_title),
+                            description = stringResource(R.string.system_hub_stage_description),
+                            accent = PluviaTheme.colors.accentCyan,
+                        )
                     } else {
-                        gridFocusTargetListIndex.coerceIn(0, state.appInfoList.lastIndex.coerceAtLeast(0))
+                        val focusedIndex = if (currentPaneType == PaneType.CAROUSEL) {
+                            currentCarouselFocusTargetIndex()
+                        } else {
+                            gridFocusTargetListIndex.coerceIn(0, state.appInfoList.lastIndex.coerceAtLeast(0))
+                        }
+                        DsHeroCard(
+                            item = state.appInfoList.getOrNull(focusedIndex),
+                            onClick = {},
+                            interactive = false,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
-                    DsHeroCard(
-                        item = state.appInfoList.getOrNull(focusedIndex),
-                        onClick = {},
-                        interactive = false,
-                        modifier = Modifier.fillMaxSize(),
-                    )
                 } else {
                     // Library list (content scrolls behind tab bar)
                     if (currentPaneType == PaneType.CAROUSEL) {
@@ -1453,7 +1524,7 @@ private fun LibraryScreenContent(
             val amazonLoggedIn = app.gamenative.service.amazon.AmazonAuthManager.hasStoredCredentials(context)
 
             SystemMenu(
-                isOpen = isSystemMenuOpen,
+                isOpen = isSystemMenuOpen && !hasExternalDisplay,
                 onDismiss = { isSystemMenuOpen = false },
                 onNavigateRoute = onNavigateRoute,
                 onDownloadsClick = onDownloadsClick,

@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.AirplaneTicket
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -57,6 +58,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.gamenative.PluviaApp
@@ -587,6 +589,340 @@ fun SystemMenu(
                             )
                         }
                     }
+    }
+}
+
+/**
+ * Touch-first, full-screen system center used by the lower display. It keeps
+ * account connections and global destinations visible without borrowing the
+ * gamepad focus or the narrow single-screen side-panel layout.
+ */
+@Composable
+fun DualSystemMenu(
+    onDismiss: () -> Unit,
+    onNavigateRoute: (String) -> Unit,
+    onDownloadsClick: () -> Unit,
+    onLogout: () -> Unit,
+    onGoOnline: () -> Unit,
+    isOffline: Boolean,
+    gogLoggedIn: Boolean,
+    epicLoggedIn: Boolean,
+    amazonLoggedIn: Boolean,
+    onGogLoginClick: () -> Unit,
+    onGogLogoutClick: () -> Unit,
+    onEpicLoginClick: () -> Unit,
+    onEpicLogoutClick: () -> Unit,
+    onAmazonLoginClick: () -> Unit,
+    onAmazonLogoutClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val uriHandler = LocalUriHandler.current
+    var persona by remember { mutableStateOf<SteamFriend?>(null) }
+
+    LaunchedEffect(Unit) {
+        persona = SteamService.instance?.localPersona?.value
+        SteamService.userSteamId?.let { SteamService.requestUserPersona() }
+    }
+
+    DisposableEffect(Unit) {
+        val onPersonaStateReceived: (SteamEvent.PersonaStateReceived) -> Unit = { event ->
+            persona = event.persona
+        }
+        val onLoggedOut: (SteamEvent.LoggedOut) -> Unit = {
+            persona = SteamFriend()
+        }
+        PluviaApp.events.on<SteamEvent.PersonaStateReceived, Unit>(onPersonaStateReceived)
+        PluviaApp.events.on<SteamEvent.LoggedOut, Unit>(onLoggedOut)
+        onDispose {
+            PluviaApp.events.off<SteamEvent.PersonaStateReceived, Unit>(onPersonaStateReceived)
+            PluviaApp.events.off<SteamEvent.LoggedOut, Unit>(onLoggedOut)
+        }
+    }
+
+    BackHandler(onBack = onDismiss)
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        ConsolePanelHeader(
+            title = stringResource(R.string.system_hub_title),
+            onBack = onDismiss,
+        )
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .focusGroup(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.system_hub_profile_section),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(58.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (persona?.avatarHash?.isNotEmpty() == true) {
+                            SteamIconImage(
+                                size = 58.dp,
+                                image = { persona?.avatarHash?.getAvatarURL() },
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = persona?.name ?: PrefManager.username.ifBlank {
+                                stringResource(R.string.default_user_name)
+                            },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = when {
+                                !SteamService.isLoggedIn -> stringResource(R.string.system_hub_not_connected)
+                                isOffline -> stringResource(R.string.system_hub_offline)
+                                else -> stringResource(R.string.system_hub_connected)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = when {
+                                !SteamService.isLoggedIn -> MaterialTheme.colorScheme.onSurfaceVariant
+                                isOffline -> PluviaTheme.colors.statusAway
+                                else -> PluviaTheme.colors.statusInstalled
+                            },
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Column {
+                    if (isOffline || !SteamService.isLoggedIn) {
+                        SystemHubRow(
+                            title = stringResource(
+                                if (!SteamService.isLoggedIn) R.string.steam_sign_in else R.string.steam_go_online,
+                            ),
+                            subtitle = stringResource(R.string.system_hub_steam_action_description),
+                            icon = Icons.AutoMirrored.Filled.Login,
+                            onClick = onGoOnline,
+                        )
+                    } else {
+                        SystemHubRow(
+                            title = stringResource(R.string.steam_go_offline),
+                            subtitle = stringResource(R.string.system_hub_steam_offline_description),
+                            icon = Icons.AutoMirrored.Filled.AirplaneTicket,
+                            onClick = {
+                                onNavigateRoute(PluviaScreen.Home.route + "?offline=true")
+                                onDismiss()
+                            },
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+                        SystemHubRow(
+                            title = stringResource(R.string.steam_sign_out),
+                            subtitle = stringResource(R.string.system_hub_steam_sign_out_description),
+                            icon = Icons.AutoMirrored.Filled.Logout,
+                            onClick = {
+                                onLogout()
+                                onDismiss()
+                            },
+                            destructive = true,
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = stringResource(R.string.system_hub_destinations_section),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Column {
+                    SystemHubRow(
+                        title = stringResource(R.string.app_downloads),
+                        subtitle = stringResource(R.string.system_hub_downloads_description),
+                        icon = Icons.Default.Download,
+                        onClick = {
+                            onDownloadsClick()
+                            onDismiss()
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+                    SystemHubRow(
+                        title = stringResource(R.string.settings_text),
+                        subtitle = stringResource(R.string.system_hub_settings_description),
+                        icon = Icons.Default.Settings,
+                        onClick = {
+                            onNavigateRoute(PluviaScreen.Settings.route)
+                            onDismiss()
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+                    SystemHubRow(
+                        title = stringResource(R.string.help_and_support),
+                        subtitle = stringResource(R.string.system_hub_support_description),
+                        icon = Icons.AutoMirrored.Filled.Help,
+                        onClick = { uriHandler.openUri("https://discord.gg/2hKv4VfZfE") },
+                    )
+                }
+            }
+
+            Text(
+                text = stringResource(R.string.system_hub_connections_section),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+            ) {
+                Column {
+                    SystemHubServiceRow(
+                        serviceName = "GOG",
+                        connected = gogLoggedIn,
+                        onClick = if (gogLoggedIn) onGogLogoutClick else onGogLoginClick,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+                    SystemHubServiceRow(
+                        serviceName = "Epic Games",
+                        connected = epicLoggedIn,
+                        onClick = if (epicLoggedIn) onEpicLogoutClick else onEpicLoginClick,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f))
+                    SystemHubServiceRow(
+                        serviceName = "Amazon Games",
+                        connected = amazonLoggedIn,
+                        onClick = if (amazonLoggedIn) onAmazonLogoutClick else onAmazonLoginClick,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+    }
+}
+
+@Composable
+private fun SystemHubServiceRow(
+    serviceName: String,
+    connected: Boolean,
+    onClick: () -> Unit,
+) {
+    SystemHubRow(
+        title = serviceName,
+        subtitle = stringResource(
+            if (connected) R.string.system_hub_connected else R.string.system_hub_not_connected,
+        ),
+        icon = if (connected) Icons.AutoMirrored.Filled.Logout else Icons.AutoMirrored.Filled.Login,
+        onClick = onClick,
+        destructive = connected,
+    )
+}
+
+@Composable
+private fun SystemHubRow(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    destructive: Boolean = false,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val contentColor = when {
+        destructive -> MaterialTheme.colorScheme.error
+        focused -> MaterialTheme.colorScheme.onPrimaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                if (focused) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
+                else Color.Transparent,
+            )
+            .selectable(
+                selected = focused,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = 16.dp, vertical = 13.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(24.dp),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (destructive) {
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.76f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

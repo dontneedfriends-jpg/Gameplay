@@ -10,6 +10,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -52,7 +53,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +72,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -80,8 +88,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.gamenative.R
+import app.gamenative.externaldisplay.DsHomeSecondScreen
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
+import app.gamenative.ui.component.DualScreenAmbientStage
 import app.gamenative.ui.component.dialog.MessageDialog
 import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.data.DownloadItemState
@@ -93,6 +103,7 @@ import app.gamenative.ui.screen.settings.ContainerStorageManagerContent
 import app.gamenative.ui.screen.settings.ContainerStorageManagerTransientUi
 import app.gamenative.ui.screen.settings.rememberContainerStorageManagerUiState
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.utils.rememberHasExternalDisplay
 import com.skydoves.landscapist.ImageOptions
 import com.skydoves.landscapist.coil.CoilImage
 import kotlinx.coroutines.delay
@@ -122,6 +133,7 @@ fun HomeDownloadsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val storageManagerState = rememberContainerStorageManagerUiState()
+    val hasExternalDisplay = rememberHasExternalDisplay()
     val scope = rememberCoroutineScope()
     var selectedSectionIndex by rememberSaveable { mutableIntStateOf(DownloadsSection.Downloads.ordinal) }
     val sections = remember { DownloadsSection.values().toList() }
@@ -162,6 +174,7 @@ fun HomeDownloadsScreen(
         clearSelectedLibraryItem()
     }
 
+    val workspaceContent: @Composable () -> Unit = {
     if (selectedLibraryItem != null) {
         LibraryDetailPane(
             libraryItem = selectedLibraryItem,
@@ -273,6 +286,32 @@ fun HomeDownloadsScreen(
             }
         }
     }
+    }
+
+    if (hasExternalDisplay) {
+        SideEffect {
+            DsHomeSecondScreen.publish(
+                DsHomeSecondScreen.Model(
+                    owner = DsHomeSecondScreen.Owner.SYSTEM,
+                    mode = DsHomeSecondScreen.Mode.SETTINGS,
+                    onBack = {
+                        if (selectedLibraryItem != null) clearSelectedLibraryItem() else onBack()
+                    },
+                    settingsContent = workspaceContent,
+                ),
+            )
+        }
+        DisposableEffect(Unit) {
+            onDispose { DsHomeSecondScreen.clear(DsHomeSecondScreen.Owner.SYSTEM) }
+        }
+        DualDownloadsStage(
+            onBack = {
+                if (selectedLibraryItem != null) clearSelectedLibraryItem() else onBack()
+            },
+        )
+    } else {
+        workspaceContent()
+    }
 
     val confirmation = state.cancelConfirmation
     MessageDialog(
@@ -289,6 +328,39 @@ fun HomeDownloadsScreen(
     )
 
     ContainerStorageManagerTransientUi(storageManagerState)
+}
+
+@Composable
+private fun DualDownloadsStage(onBack: () -> Unit) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.ButtonB) {
+                    onBack()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
+    ) {
+        DualScreenAmbientStage(
+            icon = Icons.Default.Download,
+            label = stringResource(R.string.app_name),
+            title = stringResource(R.string.app_downloads),
+            description = stringResource(R.string.downloads_stage_description),
+            accent = PluviaTheme.colors.statusDownloading,
+            hint = stringResource(R.string.downloads_stage_navigation_hint),
+        )
+    }
 }
 
 @Composable

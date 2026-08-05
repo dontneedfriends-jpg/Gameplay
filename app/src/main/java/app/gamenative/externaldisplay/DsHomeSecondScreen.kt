@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
@@ -138,6 +139,7 @@ object DsHomeSecondScreen {
 
     enum class Owner {
         LIBRARY,
+        SYSTEM,
         GAME_CARD,
         SETTINGS,
         GAME,
@@ -206,6 +208,7 @@ object DsHomeSecondScreen {
         val performanceHudKey: Int = 0,
         val onShowDashboard: () -> Unit = {},
         val onShowMenu: () -> Unit = {},
+        val onBack: () -> Unit = {},
         val onNavigate: (String) -> Unit = {},
         val onFocused: (Int) -> Unit = {},
     )
@@ -241,9 +244,10 @@ object DsHomeSecondScreen {
     private val Owner.priority: Int
         get() = when (this) {
             Owner.LIBRARY -> 0
-            Owner.SETTINGS -> 1
-            Owner.GAME_CARD -> 2
-            Owner.GAME -> 3
+            Owner.SYSTEM -> 1
+            Owner.SETTINGS -> 2
+            Owner.GAME_CARD -> 3
+            Owner.GAME -> 4
         }
 }
 
@@ -347,12 +351,13 @@ class DsHomePresentation(
 
     private fun updateInputMode(mode: DsHomeSecondScreen.Mode) {
         val gamePanel = mode == DsHomeSecondScreen.Mode.GAME_DASHBOARD ||
-            mode == DsHomeSecondScreen.Mode.QUICK_MENU
+            mode == DsHomeSecondScreen.Mode.QUICK_MENU ||
+            mode == DsHomeSecondScreen.Mode.SETTINGS
         val passive = mode == DsHomeSecondScreen.Mode.DETAILS ||
             mode == DsHomeSecondScreen.Mode.QUICK_MENU_PASSIVE
         if (gamePanel) {
-            // The lower screen stays touchable, but never becomes the gamepad
-            // focus target while a game is running.
+            // Game and system workspaces stay touchable on the lower screen,
+            // while hardware keys remain routed through the upper stage.
             window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             window?.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         } else if (passive) {
@@ -376,7 +381,32 @@ class DsHomePresentation(
     // so in-menu BackHandlers (e.g. QuickMenu dismiss) work too. Consuming the
     // event also stops the Dialog's default dismiss.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val currentModel = DsHomeSecondScreen.model
+        if (event.action == KeyEvent.ACTION_DOWN && currentModel?.mode == DsHomeSecondScreen.Mode.SETTINGS) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_BUTTON_L1,
+                KeyEvent.KEYCODE_BUTTON_L2,
+                -> {
+                    currentModel.onPreviousTab()
+                    return true
+                }
+                KeyEvent.KEYCODE_BUTTON_R1,
+                KeyEvent.KEYCODE_BUTTON_R2,
+                -> {
+                    currentModel.onNextTab()
+                    return true
+                }
+                KeyEvent.KEYCODE_BUTTON_B -> {
+                    currentModel.onBack()
+                    return true
+                }
+            }
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (currentModel?.mode == DsHomeSecondScreen.Mode.SETTINGS) {
+                currentModel.onBack()
+                return true
+            }
             if (event.action == KeyEvent.ACTION_DOWN) {
                 val handledInCompose = composeView.dispatchKeyEvent(event)
                 if (!handledInCompose) {
@@ -601,6 +631,12 @@ private fun DualLibraryHeader(model: DsHomeSecondScreen.Model) {
         }
         IconButton(onClick = model.onOptions) {
             Icon(Icons.Default.Tune, contentDescription = stringResource(app.gamenative.R.string.options))
+        }
+        IconButton(onClick = model.onSystemMenu) {
+            Icon(
+                Icons.Default.AccountCircle,
+                contentDescription = stringResource(app.gamenative.R.string.system_hub_open),
+            )
         }
         IconButton(onClick = model.onOpenSettings) {
             Icon(Icons.Default.Settings, contentDescription = stringResource(app.gamenative.R.string.settings_title))
