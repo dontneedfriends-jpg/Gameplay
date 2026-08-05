@@ -11,6 +11,15 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
 
 jobs:
+  catalog-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate generated component catalog
+        run: |
+          python3 scripts/catalog/generate_catalog.py --check
+          python3 -m unittest discover -s scripts/catalog -p 'test_*.py'
+
   validate-workflows:
     runs-on: ubuntu-latest
     steps:
@@ -33,7 +42,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: validate-workflows
+    needs: [catalog-validation, validate-workflows]
 
     steps:
       - name: Checking out Gameplay

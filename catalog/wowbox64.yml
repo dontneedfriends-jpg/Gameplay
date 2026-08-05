@@ -1,0 +1,11 @@
+{
+  "type": "wowbox64",
+  "components": [
+    {
+      "id": "0.3.6-0",
+      "name": "WOWBox64 0.3.6",
+      "url": "https://github.com/Arihany/WinlatorWCPHub/releases/download/WOWBOX64/wowbox64-0.3.6.wcp",
+      "variant": "bionic"
+    }
+  ]
+}
