@@ -11,6 +11,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -20,6 +22,61 @@ data class ManifestInstallResult(
 )
 
 object ManifestInstaller {
+    internal fun downloadUrls(entry: ManifestEntry): List<String> =
+        (entry.urls + entry.url).filter(String::isNotBlank).distinct()
+
+    internal fun validateDownloadedArtifact(file: File, entry: ManifestEntry) {
+        check(file.isFile && file.length() > 0L) { "downloaded artifact is empty" }
+        entry.sizeBytes?.let { expected ->
+            check(file.length() == expected) {
+                "artifact size mismatch: expected $expected, got ${file.length()}"
+            }
+        }
+        entry.sha256?.takeIf(String::isNotBlank)?.let { expected ->
+            val digest = MessageDigest.getInstance("SHA-256")
+            val actual = file.inputStream().buffered().use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+                digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+            }
+            check(actual.equals(expected, ignoreCase = true)) { "artifact SHA-256 mismatch" }
+        }
+    }
+
+    private suspend fun fetchVerifiedArtifact(
+        entry: ManifestEntry,
+        destination: File,
+        onProgress: (Float) -> Unit,
+    ) {
+        destination.parentFile?.mkdirs()
+        val partial = File(destination.parentFile, "${destination.name}.partial")
+        var lastError: Exception? = null
+        for (url in downloadUrls(entry)) {
+            partial.delete()
+            try {
+                SteamService.fetchFile(url, partial, onProgress)
+                validateDownloadedArtifact(partial, entry)
+                if (destination.exists() && !destination.delete()) {
+                    error("cannot replace cached artifact")
+                }
+                if (!partial.renameTo(destination)) {
+                    partial.copyTo(destination, overwrite = true)
+                    partial.delete()
+                }
+                return
+            } catch (error: Exception) {
+                lastError = error
+                partial.delete()
+                Timber.w(error, "ManifestInstaller: mirror failed for %s", url)
+            }
+        }
+        throw IOException("All component download URLs failed for ${entry.id}", lastError)
+    }
+
     suspend fun downloadAndInstallDriver(
         context: Context,
         entry: ManifestEntry,
@@ -28,7 +85,7 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            SteamService.fetchFile(entry.url, destFile, onProgress)
+            fetchVerifiedArtifact(entry, destFile, onProgress)
             val uri = Uri.fromFile(destFile)
             val name = AdrenotoolsManager(context).installDriver(uri)
             if (name.isEmpty()) {
@@ -80,7 +137,8 @@ object ManifestInstaller {
      * directly into the wine prefix at launch. "Installing" one just means caching the .tzst in
      * the DXWrapperDownloader cache dir so the launch path finds it instead of downloading.
      */
-    private fun isTzstEntry(entry: ManifestEntry): Boolean = entry.url.endsWith(".tzst")
+    private fun isTzstEntry(entry: ManifestEntry): Boolean =
+        entry.archiveFormat == "tzst" || downloadUrls(entry).first().endsWith(".tzst")
 
     private suspend fun installTzstToCache(
         context: Context,
@@ -91,14 +149,7 @@ object ManifestInstaller {
             val cacheDir = File(context.filesDir, "assets/dxwrapper")
             cacheDir.mkdirs()
             val dest = File(cacheDir, entry.url.substringAfterLast("/"))
-            SteamService.fetchFile(entry.url, dest, onProgress)
-            if (!dest.exists() || dest.length() == 0L) {
-                dest.delete()
-                return@withContext ManifestInstallResult(
-                    success = false,
-                    message = context.getString(R.string.manifest_install_failed, entry.name),
-                )
-            }
+            fetchVerifiedArtifact(entry, dest, onProgress)
             ManifestInstallResult(
                 success = true,
                 message = context.getString(R.string.manifest_install_success, entry.name),
@@ -124,7 +175,7 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            SteamService.fetchFile(entry.url, destFile, onProgress)
+            fetchVerifiedArtifact(entry, destFile, onProgress)
             val uri = Uri.fromFile(destFile)
             val mgr = ContentsManager(context)
 
