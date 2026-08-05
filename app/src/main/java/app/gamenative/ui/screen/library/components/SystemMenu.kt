@@ -46,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +77,9 @@ import app.gamenative.ui.util.shouldShowGamepadUI
 import app.gamenative.utils.getAvatarURL
 import `in`.dragonbra.javasteam.enums.EPersonaState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 /**
@@ -618,10 +623,18 @@ fun DualSystemMenu(
 ) {
     val uriHandler = LocalUriHandler.current
     var persona by remember { mutableStateOf<SteamFriend?>(null) }
+    val initialFocusRequester = remember { FocusRequester() }
+    val windowInfo = LocalWindowInfo.current
 
     LaunchedEffect(Unit) {
         persona = SteamService.instance?.localPersona?.value
         SteamService.userSteamId?.let { SteamService.requestUserPersona() }
+        withTimeoutOrNull(2_000) {
+            snapshotFlow { windowInfo.isWindowFocused }
+                .filter { it }
+                .first()
+        }
+        runCatching { initialFocusRequester.requestFocus() }
     }
 
     DisposableEffect(Unit) {
@@ -738,6 +751,7 @@ fun DualSystemMenu(
                             ),
                             subtitle = stringResource(R.string.system_hub_steam_action_description),
                             icon = Icons.AutoMirrored.Filled.Login,
+                            focusRequester = initialFocusRequester,
                             onClick = onGoOnline,
                         )
                     } else {
@@ -745,6 +759,7 @@ fun DualSystemMenu(
                             title = stringResource(R.string.steam_go_offline),
                             subtitle = stringResource(R.string.system_hub_steam_offline_description),
                             icon = Icons.AutoMirrored.Filled.AirplaneTicket,
+                            focusRequester = initialFocusRequester,
                             onClick = {
                                 onNavigateRoute(PluviaScreen.Home.route + "?offline=true")
                                 onDismiss()
@@ -863,6 +878,7 @@ private fun SystemHubRow(
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
     destructive: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -876,6 +892,9 @@ private fun SystemHubRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .then(
+                if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier,
+            )
             .background(
                 if (focused) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f)
                 else Color.Transparent,

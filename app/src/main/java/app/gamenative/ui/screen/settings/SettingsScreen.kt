@@ -44,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +59,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -79,6 +81,9 @@ import app.gamenative.ui.theme.PluviaTheme
 import app.gamenative.ui.theme.motionSpec
 import app.gamenative.utils.rememberHasExternalDisplay
 import com.materialkolor.PaletteStyle
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal enum class SettingsCategory(
     val titleRes: Int,
@@ -485,6 +490,8 @@ private fun DualSettingsWorkspace(
     val context = LocalContext.current
     val categories = remember { SettingsCategory.entries.toList() }
     val scrollState = rememberScrollState()
+    val selectedCategoryFocusRequester = remember { FocusRequester() }
+    val windowInfo = LocalWindowInfo.current
     val closeSearch = {
         onSearchActive(false)
         onSearchQuery("")
@@ -494,6 +501,14 @@ private fun DualSettingsWorkspace(
     BackHandler(enabled = !searchActive, onBack = onBack)
 
     LaunchedEffect(selectedCategory) { scrollState.scrollTo(0) }
+    LaunchedEffect(selectedCategory) {
+        withTimeoutOrNull(2_000) {
+            snapshotFlow { windowInfo.isWindowFocused }
+                .filter { it }
+                .first()
+        }
+        runCatching { selectedCategoryFocusRequester.requestFocus() }
+    }
 
     Box(
         modifier = Modifier
@@ -541,6 +556,11 @@ private fun DualSettingsWorkspace(
             ) {
                 items(categories) { category ->
                     FilterChip(
+                        modifier = if (category == selectedCategory) {
+                            Modifier.focusRequester(selectedCategoryFocusRequester)
+                        } else {
+                            Modifier
+                        },
                         selected = category == selectedCategory,
                         onClick = { onSelectedCategory(category) },
                         label = {

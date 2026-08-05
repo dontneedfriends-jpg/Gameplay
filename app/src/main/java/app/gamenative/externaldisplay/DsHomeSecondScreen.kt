@@ -146,6 +146,7 @@ object DsHomeSecondScreen {
         SYSTEM,
         GAME_CARD,
         SETTINGS,
+        DIALOG,
         GAME,
     }
 
@@ -256,7 +257,8 @@ object DsHomeSecondScreen {
             Owner.SYSTEM -> 1
             Owner.SETTINGS -> 2
             Owner.GAME_CARD -> 3
-            Owner.GAME -> 4
+            Owner.DIALOG -> 4
+            Owner.GAME -> 5
         }
 }
 
@@ -360,13 +362,12 @@ class DsHomePresentation(
 
     private fun updateInputMode(mode: DsHomeSecondScreen.Mode) {
         val gamePanel = mode == DsHomeSecondScreen.Mode.GAME_DASHBOARD ||
-            mode == DsHomeSecondScreen.Mode.QUICK_MENU ||
-            mode == DsHomeSecondScreen.Mode.SETTINGS
+            mode == DsHomeSecondScreen.Mode.QUICK_MENU
         val passive = mode == DsHomeSecondScreen.Mode.DETAILS ||
             mode == DsHomeSecondScreen.Mode.QUICK_MENU_PASSIVE
         if (gamePanel) {
-            // Game and system workspaces stay touchable on the lower screen,
-            // while hardware keys remain routed through the upper stage.
+            // In-game panels stay touchable on the lower screen while hardware
+            // keys remain routed to the game on the upper display.
             window?.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
             window?.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
         } else if (passive) {
@@ -375,6 +376,8 @@ class DsHomePresentation(
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             )
         } else {
+            // Library, global menu and settings are controller workspaces on the
+            // lower display. They must own window focus for D-pad traversal and A.
             window?.clearFlags(
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,

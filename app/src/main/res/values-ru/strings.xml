@@ -1,4 +1,8 @@
 <resources>
+    <string name="install_content_size">Загрузка: %1$s • После установки: %2$s</string>
+    <string name="install_branch_name">Ветка: %1$s</string>
+    <string name="install_select_all">Выбрать всё</string>
+    <string name="install_clear_selection">Снять выделение</string>
     <string name="abc_action_bar_up_description">Перейти вверх</string>
     <string name="abc_action_mode_done">Готово</string>
     <string name="abc_capital_off">ВЫКЛ</string>

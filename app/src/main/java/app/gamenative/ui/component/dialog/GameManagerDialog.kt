@@ -2,8 +2,11 @@ package app.gamenative.ui.component.dialog
 
 import android.content.Context
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,20 +27,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,13 +58,21 @@ import app.gamenative.BuildConfig
 import app.gamenative.R
 import app.gamenative.data.DepotInfo
 import app.gamenative.data.ManifestInfo
+import app.gamenative.externaldisplay.DsHomeSecondScreen
 import app.gamenative.service.SteamService
 import app.gamenative.service.SteamService.Companion.INVALID_APP_ID
 import app.gamenative.ui.component.LoadingScreen
+import app.gamenative.ui.component.ConsoleDialogButton
+import app.gamenative.ui.component.GamepadAction
+import app.gamenative.ui.component.GamepadActionBar
+import app.gamenative.ui.component.GamepadButton
+import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.component.topbar.BackButton
 import app.gamenative.ui.data.GameDisplayInfo
 import app.gamenative.ui.internal.fakeAppInfo
+import app.gamenative.ui.screen.library.components.ConsolePanelHeader
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.utils.rememberHasExternalDisplay
 import app.gamenative.utils.SteamUtils
 import app.gamenative.utils.StorageUtils
 import com.skydoves.landscapist.ImageOptions
@@ -64,6 +81,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.collections.orEmpty
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class InstallSizeInfo(
     val downloadSize: String,
@@ -294,6 +314,163 @@ fun GameManagerDialog(
         return selectedAppIds.filter { it.value }.isNotEmpty()
     }
 
+    val hasExternalDisplay = rememberHasExternalDisplay()
+    if (visible && hasExternalDisplay) {
+        val secondScreenContent: @Composable () -> Unit = {
+            val cancelFocusRequester = remember { FocusRequester() }
+            val windowInfo = LocalWindowInfo.current
+            val installEnabled = installButtonEnabled()
+
+            BackHandler(onBack = onDismissRequest)
+            LaunchedEffect(Unit) {
+                withTimeoutOrNull(2_000) {
+                    snapshotFlow { windowInfo.isWindowFocused }
+                        .filter { it }
+                        .first()
+                }
+                runCatching { cancelFocusRequester.requestFocus() }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 56.dp),
+                ) {
+                    ConsolePanelHeader(
+                        title = displayInfo.name,
+                        onBack = onDismissRequest,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(scrollState)
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.install),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = installSizeDisplay(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (branch != null && branch != "public") {
+                            Text(
+                                text = stringResource(R.string.install_branch_name, branch),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+
+                        if (selectableAppIds.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                Button(
+                                    onClick = {
+                                        val newState = !allSelectableSelected
+                                        selectableAppIds.forEach { appId -> selectedAppIds[appId] = newState }
+                                    },
+                                ) {
+                                    Text(
+                                        stringResource(R.string.install_select_all)
+                                            .takeIf { !allSelectableSelected }
+                                            ?: stringResource(R.string.install_clear_selection),
+                                    )
+                                }
+                            }
+                        }
+
+                        allDownloadableApps.forEach { (dlcAppId, depotInfo) ->
+                            val checked = selectedAppIds[dlcAppId] ?: false
+                            val enabled = enabledAppIds[dlcAppId] ?: false
+                            val (downloadSize, installSize) = getSizeInfo(dlcAppId)
+                            DualInstallContentRow(
+                                title = getDepotAppName(depotInfo),
+                                subtitle = stringResource(
+                                    R.string.install_content_size,
+                                    downloadSize,
+                                    installSize,
+                                ),
+                                checked = checked,
+                                enabled = enabled,
+                                onToggle = { selectedAppIds[dlcAppId] = !checked },
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ConsoleDialogButton(
+                            text = stringResource(R.string.cancel),
+                            onClick = onDismissRequest,
+                            focusRequester = cancelFocusRequester,
+                        )
+                        Button(
+                            enabled = installEnabled,
+                            onClick = {
+                                onInstall(
+                                    selectedAppIds
+                                        .filter { it.key in enabledAppIds.filterValues { value -> value }.keys }
+                                        .filterValues { value -> value }
+                                        .keys
+                                        .toList(),
+                                )
+                            },
+                        ) {
+                            Text(stringResource(R.string.install))
+                        }
+                    }
+                }
+
+                GamepadActionBar(
+                    actions = listOf(
+                        GamepadAction(GamepadButton.A, R.string.action_select),
+                        GamepadAction(GamepadButton.B, R.string.back, onDismissRequest),
+                    ),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    forceVisible = true,
+                    compact = true,
+                )
+            }
+        }
+
+        SideEffect {
+            DsHomeSecondScreen.publish(
+                DsHomeSecondScreen.Model(
+                    owner = DsHomeSecondScreen.Owner.DIALOG,
+                    mode = DsHomeSecondScreen.Mode.SETTINGS,
+                    onBack = onDismissRequest,
+                    settingsContent = secondScreenContent,
+                ),
+            )
+        }
+        DisposableEffect(Unit) {
+            onDispose { DsHomeSecondScreen.clear(DsHomeSecondScreen.Owner.DIALOG) }
+        }
+        return
+    }
+
     when {
         visible -> {
             Dialog(
@@ -515,6 +692,65 @@ fun GameManagerDialog(
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun DualInstallContentRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(10.dp)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = if (focused) {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerLow
+                },
+                shape = shape,
+            )
+            .focusRing(interactionSource, shape, width = 2.dp)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onToggle,
+            )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (focused) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Checkbox(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = null,
+        )
     }
 }
 
