@@ -6,6 +6,9 @@ import app.gamenative.PrefManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Request
 import timber.log.Timber
 
@@ -66,7 +69,17 @@ object ManifestRepository {
     fun parseManifest(jsonString: String?): ManifestData? {
         if (jsonString.isNullOrBlank()) return null
         return try {
-            json.decodeFromString<ManifestData>(jsonString)
+            val root = json.parseToJsonElement(jsonString).jsonObject
+            when (val schemaVersion = root["schemaVersion"]?.jsonPrimitive?.intOrNull ?: 1) {
+                1 -> json.decodeFromString<ManifestData>(jsonString)
+                2 -> {
+                    val catalog = json.decodeFromString<ComponentCatalogDocument>(jsonString)
+                    val errors = ComponentCatalogValidator.validate(catalog)
+                    require(errors.isEmpty()) { errors.joinToString(separator = "; ") }
+                    catalog.toManifestData()
+                }
+                else -> error("Unsupported component catalog schemaVersion=$schemaVersion")
+            }
         } catch (e: Exception) {
             Timber.e(e, "ManifestRepository: parse failed")
             null
