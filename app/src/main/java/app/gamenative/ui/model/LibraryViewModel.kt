@@ -1179,6 +1179,24 @@ class LibraryViewModel @Inject constructor(
             // Total count for the current filter
             val totalFound = combined.size
 
+            val installedSteamCount = if (currentState.showSteamInLibrary) {
+                stableSteamFilteredBeforeCompatibility.count { item ->
+                    downloadDirectorySet.contains(SteamService.getAppDirName(item)) &&
+                        passesCompatibleFilter(item.name) &&
+                        passesStatsFilters(currentState, GameSource.STEAM, item.name)
+                }
+            } else {
+                0
+            }
+            val installedCount = installedSteamCount + if (steamCollectionSelected) {
+                0
+            } else {
+                (if (currentState.showCustomGamesInLibrary) customEntries.size else 0) +
+                    (if (currentState.showGOGInLibrary) gogEntries.count { it.isInstalled } else 0) +
+                    (if (currentState.showEpicInLibrary) epicEntries.count { it.isInstalled } else 0) +
+                    (if (currentState.showAmazonInLibrary) amazonEntries.count { it.isInstalled } else 0)
+            }
+
             // Determine how many pages and slice the list for incremental loading
             val pageSize = PrefManager.itemsPerPage
             // Update internal pagination state
@@ -1213,6 +1231,7 @@ class LibraryViewModel @Inject constructor(
                     hasCompletedInitialLoad = it.hasCompletedInitialLoad || completesInitialLoad,
                     // Per-source counts for tab badges
                     // Use user prefs + auth state only (not current tab) so badges stay stable across tab switches
+                    installedCount = installedCount,
                     allCount = (if (currentState.showSteamInLibrary) stableSteamCount else 0) +
                         (if (currentState.showCustomGamesInLibrary) customEntries.size else 0) +
                         (if (currentState.showGOGInLibrary && GOGService.hasStoredCredentials(context)) gogEntries.size else 0) +

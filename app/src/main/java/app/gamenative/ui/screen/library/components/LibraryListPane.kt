@@ -46,11 +46,9 @@ import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
 import app.gamenative.data.GameSource
 import app.gamenative.data.LibraryItem
-import app.gamenative.service.DownloadService
 import app.gamenative.service.amazon.AmazonService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
-import app.gamenative.ui.enums.AppFilter
 import app.gamenative.ui.component.Scrollbar
 import app.gamenative.ui.data.LibraryState
 import app.gamenative.ui.data.statsFor
@@ -64,52 +62,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
 import timber.log.Timber
-
-/**
- * Calculates the installed games count based on the current filter state.
- *
- * @param state The current library state containing filters and visibility settings
- * @return The number of installed games, respecting current filters and source visibility
- */
-private fun calculateInstalledCount(context: android.content.Context, state: LibraryState): Int {
-    if (state.appInfoSortType.contains(AppFilter.INSTALLED)) {
-        return state.totalAppsInFilter
-    }
-
-    val downloadDirectoryApps = DownloadService.getDownloadDirectoryApps()
-
-    val steamCount = if (state.showSteamInLibrary) {
-        downloadDirectoryApps.count()
-    } else {
-        0
-    }
-
-    val customGameCount = if (state.showCustomGamesInLibrary) {
-        PrefManager.customGamesCount
-    } else {
-        0
-    }
-
-    val gogCount = if (state.showGOGInLibrary && GOGService.hasStoredCredentials(context)) {
-        PrefManager.gogInstalledGamesCount
-    } else {
-        0
-    }
-
-    val epicCount = if (state.showEpicInLibrary && EpicService.hasStoredCredentials(context)) {
-        PrefManager.epicInstalledGamesCount
-    } else {
-        0
-    }
-
-    val amazonCount = if (state.showAmazonInLibrary && AmazonService.hasStoredCredentials(context)) {
-        PrefManager.amazonInstalledGamesCount
-    } else {
-        0
-    }
-
-    return steamCount + customGameCount + gogCount + epicCount + amazonCount
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,19 +80,6 @@ internal fun LibraryListPane(
 ) {
     val context = LocalContext.current
     val snackBarHost = remember { SnackbarHostState() }
-
-    // Calculate installed count based on current filter state
-    val installedCount = remember(
-        state.appInfoSortType,
-        state.showSteamInLibrary,
-        state.showCustomGamesInLibrary,
-        state.showGOGInLibrary,
-        state.showEpicInLibrary,
-        state.showAmazonInLibrary,
-        state.totalAppsInFilter,
-    ) {
-        calculateInstalledCount(context, state)
-    }
 
     val pullToRefreshState = rememberPullToRefreshState()
     val windowWidthClass = rememberWindowWidthClass()

@@ -69,6 +69,7 @@ data class LibraryState(
     val currentTab: LibraryTab = LibraryTab.INSTALLED,
 
     // Per-source game counts for tab badges
+    val installedCount: Int = 0,
     val allCount: Int = 0,
     val steamCount: Int = 0,
     val gogCount: Int = 0,
@@ -76,6 +77,43 @@ data class LibraryState(
     val amazonCount: Int = 0,
     val localCount: Int = 0,
 )
+
+internal fun LibraryState.libraryTabCounts(): Map<LibraryTab, Int> = libraryTabCounts(
+    installed = installedCount,
+    all = allCount,
+    steam = steamCount,
+    gog = gogCount,
+    epic = epicCount,
+    amazon = amazonCount,
+    local = localCount,
+)
+
+internal fun libraryTabCounts(
+    installed: Int,
+    all: Int,
+    steam: Int = 0,
+    gog: Int = 0,
+    epic: Int = 0,
+    amazon: Int = 0,
+    local: Int = 0,
+): Map<LibraryTab, Int> = mapOf(
+    LibraryTab.INSTALLED to installed,
+    LibraryTab.ALL to all,
+    LibraryTab.STEAM to steam,
+    LibraryTab.GOG to gog,
+    LibraryTab.EPIC to epic,
+    LibraryTab.AMAZON to amazon,
+    LibraryTab.LOCAL to local,
+)
+
+internal fun shouldLoadNextLibraryPage(
+    lastVisibleIndex: Int?,
+    loadedItemCount: Int,
+    totalItemCount: Int,
+): Boolean = lastVisibleIndex != null &&
+    loadedItemCount > 0 &&
+    lastVisibleIndex >= loadedItemCount - 1 &&
+    loadedItemCount < totalItemCount
 
 internal enum class LibraryContentState {
     LOADING,

@@ -95,6 +95,7 @@ import app.gamenative.ui.component.dialog.LoadingDialog
 import app.gamenative.ui.components.rememberCustomGameFolderPicker
 import app.gamenative.ui.components.requestPermissionsForPath
 import app.gamenative.ui.data.LibraryState
+import app.gamenative.ui.data.libraryTabCounts
 import app.gamenative.ui.data.statsFor
 import app.gamenative.ui.data.Achievement
 import com.winlator.container.ContainerData
@@ -648,7 +649,11 @@ private fun LibraryScreenContent(
 
     // Restore focus after tab change - handles both empty and populated tabs
     LaunchedEffect(state.currentTab) {
-        if (hasExternalDisplay) return@LaunchedEffect
+        if (hasExternalDisplay) {
+            gridFocusTargetListIndex = 0
+            carouselFocusTargetListIndex = 0
+            return@LaunchedEffect
+        }
         // Brief delay to let list populate after tab change
         kotlinx.coroutines.delay(150)
 
@@ -1121,6 +1126,10 @@ private fun LibraryScreenContent(
                             isLoading = state.isLoading,
                             isSearching = state.isSearching,
                             searchQuery = state.searchQuery,
+                            totalItemCount = state.totalAppsInFilter,
+                            currentPage = state.currentPaginationPage,
+                            lastPage = state.lastPaginationPage,
+                            tabCounts = state.libraryTabCounts(),
                             onSearchQuery = onSearchQuery,
                             onSearchToggle = {
                                 if (state.isSearching) {
@@ -1150,6 +1159,7 @@ private fun LibraryScreenContent(
                                 PrefManager.libraryLayout = newLayout
                             },
                             onRefresh = onRefresh,
+                            onPageChange = onPageChange,
                             onNavigate = { appId ->
                                 selectedAppId = appId
                                 selectedLibraryItem = state.appInfoList.find { it.appId == appId }
@@ -1369,14 +1379,7 @@ private fun LibraryScreenContent(
                             PrefManager.libraryLayout = newPaneType
                             currentPaneType = newPaneType
                         },
-                        tabCounts = mapOf(
-                            LibraryTab.ALL to state.allCount,
-                            LibraryTab.STEAM to state.steamCount,
-                            LibraryTab.GOG to state.gogCount,
-                            LibraryTab.EPIC to state.epicCount,
-                            LibraryTab.AMAZON to state.amazonCount,
-                            LibraryTab.LOCAL to state.localCount,
-                        ),
+                        tabCounts = state.libraryTabCounts(),
                         onTabSelected = onTabChanged,
                         onOptionsClick = { onOptionsPanelToggle(true) },
                         onSearchClick = { onIsSearching(true) },

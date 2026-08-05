@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -111,6 +112,7 @@ import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.component.GameStatsRow
 import app.gamenative.ui.data.GameCardStats
 import app.gamenative.ui.data.PerformanceHudConfig
+import app.gamenative.ui.data.shouldLoadNextLibraryPage
 import app.gamenative.ui.enums.LibraryTab
 import app.gamenative.ui.enums.PaneType
 import app.gamenative.ui.screen.library.components.DsGameGrid
@@ -125,7 +127,9 @@ import com.skydoves.landscapist.coil.CoilImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
@@ -184,6 +188,10 @@ object DsHomeSecondScreen {
         val isLoading: Boolean = false,
         val isSearching: Boolean = false,
         val searchQuery: String = "",
+        val totalItemCount: Int = items.size,
+        val currentPage: Int = 1,
+        val lastPage: Int = 1,
+        val tabCounts: Map<LibraryTab, Int> = emptyMap(),
         val onSearchQuery: (String) -> Unit = {},
         val onSearchToggle: () -> Unit = {},
         val onPreviousTab: () -> Unit = {},
@@ -195,6 +203,7 @@ object DsHomeSecondScreen {
         val onQuickActions: () -> Unit = {},
         val onLayoutCycle: () -> Unit = {},
         val onRefresh: () -> Unit = {},
+        val onPageChange: (Int) -> Unit = {},
         val cardContent: (@Composable () -> Unit)? = null,
         val menuContent: (@Composable () -> Unit)? = null,
         val settingsContent: (@Composable () -> Unit)? = null,
@@ -441,6 +450,19 @@ private fun DsHomeSecondScreenGrid(model: DsHomeSecondScreen.Model) {
         2 -> 144.dp
         else -> 116.dp
     }
+    LaunchedEffect(model.currentTab) {
+        gridState.scrollToItem(0)
+    }
+    LaunchedEffect(gridState, model.items.size, model.totalItemCount) {
+        snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { lastVisibleIndex ->
+                if (shouldLoadNextLibraryPage(lastVisibleIndex, model.items.size, model.totalItemCount)) {
+                    model.onPageChange(1)
+                }
+            }
+    }
     // The presentation window gains real focus a moment after show(); wait for
     // window focus before bootstrapping compose focus so the initial selection
     // sticks instead of being stolen back by the main display.
@@ -612,8 +634,13 @@ private fun DualLibraryHeader(model: DsHomeSecondScreen.Model) {
         IconButton(onClick = model.onPreviousTab) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null)
         }
+        val currentTabCount = model.tabCounts[model.currentTab] ?: model.totalItemCount
         Text(
-            text = stringResource(model.currentTab.labelResId),
+            text = stringResource(
+                app.gamenative.R.string.library_tab_with_count,
+                stringResource(model.currentTab.labelResId),
+                currentTabCount,
+            ),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -621,6 +648,14 @@ private fun DualLibraryHeader(model: DsHomeSecondScreen.Model) {
         )
         IconButton(onClick = model.onNextTab) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
+        if (model.lastPage > 1) {
+            Text(
+                text = "${model.currentPage.coerceAtMost(model.lastPage)} / ${model.lastPage}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
         Spacer(modifier = Modifier.weight(1f))
         IconButton(onClick = model.onLayoutCycle) {
@@ -652,7 +687,22 @@ private fun DsHomeSecondScreenList(
     model: DsHomeSecondScreen.Model,
     firstItemFocusRequester: FocusRequester,
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(model.currentTab) {
+        listState.scrollToItem(0)
+    }
+    LaunchedEffect(listState, model.items.size, model.totalItemCount) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { lastVisibleIndex ->
+                if (shouldLoadNextLibraryPage(lastVisibleIndex, model.items.size, model.totalItemCount)) {
+                    model.onPageChange(1)
+                }
+            }
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 68.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
