@@ -419,14 +419,18 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
 
     @NonNull
     private String getFinalCommand(String winePath, CpuBackendType backend, EnvVars envVars, File binDir, String guestExecutable) {
+        // guestExecutable is already a complete command line assembled by the
+        // launch pipeline (wine subcommand + executable + arguments). Quoting it
+        // as one shell token makes the entire line look like an executable name.
+        // A future argv migration must quote/encode individual tokens upstream.
         String command;
         if (wineInfo.isArm64EC()) {
-            command = winePath + "/" + EnvRedactor.shellQuote(guestExecutable);
+            command = winePath + "/" + guestExecutable;
             String hodll = backend.hodll();
             if (hodll != null) envVars.put("HODLL", hodll);
         }
         else
-            command = binDir + "/box64 " + EnvRedactor.shellQuote(guestExecutable);
+            command = binDir + "/box64 " + guestExecutable;
         return command;
     }
 
