@@ -3,6 +3,7 @@ package app.gamenative.externaldisplay
 import android.app.Presentation
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.view.Display
 import android.view.KeyEvent
@@ -291,11 +292,29 @@ class DsHomePresentation(
 
     private val presentationLifecycleOwner = PresentationLifecycleOwner()
     private lateinit var composeView: ComposeView
+    private var composeWindowContext: Context? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         updateInputMode(DsHomeSecondScreen.model?.mode ?: DsHomeSecondScreen.Mode.DETAILS)
-        composeView = ComposeView(context).apply {
+        // A Presentation window is TYPE_PRESENTATION (2037). Compose Dialog()
+        // creates its own window with LayoutParams.type TYPE_APPLICATION (2) and
+        // Android 13+ rejects that mismatch with "Window type mismatch". Build
+        // the ComposeView on a TYPE_APPLICATION window context bound to the same
+        // display so dialogs opened from second-screen content (settings auth,
+        // quick menu, etc.) show without crashing.
+        val composeContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            runCatching {
+                context.createWindowContext(
+                    display,
+                    WindowManager.LayoutParams.TYPE_APPLICATION,
+                    null,
+                ).also { composeWindowContext = it }
+            }.getOrElse { context }
+        } else {
+            context
+        }
+        composeView = ComposeView(composeContext).apply {
             setViewTreeLifecycleOwner(presentationLifecycleOwner)
             setViewTreeSavedStateRegistryOwner(presentationLifecycleOwner)
             setViewTreeOnBackPressedDispatcherOwner(presentationLifecycleOwner)
