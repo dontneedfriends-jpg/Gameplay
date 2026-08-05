@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,10 +20,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.filled.Close
@@ -45,7 +48,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Scaffold
 import app.gamenative.ui.component.Slider
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -340,6 +346,7 @@ fun ContainerConfigDialog(
     mediaIconUrl: String? = null,
     gameId: Int? = null,
     appId: String? = null,
+    embedded: Boolean = false,
 ) {
     if (visible) {
         val context = LocalContext.current
@@ -1261,13 +1268,13 @@ fun ContainerConfigDialog(
         )
 
         LoadingDialog(
-            visible = showManifestDownloadDialog,
+            visible = !embedded && showManifestDownloadDialog,
             progress = manifestDownloadProgress,
             message = manifestDownloadMessage,
         )
 
         MessageDialog(
-            visible = dismissDialogState.visible,
+            visible = !embedded && dismissDialogState.visible,
             title = dismissDialogState.title,
             message = dismissDialogState.message,
             confirmBtnText = dismissDialogState.confirmBtnText,
@@ -1277,14 +1284,7 @@ fun ContainerConfigDialog(
             onConfirmClick = onDismissRequest,
         )
 
-        Dialog(
-            onDismissRequest = onDismissCheck,
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnClickOutside = false,
-                decorFitsSystemWindows = false,
-            ),
-            content = {
+        val configurationContent: @Composable () -> Unit = {
                 val scrollState = rememberScrollState()
                 var selectedTab by rememberSaveable { mutableIntStateOf(0) }
                 var searchActive by rememberSaveable { mutableStateOf(false) }
@@ -1451,7 +1451,101 @@ fun ContainerConfigDialog(
                     }
                 }
             }
-        )
+
+        if (embedded) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                configurationContent()
+                EmbeddedContainerOverlay(
+                    dismissState = dismissDialogState,
+                    loading = showManifestDownloadDialog,
+                    loadingProgress = manifestDownloadProgress,
+                    loadingMessage = manifestDownloadMessage,
+                    onKeepEditing = {
+                        dismissDialogState = MessageDialogState(visible = false)
+                    },
+                    onDiscard = onDismissRequest,
+                )
+            }
+        } else {
+            Dialog(
+                onDismissRequest = onDismissCheck,
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnClickOutside = false,
+                    decorFitsSystemWindows = false,
+                ),
+                content = configurationContent,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmbeddedContainerOverlay(
+    dismissState: MessageDialogState,
+    loading: Boolean,
+    loadingProgress: Float,
+    loadingMessage: String,
+    onKeepEditing: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    if (!loading && !dismissState.visible) return
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f),
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Surface(
+                modifier = Modifier
+                    .widthIn(max = 520.dp)
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    if (loading) {
+                        Text(
+                            text = loadingMessage,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        if (loadingProgress < 0f) {
+                            CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                        } else {
+                            LinearProgressIndicator(
+                                progress = { loadingProgress.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = dismissState.title.orEmpty(),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            text = dismissState.message.orEmpty(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                        ) {
+                            TextButton(onClick = onKeepEditing) {
+                                Text(dismissState.dismissBtnText)
+                            }
+                            TextButton(onClick = onDiscard) {
+                                Text(dismissState.confirmBtnText)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

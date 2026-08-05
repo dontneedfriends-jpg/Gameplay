@@ -103,6 +103,7 @@ import app.gamenative.ui.internal.fakeAppInfo
 import app.gamenative.ui.model.LibraryViewModel
 import app.gamenative.service.SteamService
 import app.gamenative.ui.screen.library.components.LibraryCarouselPane
+import app.gamenative.ui.screen.PluviaScreen
 import app.gamenative.ui.screen.library.components.LibraryCompactRowPane
 import app.gamenative.externaldisplay.DsHomeSecondScreen
 import app.gamenative.ui.screen.library.components.DsHeroCard
@@ -248,6 +249,7 @@ private fun LibraryScreenContent(
 ) {
     val context = LocalContext.current
     val lifecycleScope = LocalLifecycleOwner.current.lifecycleScope
+    val hasExternalDisplay = rememberHasExternalDisplay()
 
     val gogOAuthLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -604,7 +606,7 @@ private fun LibraryScreenContent(
         if (selectedAppId != null) {
             controllerBootstrapNeeded = true
         }
-        if (selectedAppId == null) {
+        if (selectedAppId == null && !hasExternalDisplay) {
             // Brief delay to let the UI settle after transition
             kotlinx.coroutines.delay(100)
             // Restore focus to content area
@@ -642,6 +644,7 @@ private fun LibraryScreenContent(
 
     // Restore focus after tab change - handles both empty and populated tabs
     LaunchedEffect(state.currentTab) {
+        if (hasExternalDisplay) return@LaunchedEffect
         // Brief delay to let list populate after tab change
         kotlinx.coroutines.delay(150)
 
@@ -671,7 +674,7 @@ private fun LibraryScreenContent(
         state.isSearching,
     ) {
         if (pendingGridFocusRequest && isListFocusable()) {
-            if (selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching) {
+            if (!hasExternalDisplay && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching) {
                 var retries = 0
                 while (pendingGridFocusRequest && retries < 8) {
                     try {
@@ -698,7 +701,7 @@ private fun LibraryScreenContent(
         state.isSearching,
     ) {
         if (pendingCarouselFocusRequest && isListFocusable()) {
-            if (selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching) {
+            if (!hasExternalDisplay && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching) {
                 val targetIndex = currentCarouselFocusTargetIndex()
                 if (carouselListState.layoutInfo.visibleItemsInfo.none { it.index == targetIndex }) {
                     carouselListState.scrollToItem(targetIndex)
@@ -730,10 +733,10 @@ private fun LibraryScreenContent(
         val listBecameNonEmpty = previousAppCount == 0 && currentCount > 0
         val listBecameEmpty = previousAppCount > 0 && currentCount == 0
 
-        if (listBecameNonEmpty && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
+        if (!hasExternalDisplay && listBecameNonEmpty && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
             requestContentFocusOrDefer()
         }
-        if (listBecameEmpty && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
+        if (!hasExternalDisplay && listBecameEmpty && selectedAppId == null && !isSystemMenuOpen && !isQuickActionsOpen && !state.isOptionsPanelOpen && !state.isSearching && !tabBarHasFocus) {
             // Empty tabs can drop focused children; re-anchor focus at the root so bumper nav keeps working.
             requestRootFocusSafe()
         }
@@ -747,7 +750,7 @@ private fun LibraryScreenContent(
         val quickActionsJustClosed = wasQuickActionsOpen && !isQuickActionsOpen
         val optionsPanelJustClosed = wasOptionsPanelOpen && !state.isOptionsPanelOpen
 
-        if ((systemMenuJustClosed || quickActionsJustClosed || optionsPanelJustClosed) && !state.isSearching) {
+        if (!hasExternalDisplay && (systemMenuJustClosed || quickActionsJustClosed || optionsPanelJustClosed) && !state.isSearching) {
             // Give a brief moment for the overlay to animate out
             kotlinx.coroutines.delay(50)
             // Restore focus to the active content layout
@@ -770,6 +773,7 @@ private fun LibraryScreenContent(
     // Helper functions defined in composable scope to capture latest state on each recomposition.
     val canBootstrapContentFocus: () -> Boolean = {
         val now = SystemClock.uptimeMillis()
+            !hasExternalDisplay &&
             selectedAppId == null &&
             !isSystemMenuOpen &&
             !isQuickActionsOpen &&
@@ -782,6 +786,7 @@ private fun LibraryScreenContent(
             (now - lastBootstrapAtMs) > 250L
     }
     val canNavigateTabsWithoutFocus: () -> Boolean = {
+            !hasExternalDisplay &&
             selectedAppId == null &&
             !isSystemMenuOpen &&
             !isQuickActionsOpen &&
@@ -894,7 +899,8 @@ private fun LibraryScreenContent(
                 // Handle gamepad buttons
                 if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_DOWN) {
                     val keyCode = keyEvent.nativeKeyEvent.keyCode
-                    val canBootstrapContentFocus = selectedAppId == null &&
+                    val canBootstrapContentFocus = !hasExternalDisplay &&
+                        selectedAppId == null &&
                         !state.isOptionsPanelOpen &&
                         !isSystemMenuOpen &&
                         !isQuickActionsOpen &&
@@ -1024,37 +1030,67 @@ private fun LibraryScreenContent(
                 }
             }
     ) {
-        val hasExternalDisplay = rememberHasExternalDisplay()
+        LaunchedEffect(hasExternalDisplay, currentPaneType) {
+            if (!hasExternalDisplay && currentPaneType == PaneType.DS_HOME) {
+                currentPaneType = PaneType.GRID_CAPSULE
+                PrefManager.libraryLayout = PaneType.GRID_CAPSULE
+            }
+        }
 
-        // Publish the second-screen model so the presentation always reflects
-        // the library: grid panes mirror the list, hero/carousel panes show the
-        // focused game's details, and the detail pane shows the opened game.
-        if (hasExternalDisplay) {
-            // Every non-DS pane shows the focused game's details on the second
-            // display; only DS_HOME mirrors the list as an icon grid.
-            val detailsMode = currentPaneType != PaneType.DS_HOME
+        // In dual-screen mode the upper display is always a passive stage and
+        // the lower display owns the complete library workspace. The selected
+        // single-screen layout only decides whether that workspace uses covers
+        // or an information-dense list.
+        if (hasExternalDisplay && selectedAppId == null) {
             val focusedIndex = if (currentPaneType == PaneType.CAROUSEL) {
                 currentCarouselFocusTargetIndex()
             } else {
                 gridFocusTargetListIndex.coerceIn(0, state.appInfoList.lastIndex.coerceAtLeast(0))
             }
-            val focusedItem = if (selectedAppId != null) {
-                selectedLibraryItem
-            } else {
-                state.appInfoList.getOrNull(focusedIndex)
-            }
+            val focusedItem = state.appInfoList.getOrNull(focusedIndex)
             SideEffect {
-                DsHomeSecondScreen.model = DsHomeSecondScreen.Model(
-                    mode = if (selectedAppId != null || detailsMode) {
-                        DsHomeSecondScreen.Mode.DETAILS
-                    } else {
-                        DsHomeSecondScreen.Mode.GRID
-                    },
+                DsHomeSecondScreen.publish(DsHomeSecondScreen.Model(
+                    owner = DsHomeSecondScreen.Owner.LIBRARY,
+                    mode = DsHomeSecondScreen.Mode.GRID,
                     items = state.appInfoList,
                     focusedIndex = focusedIndex,
                     focusedItem = focusedItem,
                     focusedStats = focusedItem?.let { state.statsFor(it) },
                     focusedCompat = focusedItem?.let { state.compatibilityMap[it.name] },
+                    libraryLayout = currentPaneType,
+                    currentTab = state.currentTab,
+                    isLoading = state.isLoading,
+                    isSearching = state.isSearching,
+                    searchQuery = state.searchQuery,
+                    onSearchQuery = onSearchQuery,
+                    onSearchToggle = {
+                        if (state.isSearching) {
+                            onIsSearching(false)
+                            onSearchQuery("")
+                        } else {
+                            onIsSearching(true)
+                        }
+                    },
+                    onPreviousTab = onPreviousTab,
+                    onNextTab = onNextTab,
+                    onOptions = { onOptionsPanelToggle(true) },
+                    onSystemMenu = { isSystemMenuOpen = true },
+                    onOpenSettings = { onNavigateRoute(PluviaScreen.Settings.route) },
+                    onAddGame = onAddCustomGameClick,
+                    onQuickActions = { isQuickActionsOpen = true },
+                    onLayoutCycle = {
+                        val newLayout = if (
+                            currentPaneType == PaneType.LIST ||
+                            currentPaneType == PaneType.INSTALLED_COMPACT
+                        ) {
+                            PaneType.GRID_CAPSULE
+                        } else {
+                            PaneType.LIST
+                        }
+                        currentPaneType = newLayout
+                        PrefManager.libraryLayout = newLayout
+                    },
+                    onRefresh = onRefresh,
                     onNavigate = { appId ->
                         selectedAppId = appId
                         selectedLibraryItem = state.appInfoList.find { it.appId == appId }
@@ -1066,8 +1102,12 @@ private fun LibraryScreenContent(
                             gridFocusTargetListIndex = idx
                         }
                     },
-                )
+                ))
             }
+        }
+
+        DisposableEffect(hasExternalDisplay) {
+            onDispose { DsHomeSecondScreen.clear(DsHomeSecondScreen.Owner.LIBRARY) }
         }
 
         if (selectedAppId == null) {
@@ -1149,6 +1189,18 @@ private fun LibraryScreenContent(
                         },
                         modifier = Modifier.fillMaxSize(),
                     )
+                } else if (hasExternalDisplay) {
+                    val focusedIndex = if (currentPaneType == PaneType.CAROUSEL) {
+                        currentCarouselFocusTargetIndex()
+                    } else {
+                        gridFocusTargetListIndex.coerceIn(0, state.appInfoList.lastIndex.coerceAtLeast(0))
+                    }
+                    DsHeroCard(
+                        item = state.appInfoList.getOrNull(focusedIndex),
+                        onClick = {},
+                        interactive = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 } else {
                     // Library list (content scrolls behind tab bar)
                     if (currentPaneType == PaneType.CAROUSEL) {
@@ -1167,40 +1219,20 @@ private fun LibraryScreenContent(
                             onFocusedIndexChanged = { carouselFocusTargetListIndex = it },
                         )
                     } else if (currentPaneType == PaneType.DS_HOME) {
-                        if (hasExternalDisplay) {
-                            // Dual-screen: hero stays on the main display, the
-                            // icon grid renders on the second display.
-                            val focusedItem = state.appInfoList.getOrNull(gridFocusTargetListIndex)
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                DsHeroCard(
-                                    item = focusedItem,
-                                    onClick = {
-                                        focusedItem?.let { item ->
-                                            selectedAppId = item.appId
-                                            selectedLibraryItem = item
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(1f),
-                                )
-                            }
-                        } else {
-                            LibraryDsHomePane(
-                                state = state,
-                                listState = listState,
-                                firstItemFocusRequester = gridFirstItemFocusRequester,
-                                focusTargetListIndex = gridFocusTargetListIndex,
-                                onFocusedIndexChanged = { gridFocusTargetListIndex = it },
-                                onPageChange = onPageChange,
-                                onNavigate = { appId ->
-                                    selectedAppId = appId
-                                    selectedLibraryItem = state.appInfoList.find { it.appId == appId }
-                                },
-                                onRefresh = onRefresh,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                        LibraryDsHomePane(
+                            state = state,
+                            listState = listState,
+                            firstItemFocusRequester = gridFirstItemFocusRequester,
+                            focusTargetListIndex = gridFocusTargetListIndex,
+                            onFocusedIndexChanged = { gridFocusTargetListIndex = it },
+                            onPageChange = onPageChange,
+                            onNavigate = { appId ->
+                                selectedAppId = appId
+                                selectedLibraryItem = state.appInfoList.find { it.appId == appId }
+                            },
+                            onRefresh = onRefresh,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     } else if (currentPaneType == PaneType.INSTALLED_COMPACT) {
                         LibraryCompactRowPane(
                             state = state,
@@ -1235,7 +1267,7 @@ private fun LibraryScreenContent(
                 }
 
                 // Top overlay: Tab bar OR Search bar
-                if (state.isSearching) {
+                if (!hasExternalDisplay && state.isSearching) {
                     // Search overlay replaces tab bar when searching
                     // TODO: Gamepad focus is a bit wonky whenever we show the search bar
                     LibrarySearchBar(
@@ -1256,7 +1288,7 @@ private fun LibraryScreenContent(
                             .align(Alignment.TopCenter)
                             .fillMaxWidth(),
                     )
-                } else {
+                } else if (!hasExternalDisplay) {
                     // Tab bar when not searching
                     LibraryTabBar(
                         currentTab = state.currentTab,
@@ -1337,7 +1369,7 @@ private fun LibraryScreenContent(
         }
 
         // Bottom action bar
-        if (selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen && !isQuickActionsOpen) {
+        if (!hasExternalDisplay && selectedAppId == null && !state.isOptionsPanelOpen && !isSystemMenuOpen && !isQuickActionsOpen) {
             val libraryActions = if (state.isSearching) {
                 listOf(
                     LibraryActions.select,

@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
@@ -154,6 +155,7 @@ private fun GamepadButtonHint(
     action: GamepadAction,
     swapFaceButtons: Boolean,
     controllerFamily: ControllerFamily,
+    compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val clickableModifier = if (action.onClick != null) {
@@ -177,21 +179,26 @@ private fun GamepadButtonHint(
     val iconRes = effectiveButton.iconFor(controllerFamily)
 
     Row(
-        modifier = clickableModifier.padding(horizontal = 6.dp, vertical = 5.dp),
+        modifier = clickableModifier.padding(
+            horizontal = if (compact) 3.dp else 6.dp,
+            vertical = if (compact) 4.dp else 5.dp,
+        ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp),
     ) {
         Image(
             painter = painterResource(iconRes),
             contentDescription = label,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(if (compact) 20.dp else 22.dp),
         )
 
         Text(
             text = label,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
-            style = MaterialTheme.typography.labelMedium,
+            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -201,13 +208,15 @@ fun GamepadActionBar(
     actions: List<GamepadAction>,
     modifier: Modifier = Modifier,
     visible: Boolean = true,
+    forceVisible: Boolean = false,
+    compact: Boolean = false,
 ) {
     val showGamepadUI = shouldShowGamepadUI()
     val swapFaceButtons = PrefManager.swapFaceButtons
     val controllerFamily = rememberControllerFamily()
 
     AnimatedVisibility(
-        visible = visible && actions.isNotEmpty() && showGamepadUI,
+        visible = visible && actions.isNotEmpty() && (forceVisible || showGamepadUI),
         enter = slideInVertically(
             initialOffsetY = { it / 2 },
             animationSpec = motionSpec(tween(durationMillis = 180)),
@@ -236,8 +245,14 @@ fun GamepadActionBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 9.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End),
+                    .padding(
+                        horizontal = if (compact) 12.dp else 24.dp,
+                        vertical = if (compact) 7.dp else 9.dp,
+                    ),
+                horizontalArrangement = Arrangement.spacedBy(
+                    if (compact) 8.dp else 16.dp,
+                    Alignment.End,
+                ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 actions.forEach { action ->
@@ -245,6 +260,7 @@ fun GamepadActionBar(
                         action = action,
                         swapFaceButtons = swapFaceButtons,
                         controllerFamily = controllerFamily,
+                        compact = compact,
                     )
                 }
             }

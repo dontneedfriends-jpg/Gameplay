@@ -47,6 +47,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -141,6 +143,10 @@ internal fun DsGameGrid(
     onFocusedIndexChanged: (Int) -> Unit,
     onNavigate: (String) -> Unit,
     onScaleCycle: () -> Unit,
+    showLabels: Boolean = false,
+    cellAspectRatio: Float = 1f,
+    preferSquareIcon: Boolean = true,
+    contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 72.dp),
     modifier: Modifier = Modifier,
 ) {
     LazyVerticalGrid(
@@ -155,7 +161,7 @@ internal fun DsGameGrid(
                     false
                 }
             },
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 72.dp),
+        contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -168,6 +174,9 @@ internal fun DsGameGrid(
                 item = item,
                 onClick = { onNavigate(item.appId) },
                 onFocused = { onFocusedIndexChanged(index) },
+                showLabel = showLabels,
+                cellAspectRatio = cellAspectRatio,
+                preferSquareIcon = preferSquareIcon,
                 focusRequester = if (firstItemFocusRequester != null && index == focusTargetIndex) {
                     firstItemFocusRequester
                 } else {
@@ -182,6 +191,7 @@ internal fun DsGameGrid(
 internal fun DsHeroCard(
     item: LibraryItem?,
     onClick: () -> Unit,
+    interactive: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -195,18 +205,24 @@ internal fun DsHeroCard(
         label = "ds_hero_fade",
         modifier = modifier.padding(horizontal = 16.dp, vertical = 10.dp),
     ) { target ->
-        Box(
-            modifier = Modifier
+        val baseModifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
                 .background(MaterialTheme.colorScheme.surfaceContainerLow)
+        val interactionModifier = if (interactive) {
+            Modifier
                 .focusRing(interactionSource, shape, width = 2.dp)
                 .selectable(
                     selected = isFocused,
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = onClick,
-                ),
+                )
+        } else {
+            Modifier
+        }
+        Box(
+            modifier = baseModifier.then(interactionModifier),
         ) {
             if (target != null) {
                 val imageUrls by produceState(
@@ -258,6 +274,9 @@ private fun DsGameCell(
     item: LibraryItem,
     onClick: () -> Unit,
     onFocused: () -> Unit,
+    showLabel: Boolean = false,
+    cellAspectRatio: Float = 1f,
+    preferSquareIcon: Boolean = true,
     focusRequester: FocusRequester? = null,
 ) {
     val context = LocalContext.current
@@ -278,7 +297,7 @@ private fun DsGameCell(
         key1 = item.appId,
     ) {
         value = withContext(Dispatchers.IO) {
-            val sgdbIcon = if (item.gameSource == GameSource.STEAM) {
+            val sgdbIcon = if (preferSquareIcon && item.gameSource == GameSource.STEAM) {
                 SteamGridDBIconProvider.iconForSteamApp(item.gameId)
             } else {
                 null
@@ -290,7 +309,7 @@ private fun DsGameCell(
 
     Box(
         modifier = Modifier
-            .aspectRatio(1f)
+            .aspectRatio(cellAspectRatio)
             .scale(scale)
             .then(
                 if (focusRequester != null) {
@@ -300,6 +319,7 @@ private fun DsGameCell(
                 },
             )
             .onFocusChanged { if (it.isFocused) onFocused() }
+            .semantics { contentDescription = item.name }
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .focusRing(interactionSource, shape, width = 2.dp)
@@ -317,6 +337,28 @@ private fun DsGameCell(
                 imageModel = { imageUrl },
                 imageOptions = ImageOptions(contentScale = ContentScale.Crop),
             )
+        }
+        if (showLabel) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.84f)),
+                        ),
+                    )
+                    .padding(start = 9.dp, end = 9.dp, top = 18.dp, bottom = 8.dp),
+            ) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

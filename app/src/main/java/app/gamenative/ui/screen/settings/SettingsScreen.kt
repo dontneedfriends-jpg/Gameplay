@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -26,9 +28,13 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,13 +58,17 @@ import androidx.compose.ui.unit.dp
 import app.gamenative.PrefManager
 import app.gamenative.R
 import app.gamenative.enums.AppTheme
+import app.gamenative.externaldisplay.DsHomeSecondScreen
 import app.gamenative.ui.component.ConsoleCategoryRail
+import app.gamenative.ui.component.GamepadAction
+import app.gamenative.ui.component.GamepadActionBar
 import app.gamenative.ui.component.GamepadHint
 import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.ConsoleIconButton
 import app.gamenative.ui.component.ConsoleListRow
 import app.gamenative.ui.component.SettingsSearchToggle
 import app.gamenative.ui.theme.PluviaTheme
+import app.gamenative.utils.rememberHasExternalDisplay
 import com.materialkolor.PaletteStyle
 
 internal enum class SettingsCategory(val titleRes: Int, val icon: ImageVector) {
@@ -150,6 +160,7 @@ private fun SettingsScreenContent(
     var searchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val categoryRailWidth = if (LocalConfiguration.current.screenWidthDp < 600) 156.dp else 228.dp
+    val hasExternalDisplay = rememberHasExternalDisplay()
 
     val closeSearch: () -> Unit = {
         searchActive = false
@@ -160,6 +171,42 @@ private fun SettingsScreenContent(
 
     LaunchedEffect(selectedCategory) {
         scrollState.scrollTo(0)
+    }
+
+    if (hasExternalDisplay) {
+        SideEffect {
+            DsHomeSecondScreen.publish(
+                DsHomeSecondScreen.Model(
+                    owner = DsHomeSecondScreen.Owner.SETTINGS,
+                    mode = DsHomeSecondScreen.Mode.SETTINGS,
+                    settingsContent = {
+                        DualSettingsWorkspace(
+                            appTheme = appTheme,
+                            paletteStyle = paletteStyle,
+                            onAppTheme = onAppTheme,
+                            onPaletteStyle = onPaletteStyle,
+                            customThemeEnabled = customThemeEnabled,
+                            customThemeJson = customThemeJson,
+                            onCustomTheme = onCustomTheme,
+                            onCustomThemeEnabled = onCustomThemeEnabled,
+                            onClearCustomTheme = onClearCustomTheme,
+                            selectedCategory = selectedCategory,
+                            onSelectedCategory = { selectedCategory = it },
+                            searchActive = searchActive,
+                            searchQuery = searchQuery,
+                            onSearchActive = { searchActive = it },
+                            onSearchQuery = { searchQuery = it },
+                            onBack = onBack,
+                        )
+                    },
+                ),
+            )
+        }
+        DisposableEffect(hasExternalDisplay) {
+            onDispose { DsHomeSecondScreen.clear(DsHomeSecondScreen.Owner.SETTINGS) }
+        }
+        DualSettingsStage(selectedCategory = selectedCategory)
+        return
     }
 
     Box(
@@ -293,6 +340,260 @@ private fun SettingsScreenContent(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun DualSettingsStage(selectedCategory: SettingsCategory) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .displayCutoutPadding()
+            .padding(40.dp),
+    ) {
+        Column(
+            modifier = Modifier.align(Alignment.CenterStart),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                imageVector = selectedCategory.icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.height(48.dp),
+            )
+            Text(
+                text = stringResource(R.string.settings_title),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(selectedCategory.titleRes),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Text(
+                text = stringResource(R.string.settings_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                color = PluviaTheme.colors.textMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DualSettingsWorkspace(
+    appTheme: AppTheme,
+    paletteStyle: PaletteStyle,
+    onAppTheme: (AppTheme) -> Unit,
+    onPaletteStyle: (PaletteStyle) -> Unit,
+    customThemeEnabled: Boolean,
+    customThemeJson: String,
+    onCustomTheme: (String) -> Unit,
+    onCustomThemeEnabled: (Boolean) -> Unit,
+    onClearCustomTheme: () -> Unit,
+    selectedCategory: SettingsCategory,
+    onSelectedCategory: (SettingsCategory) -> Unit,
+    searchActive: Boolean,
+    searchQuery: String,
+    onSearchActive: (Boolean) -> Unit,
+    onSearchQuery: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val categories = remember { SettingsCategory.entries.toList() }
+    val scrollState = rememberScrollState()
+    val closeSearch = {
+        onSearchActive(false)
+        onSearchQuery("")
+    }
+
+    BackHandler(enabled = searchActive, onBack = closeSearch)
+    BackHandler(enabled = !searchActive, onBack = onBack)
+
+    LaunchedEffect(selectedCategory) { scrollState.scrollTo(0) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val index = categories.indexOf(selectedCategory).coerceAtLeast(0)
+                when (event.key) {
+                    Key.ButtonR1, Key.ButtonR2 -> {
+                        onSelectedCategory(categories[(index + 1) % categories.size])
+                        true
+                    }
+                    Key.ButtonL1, Key.ButtonL2 -> {
+                        onSelectedCategory(categories[(index - 1 + categories.size) % categories.size])
+                        true
+                    }
+                    Key.ButtonB -> {
+                        if (searchActive) closeSearch() else onBack()
+                        true
+                    }
+                    else -> false
+                }
+            },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 56.dp),
+        ) {
+            SettingsHeader(
+                onBack = onBack,
+                searchActive = searchActive,
+                searchQuery = searchQuery,
+                onSearchQuery = onSearchQuery,
+                onSearchOpen = { onSearchActive(true) },
+                onSearchClose = closeSearch,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(categories) { category ->
+                    FilterChip(
+                        selected = category == selectedCategory,
+                        onClick = { onSelectedCategory(category) },
+                        label = {
+                            Text(
+                                text = stringResource(category.titleRes),
+                                maxLines = 1,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = category.icon,
+                                contentDescription = null,
+                                modifier = Modifier.height(18.dp),
+                            )
+                        },
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                if (searchActive && searchQuery.isNotBlank()) {
+                    val results = filterSettings(
+                        entries = settingsSearchEntries,
+                        query = searchQuery,
+                        titleProvider = { context.getString(it) },
+                    )
+                    if (results.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.settings_search_no_results),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        results.forEach { result ->
+                            ConsoleListRow(
+                                title = stringResource(result.titleRes),
+                                subtitle = stringResource(result.category.titleRes),
+                                onClick = {
+                                    onSelectedCategory(result.category)
+                                    closeSearch()
+                                },
+                            )
+                        }
+                    }
+                } else {
+                    SettingsCategoryContent(
+                        category = selectedCategory,
+                        appTheme = appTheme,
+                        paletteStyle = paletteStyle,
+                        onAppTheme = onAppTheme,
+                        onPaletteStyle = onPaletteStyle,
+                        customThemeEnabled = customThemeEnabled,
+                        customThemeJson = customThemeJson,
+                        onCustomTheme = onCustomTheme,
+                        onCustomThemeEnabled = onCustomThemeEnabled,
+                        onClearCustomTheme = onClearCustomTheme,
+                    )
+                }
+            }
+        }
+
+        GamepadActionBar(
+            actions = listOf(
+                GamepadAction(GamepadButton.LB, R.string.hint_categories),
+                GamepadAction(GamepadButton.RB, R.string.hint_categories),
+                GamepadAction(GamepadButton.B, R.string.back, onBack),
+            ),
+            modifier = Modifier.align(Alignment.BottomCenter),
+            forceVisible = true,
+            compact = true,
+        )
+    }
+}
+
+@Composable
+private fun SettingsCategoryContent(
+    category: SettingsCategory,
+    appTheme: AppTheme,
+    paletteStyle: PaletteStyle,
+    onAppTheme: (AppTheme) -> Unit,
+    onPaletteStyle: (PaletteStyle) -> Unit,
+    customThemeEnabled: Boolean,
+    customThemeJson: String,
+    onCustomTheme: (String) -> Unit,
+    onCustomThemeEnabled: (Boolean) -> Unit,
+    onClearCustomTheme: () -> Unit,
+) {
+    when (category) {
+        SettingsCategory.INTERFACE -> SettingsGroupInterface(
+            appTheme = appTheme,
+            paletteStyle = paletteStyle,
+            onAppTheme = onAppTheme,
+            onPaletteStyle = onPaletteStyle,
+            customThemeEnabled = customThemeEnabled,
+            customThemeJson = customThemeJson,
+            onCustomTheme = onCustomTheme,
+            onCustomThemeEnabled = onCustomThemeEnabled,
+            onClearCustomTheme = onClearCustomTheme,
+            section = InterfaceSettingsSection.APPEARANCE,
+        )
+        SettingsCategory.CONTROLS -> SettingsGroupInterface(
+            appTheme = appTheme,
+            paletteStyle = paletteStyle,
+            onAppTheme = onAppTheme,
+            onPaletteStyle = onPaletteStyle,
+            section = InterfaceSettingsSection.CONTROLS,
+        )
+        SettingsCategory.RUNTIME -> SettingsGroupEmulation()
+        SettingsCategory.LIBRARY -> SettingsGroupInterface(
+            appTheme = appTheme,
+            paletteStyle = paletteStyle,
+            onAppTheme = onAppTheme,
+            onPaletteStyle = onPaletteStyle,
+            section = InterfaceSettingsSection.LIBRARY,
+        )
+        SettingsCategory.DOWNLOADS -> SettingsGroupInterface(
+            appTheme = appTheme,
+            paletteStyle = paletteStyle,
+            onAppTheme = onAppTheme,
+            onPaletteStyle = onPaletteStyle,
+            section = InterfaceSettingsSection.DOWNLOADS,
+        )
+        SettingsCategory.SYSTEM -> {
+            SettingsGroupInfo()
+            Spacer(modifier = Modifier.height(20.dp))
+            SettingsGroupDebug()
         }
     }
 }

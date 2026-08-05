@@ -106,7 +106,7 @@ import app.gamenative.service.AchievementWatcher
 import app.gamenative.service.SteamService
 import app.gamenative.service.epic.EpicService
 import app.gamenative.service.gog.GOGService
-import app.gamenative.ui.component.QuickMenu
+import app.gamenative.externaldisplay.GameQuickMenu
 import app.gamenative.ui.component.QuickMenuAction
 import app.gamenative.ui.component.SteamInviteState
 import app.gamenative.ui.component.parseBooleanExtra
@@ -119,6 +119,7 @@ import app.gamenative.ui.widget.PerformanceHudView
 import app.gamenative.utils.AssetUtils
 import app.gamenative.utils.ContainerUtils
 import app.gamenative.utils.DriveDTempCleanup
+import app.gamenative.utils.DualScreenDevice
 import app.gamenative.utils.downloader.CoreDriverDownloader
 import app.gamenative.utils.CustomGameScanner
 import app.gamenative.utils.ExecutableSelectionUtils
@@ -787,6 +788,12 @@ fun XServerScreen(
 
     fun updatePerformanceHud(show: Boolean) {
         if (!show) {
+            removePerformanceHud()
+            return
+        }
+        if (PrefManager.dualScreenLauncher && DualScreenDevice.hasExternalDisplay(context)) {
+            // On dual-screen devices the same HUD is hosted by the lower
+            // presentation, keeping the game image on the upper panel clean.
             removePerformanceHud()
             return
         }
@@ -2405,6 +2412,8 @@ fun XServerScreen(
             }
             val configuredExternalMode = ExternalDisplayInputController.fromConfig(container.externalDisplayMode)
             val swapEnabled = container.isExternalDisplaySwap
+            val launcherOwnsExternalDisplay = PrefManager.dualScreenLauncher &&
+                DualScreenDevice.hasExternalDisplay(context)
 
             val overlay = SwapInputOverlayView(context, xServerView.getxServer()).apply {
                 visibility = View.GONE
@@ -2414,7 +2423,14 @@ fun XServerScreen(
             swapInputOverlay = overlay
 
             val externalDisplayController =
-                if (!swapEnabled && configuredExternalMode != ExternalDisplayInputController.Mode.OFF) {
+                if (!swapEnabled && configuredExternalMode != ExternalDisplayInputController.Mode.OFF &&
+                    !launcherOwnsExternalDisplay
+                ) {
+                    // When the second-screen launcher is enabled the second display
+                    // is owned by DsHomePresentation (now-playing panel / in-game
+                    // QuickMenu). Starting the touchpad/keyboard controller here
+                    // would show it ON TOP (it launches after DsHomePresentation),
+                    // covering the now-playing panel and hiding the QuickMenu.
                     ExternalDisplayInputController(
                         context = context,
                         xServer = xServerView.getxServer(),
@@ -2666,7 +2682,7 @@ fun XServerScreen(
             )
         }
 
-        QuickMenu(
+        GameQuickMenu(
             isVisible = showQuickMenu,
             onDismiss = dismissOverlayMenu,
             onItemSelected = onQuickMenuItemSelected,
@@ -2692,6 +2708,8 @@ fun XServerScreen(
             fpsLimiterEnabled = fpsLimiterEnabled,
             fpsLimiterTarget = fpsLimiterTarget,
             fpsLimiterMax = detectedMaxRefreshRateHz,
+            game = currentAppInfo,
+            frameRating = frameRating,
             onPerformanceHudConfigChanged = ::applyPerformanceHudConfig,
             onFpsLimiterEnabledChanged = ::applyFpsLimiterEnabled,
             onFpsLimiterChanged = ::applyFpsLimiterTarget,

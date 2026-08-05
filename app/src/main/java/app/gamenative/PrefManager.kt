@@ -1,6 +1,7 @@
 package app.gamenative
 
 import android.content.Context
+import androidx.compose.runtime.mutableStateOf
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
@@ -76,9 +77,17 @@ object PrefManager {
                 removePref(oldRefreshToken)
             }
         }
+
+        // Sync the reactive second-screen toggle with the persisted value so
+        // composables observe the stored choice on a cold start.
+        dualScreenLauncherState.value = getPref(
+            DUAL_SCREEN_LAUNCHER,
+            app.gamenative.utils.DualScreenDevice.isKnownDualScreenModel(),
+        )
     }
 
     fun clearPreferences() {
+        dualScreenLauncherState.value = app.gamenative.utils.DualScreenDevice.isKnownDualScreenModel()
         scope.launch {
             dataStore.edit { it.clear() }
         }
@@ -753,6 +762,42 @@ object PrefManager {
     var externalDisplaySwap: Boolean
         get() = getPref(EXTERNAL_DISPLAY_SWAP, false)
         set(value) { setPref(EXTERNAL_DISPLAY_SWAP, value) }
+
+    // Master switch for the second-display launcher modes (library grid/details,
+    // game card and in-game QuickMenu on the second screen). Backed by a
+    // reactive state so composables recompose when it changes.
+    private val DUAL_SCREEN_LAUNCHER = booleanPreferencesKey("dual_screen_launcher")
+    val dualScreenLauncherState = mutableStateOf(
+        app.gamenative.utils.DualScreenDevice.isKnownDualScreenModel(),
+    )
+    var dualScreenLauncher: Boolean
+        get() = getPref(
+            DUAL_SCREEN_LAUNCHER,
+            app.gamenative.utils.DualScreenDevice.isKnownDualScreenModel(),
+        )
+        set(value) {
+            setPref(DUAL_SCREEN_LAUNCHER, value)
+            dualScreenLauncherState.value = value
+        }
+
+    // Dual-screen game presentation. These preferences are deliberately
+    // independent: users can keep Steam-style logo art on the library Hero,
+    // use a plain title in the in-game dashboard, and choose which lower-screen
+    // workspace is shown when a game starts.
+    private val DUAL_SCREEN_HERO_USE_LOGO = booleanPreferencesKey("dual_screen_hero_use_logo")
+    var dualScreenHeroUseLogo: Boolean
+        get() = getPref(DUAL_SCREEN_HERO_USE_LOGO, true)
+        set(value) { setPref(DUAL_SCREEN_HERO_USE_LOGO, value) }
+
+    private val DUAL_SCREEN_GAME_USE_LOGO = booleanPreferencesKey("dual_screen_game_use_logo")
+    var dualScreenGameUseLogo: Boolean
+        get() = getPref(DUAL_SCREEN_GAME_USE_LOGO, false)
+        set(value) { setPref(DUAL_SCREEN_GAME_USE_LOGO, value) }
+
+    private val DUAL_SCREEN_GAME_DEFAULT_PANEL = intPreferencesKey("dual_screen_game_default_panel")
+    var dualScreenGameDefaultPanel: Int
+        get() = getPref(DUAL_SCREEN_GAME_DEFAULT_PANEL, 0).coerceIn(0, 1)
+        set(value) { setPref(DUAL_SCREEN_GAME_DEFAULT_PANEL, value.coerceIn(0, 1)) }
 
     // Disable Mouse Input (prevents external mouse events)
     private val DISABLE_MOUSE_INPUT = booleanPreferencesKey("disable_mouse_input")

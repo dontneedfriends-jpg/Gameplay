@@ -705,6 +705,79 @@ fun SettingsGroupInterface(
         )
     }
 
+    if (section == InterfaceSettingsSection.LIBRARY) SettingsGroup(
+        modifier = Modifier.background(Color.Transparent),
+        title = { Text(text = stringResource(R.string.settings_interface_second_screen_group)) },
+    ) {
+        val secondScreenEnabled = PrefManager.dualScreenLauncherState.value
+        SettingsSwitch(
+            colors = settingsTileColorsAlt(),
+            title = { Text(text = stringResource(R.string.settings_interface_second_screen_title)) },
+            subtitle = { Text(text = stringResource(R.string.settings_interface_second_screen_subtitle)) },
+            state = secondScreenEnabled,
+            onCheckedChange = {
+                PrefManager.dualScreenLauncher = it
+            },
+        )
+
+        var heroTitleMode by rememberSaveable {
+            mutableStateOf(if (PrefManager.dualScreenHeroUseLogo) 0 else 1)
+        }
+        SettingsListDropdown(
+            enabled = secondScreenEnabled,
+            colors = settingsTileColorsAlt(),
+            value = heroTitleMode,
+            items = listOf(
+                stringResource(R.string.settings_interface_second_screen_title_logo),
+                stringResource(R.string.settings_interface_second_screen_title_text),
+            ),
+            title = { Text(stringResource(R.string.settings_interface_second_screen_hero_title)) },
+            subtitle = { Text(stringResource(R.string.settings_interface_second_screen_hero_subtitle)) },
+            onItemSelected = { selected ->
+                heroTitleMode = selected
+                PrefManager.dualScreenHeroUseLogo = selected == 0
+            },
+        )
+
+        var gameTitleMode by rememberSaveable {
+            mutableStateOf(if (PrefManager.dualScreenGameUseLogo) 0 else 1)
+        }
+        SettingsListDropdown(
+            enabled = secondScreenEnabled,
+            colors = settingsTileColorsAlt(),
+            value = gameTitleMode,
+            items = listOf(
+                stringResource(R.string.settings_interface_second_screen_title_logo),
+                stringResource(R.string.settings_interface_second_screen_title_text),
+            ),
+            title = { Text(stringResource(R.string.settings_interface_second_screen_game_title)) },
+            subtitle = { Text(stringResource(R.string.settings_interface_second_screen_game_title_subtitle)) },
+            onItemSelected = { selected ->
+                gameTitleMode = selected
+                PrefManager.dualScreenGameUseLogo = selected == 0
+            },
+        )
+
+        var defaultGamePanel by rememberSaveable {
+            mutableStateOf(PrefManager.dualScreenGameDefaultPanel)
+        }
+        SettingsListDropdown(
+            enabled = secondScreenEnabled,
+            colors = settingsTileColorsAlt(),
+            value = defaultGamePanel,
+            items = listOf(
+                stringResource(R.string.settings_interface_second_screen_panel_game),
+                stringResource(R.string.quick_menu_title),
+            ),
+            title = { Text(stringResource(R.string.settings_interface_second_screen_default_panel_title)) },
+            subtitle = { Text(stringResource(R.string.settings_interface_second_screen_default_panel_subtitle)) },
+            onItemSelected = { selected ->
+                defaultGamePanel = selected
+                PrefManager.dualScreenGameDefaultPanel = selected
+            },
+        )
+    }
+
     // Platform integrations now live in the System Menu. The detailed
     // integration tiles and logout flows have been removed from Settings
     // to avoid duplication.

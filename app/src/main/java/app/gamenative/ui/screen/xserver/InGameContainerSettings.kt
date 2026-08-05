@@ -2,9 +2,11 @@ package app.gamenative.ui.screen.xserver
 
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -214,6 +216,7 @@ fun InGameContainerSettingsOverlay(
     renderer: VulkanRenderer?,
     glRenderer: GLRenderer?,
     onRestart: () -> Unit,
+    embedded: Boolean = false,
 ) {
     if (state.visible) {
         val context = LocalContext.current
@@ -226,6 +229,7 @@ fun InGameContainerSettingsOverlay(
                     state.save(context, newConfig)
                     syncCursorVisibility(renderer, glRenderer, newConfig)
                 },
+                embedded = embedded,
             )
         }
     }
@@ -237,6 +241,7 @@ fun InGameContainerSettingsOverlay(
                 onRestart()
             },
             onContinue = state::dismissRestartPrompt,
+            embedded = embedded,
         )
     }
 }
@@ -245,16 +250,11 @@ fun InGameContainerSettingsOverlay(
 private fun RestartRequiredDialog(
     onRestart: () -> Unit,
     onContinue: () -> Unit,
+    embedded: Boolean = false,
 ) {
     val restartFocusRequester = remember { FocusRequester() }
 
-    Dialog(
-        onDismissRequest = onContinue,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false,
-        ),
-    ) {
+    val prompt: @Composable () -> Unit = {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -301,6 +301,22 @@ private fun RestartRequiredDialog(
                     ),
                 )
             }
+        }
+    }
+
+    if (embedded) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            prompt()
+        }
+    } else {
+        Dialog(
+            onDismissRequest = onContinue,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnClickOutside = false,
+            ),
+        ) {
+            prompt()
         }
     }
 

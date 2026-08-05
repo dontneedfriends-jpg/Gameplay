@@ -3,6 +3,8 @@ package app.gamenative.ui.component
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -288,6 +290,7 @@ fun QuickMenu(
     onAnimationComplete: (Boolean) -> Unit = {},
     /** Lets the menu open itself when the running game asks for its Steam invite dialog. */
     onRequestOpen: () -> Unit = {},
+    fullScreen: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val exitGameItem = QuickMenuItem(
@@ -454,43 +457,50 @@ fun QuickMenu(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AnimatedVisibility(
-            visible = isVisible,
-            enter = fadeIn(animationSpec = motionSpec(tween(200))),
-            exit = fadeOut(animationSpec = motionSpec(tween(150))),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismiss,
-                    ),
-            )
+        if (!fullScreen) {
+            AnimatedVisibility(
+                visible = isVisible,
+                enter = fadeIn(animationSpec = motionSpec(tween(200))),
+                exit = fadeOut(animationSpec = motionSpec(tween(150))),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss,
+                        ),
+                )
+            }
         }
 
         AnimatedVisibility(
             visibleState = visibleState,
-            enter = slideInHorizontally(
+            enter = if (fullScreen) EnterTransition.None else slideInHorizontally(
                 initialOffsetX = { fullWidth -> -fullWidth },
                 animationSpec = motionSpec(tween(200)),
             ),
-            exit = slideOutHorizontally(
+            exit = if (fullScreen) ExitTransition.None else slideOutHorizontally(
                 targetOffsetX = { fullWidth -> -fullWidth },
                 animationSpec = motionSpec(tween(150)),
             ),
-            modifier = Modifier.align(Alignment.CenterStart),
+            modifier = if (fullScreen) Modifier.fillMaxSize() else Modifier.align(Alignment.CenterStart),
         ) {
             Surface(
-                modifier = Modifier
-                    .width(adaptivePanelWidth(400.dp))
-                    .fillMaxHeight(),
-                shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
+                modifier = if (fullScreen) {
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier
+                        .width(adaptivePanelWidth(400.dp))
+                        .fillMaxHeight()
+                },
+                shape = if (fullScreen) RoundedCornerShape(0.dp)
+                    else RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 2.dp,
-                shadowElevation = 24.dp,
+                tonalElevation = if (fullScreen) 0.dp else 2.dp,
+                shadowElevation = if (fullScreen) 0.dp else 24.dp,
             ) {
                 Column(
                     modifier = Modifier
@@ -535,8 +545,11 @@ fun QuickMenu(
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .verticalScroll(tabScrollState),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    .then(
+                                        if (fullScreen) Modifier
+                                        else Modifier.verticalScroll(tabScrollState),
+                                    ),
+                                verticalArrangement = Arrangement.spacedBy(if (fullScreen) 6.dp else 8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 QuickMenuTabButton(
@@ -646,7 +659,7 @@ fun QuickMenu(
                                     accentColor = PluviaTheme.colors.accentPurple,
                                     onSelected = {
                                         inGameAchievements.open()
-                                        onDismiss()
+                                        if (!fullScreen) onDismiss()
                                     },
                                     activateOnFocus = false,
                                     modifier = Modifier.width(56.dp),
@@ -663,7 +676,7 @@ fun QuickMenu(
                                 onSelected = {
                                     containerSettings?.let { settings ->
                                         settings.open()
-                                        onDismiss()
+                                        if (!fullScreen) onDismiss()
                                     }
                                 },
                                 activateOnFocus = false,
@@ -870,6 +883,7 @@ fun QuickMenu(
                     onDismiss()
                 }
             },
+            embedded = fullScreen,
         )
     }
 
