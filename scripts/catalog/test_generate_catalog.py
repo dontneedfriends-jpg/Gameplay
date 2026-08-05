@@ -29,6 +29,24 @@ class GenerateCatalogTest(unittest.TestCase):
         index_path.write_text(json.dumps(index), encoding="utf-8")
         return index_path
 
+    def write_v2_source(self, entries):
+        (self.catalog_dir / "fex.yml").write_text(
+            json.dumps({"type": "fexcore", "components": entries}),
+            encoding="utf-8",
+        )
+        index = {
+            "sourceSchemaVersion": 2,
+            "output": {
+                "schemaVersion": 2,
+                "catalogVersion": "2026.08.1",
+                "generatedAt": "2026-08-05T00:00:00Z",
+            },
+            "sources": [{"path": "fex.yml", "type": "fexcore"}],
+        }
+        index_path = self.catalog_dir / "index.yml"
+        index_path.write_text(json.dumps(index), encoding="utf-8")
+        return index_path
+
     def test_generation_is_deterministic(self):
         index = self.write_source(
             [{"id": "dxvk-2.7", "name": "DXVK 2.7", "url": "https://example.com/dxvk.wcp"}]
@@ -63,6 +81,62 @@ class GenerateCatalogTest(unittest.TestCase):
         index_path.write_text(json.dumps(index), encoding="utf-8")
         with self.assertRaisesRegex(CatalogError, "direct child"):
             load_and_validate_sources(index_path)
+
+    def test_v2_generation_preserves_verified_metadata(self):
+        index = self.write_v2_source([self.v2_entry()])
+
+        generated = json.loads(generate_manifest(index))
+
+        self.assertEqual(2, generated["schemaVersion"])
+        self.assertEqual("fexcore", generated["components"][0]["type"])
+        self.assertEqual(123456, generated["components"][0]["sizeBytes"])
+
+    def test_v2_rejects_missing_dependency(self):
+        entry = self.v2_entry()
+        entry["requires"] = ["missing-runtime"]
+        index = self.write_v2_source([entry])
+
+        with self.assertRaisesRegex(CatalogError, "missing dependency"):
+            load_and_validate_sources(index)
+
+    def test_v2_rejects_placeholder_integrity_metadata(self):
+        entry = self.v2_entry()
+        entry["sizeBytes"] = 0
+        entry["sha256"] = "unknown"
+        index = self.write_v2_source([entry])
+
+        with self.assertRaisesRegex(CatalogError, "sizeBytes"):
+            load_and_validate_sources(index)
+
+    def test_v2_rejects_archive_format_mismatch(self):
+        entry = self.v2_entry()
+        entry["archiveFormat"] = "zip"
+        index = self.write_v2_source([entry])
+
+        with self.assertRaisesRegex(CatalogError, "does not match archiveFormat"):
+            load_and_validate_sources(index)
+
+    @staticmethod
+    def v2_entry():
+        return {
+            "id": "fex-2607-arm64ec",
+            "name": "FEX 2607 ARM64EC",
+            "version": "2607",
+            "channel": "experimental",
+            "variant": "bionic",
+            "abi": ["arm64-v8a"],
+            "archiveFormat": "wcp",
+            "urls": ["https://example.com/fex.wcp"],
+            "sizeBytes": 123456,
+            "sha256": "a" * 64,
+            "sourceRepository": "https://github.com/FEX-Emu/FEX",
+            "sourceCommit": "b" * 40,
+            "license": "MIT",
+            "pageSizes": [4096, 16384],
+            "requiredFiles": ["windows/system32/libwow64fex.dll"],
+            "requires": [],
+            "conflicts": ["wowbox64-*"],
+        }
 
 
 if __name__ == "__main__":

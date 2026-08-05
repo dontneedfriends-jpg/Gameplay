@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +29,37 @@ SOURCE_LAYOUT = (
 )
 LEGACY_TYPES = {group for _, group in SOURCE_LAYOUT if group != "audio"}
 ENTRY_KEYS = {"id", "name", "url", "variant", "arch"}
+V2_REQUIRED_KEYS = {
+    "id",
+    "name",
+    "version",
+    "channel",
+    "abi",
+    "archiveFormat",
+    "urls",
+    "sizeBytes",
+    "sha256",
+    "sourceRepository",
+    "sourceCommit",
+    "license",
+    "pageSizes",
+    "requiredFiles",
+    "requires",
+    "conflicts",
+}
+V2_OPTIONAL_KEYS = {"variant"}
+CHANNELS = {"stable", "beta", "experimental"}
+PAGE_SIZES = {4096, 16384}
+ARCHIVE_SUFFIXES = (".zip", ".wcp", ".tzst", ".tar.xz", ".adpkg")
+ARCHIVE_FORMAT_SUFFIXES = {
+    "zip": ".zip",
+    "wcp": ".wcp",
+    "tzst": ".tzst",
+    "tar.xz": ".tar.xz",
+    "adpkg": ".adpkg",
+}
+SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,64}$")
 
 
 class CatalogError(ValueError):
@@ -53,15 +87,87 @@ def _safe_source_path(catalog_dir: Path, relative: str) -> Path:
     return candidate
 
 
+def _validate_https_url(url: Any, label: str, *, require_archive: bool = False) -> None:
+    if not isinstance(url, str) or not url.strip():
+        raise CatalogError(f"{label}: URL must be a non-empty string")
+    parsed = urlparse(url)
+    if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise CatalogError(f"{label}: URL must use HTTPS without embedded credentials")
+    if require_archive and not parsed.path.lower().endswith(ARCHIVE_SUFFIXES):
+        raise CatalogError(f"{label}: URL must point to a supported archive")
+
+
+def _safe_archive_path(path: Any) -> bool:
+    if not isinstance(path, str) or not path or path.startswith(("/", "\\")):
+        return False
+    if re.match(r"^[A-Za-z]:", path):
+        return False
+    return all(part not in {"", ".."} for part in path.replace("\\", "/").split("/"))
+
+
+def _validate_v2_entry(entry: dict[str, Any], label: str) -> None:
+    unknown = set(entry) - V2_REQUIRED_KEYS - V2_OPTIONAL_KEYS
+    missing = V2_REQUIRED_KEYS - set(entry)
+    if unknown or missing:
+        raise CatalogError(f"{label}: unknown={sorted(unknown)} missing={sorted(missing)}")
+    for key in ("id", "name", "version", "archiveFormat", "license"):
+        if not isinstance(entry[key], str) or not entry[key].strip():
+            raise CatalogError(f"{label}: {key} must be a non-empty string")
+    expected_suffix = ARCHIVE_FORMAT_SUFFIXES.get(entry["archiveFormat"])
+    if expected_suffix is None:
+        raise CatalogError(f"{label}: unsupported archiveFormat {entry['archiveFormat']}")
+    if entry["channel"] not in CHANNELS:
+        raise CatalogError(f"{label}: unsupported channel {entry['channel']}")
+    if not isinstance(entry["abi"], list) or not entry["abi"] or any(not isinstance(value, str) or not value for value in entry["abi"]):
+        raise CatalogError(f"{label}: abi must be a non-empty string list")
+    if not isinstance(entry["urls"], list) or not entry["urls"]:
+        raise CatalogError(f"{label}: urls must not be empty")
+    for url in entry["urls"]:
+        _validate_https_url(url, label, require_archive=True)
+        if not urlparse(url).path.lower().endswith(expected_suffix):
+            raise CatalogError(f"{label}: URL does not match archiveFormat {entry['archiveFormat']}")
+    if not isinstance(entry["sizeBytes"], int) or isinstance(entry["sizeBytes"], bool) or entry["sizeBytes"] <= 0:
+        raise CatalogError(f"{label}: sizeBytes must be a positive integer")
+    if not isinstance(entry["sha256"], str) or not SHA256_RE.fullmatch(entry["sha256"]):
+        raise CatalogError(f"{label}: sha256 must contain 64 hexadecimal characters")
+    _validate_https_url(entry["sourceRepository"], f"{label} sourceRepository")
+    if not isinstance(entry["sourceCommit"], str) or not COMMIT_RE.fullmatch(entry["sourceCommit"]):
+        raise CatalogError(f"{label}: sourceCommit must be a commit hash")
+    if not isinstance(entry["pageSizes"], list) or not entry["pageSizes"] or any(value not in PAGE_SIZES for value in entry["pageSizes"]):
+        raise CatalogError(f"{label}: pageSizes contains an unsupported value")
+    if not isinstance(entry["requiredFiles"], list) or not entry["requiredFiles"]:
+        raise CatalogError(f"{label}: requiredFiles must not be empty")
+    if any(not _safe_archive_path(path) for path in entry["requiredFiles"]):
+        raise CatalogError(f"{label}: requiredFiles contains an unsafe path")
+    for key in ("requires", "conflicts"):
+        if not isinstance(entry[key], list) or any(not isinstance(value, str) or not value for value in entry[key]):
+            raise CatalogError(f"{label}: {key} must be a string list")
+
+
 def load_and_validate_sources(index_path: Path = DEFAULT_INDEX) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
     index = load_yaml_subset(index_path)
     if not isinstance(index, dict):
         raise CatalogError("catalog/index.yml must contain an object")
-    if index.get("sourceSchemaVersion") != 1:
-        raise CatalogError("sourceSchemaVersion must be 1")
+    source_schema = index.get("sourceSchemaVersion")
+    if source_schema not in {1, 2}:
+        raise CatalogError("sourceSchemaVersion must be 1 or 2")
     output = index.get("output")
-    if not isinstance(output, dict) or output.get("version") != 1 or not output.get("updatedAt"):
-        raise CatalogError("index output must contain version=1 and updatedAt")
+    if not isinstance(output, dict):
+        raise CatalogError("index output must be an object")
+    if source_schema == 1:
+        if output.get("version") != 1 or not output.get("updatedAt"):
+            raise CatalogError("v1 index output must contain version=1 and updatedAt")
+    elif set(output) != {"schemaVersion", "catalogVersion", "generatedAt"} or output.get("schemaVersion") != 2:
+        raise CatalogError("v2 index output must contain schemaVersion=2, catalogVersion and generatedAt")
+    else:
+        if not isinstance(output["catalogVersion"], str) or not output["catalogVersion"].strip():
+            raise CatalogError("v2 catalogVersion must not be blank")
+        try:
+            generated_at = datetime.fromisoformat(output["generatedAt"].replace("Z", "+00:00"))
+            if generated_at.tzinfo is None:
+                raise ValueError("timezone required")
+        except (AttributeError, ValueError) as error:
+            raise CatalogError("v2 generatedAt must be an ISO-8601 timestamp with timezone") from error
     sources = index.get("sources")
     if not isinstance(sources, list) or not sources:
         raise CatalogError("index sources must be a non-empty list")
@@ -91,24 +197,56 @@ def load_and_validate_sources(index_path: Path = DEFAULT_INDEX) -> tuple[dict[st
             label = f"{relative} components[{position}]"
             if not isinstance(entry, dict):
                 raise CatalogError(f"{label}: entry must be an object")
-            unknown = set(entry) - ENTRY_KEYS
-            missing = {"id", "name", "url"} - set(entry)
-            if unknown or missing:
-                raise CatalogError(f"{label}: unknown={sorted(unknown)} missing={sorted(missing)}")
-            if any(not isinstance(entry[key], str) or not entry[key].strip() for key in ("id", "name", "url")):
-                raise CatalogError(f"{label}: id, name and url must be non-empty strings")
-            if not entry["url"].lower().startswith("https://"):
-                raise CatalogError(f"{label}: url must use HTTPS")
+            if source_schema == 1:
+                unknown = set(entry) - ENTRY_KEYS
+                missing = {"id", "name", "url"} - set(entry)
+                if unknown or missing:
+                    raise CatalogError(f"{label}: unknown={sorted(unknown)} missing={sorted(missing)}")
+                if any(not isinstance(entry[key], str) or not entry[key].strip() for key in ("id", "name", "url")):
+                    raise CatalogError(f"{label}: id, name and url must be non-empty strings")
+                _validate_https_url(entry["url"], label, require_archive=True)
+            else:
+                _validate_v2_entry(entry, label)
             if entry["id"] in ids:
                 raise CatalogError(f"duplicate component id: {entry['id']}")
             ids.add(entry["id"])
             validated.append(entry)
         groups[expected_type] = validated
+
+    if source_schema == 2:
+        entries_by_id = {entry["id"]: entry for entries in groups.values() for entry in entries}
+        stable_keys: set[tuple[Any, ...]] = set()
+        for group, entries in groups.items():
+            for entry in entries:
+                label = entry["id"]
+                if group not in LEGACY_TYPES:
+                    raise CatalogError(f"{label}: unsupported install type {group}")
+                if entry["channel"] == "stable":
+                    stable_key = (group, entry["version"], entry.get("variant"), tuple(entry["abi"]))
+                    if stable_key in stable_keys:
+                        raise CatalogError(f"duplicate stable version key: {stable_key}")
+                    stable_keys.add(stable_key)
+                for dependency in entry["requires"]:
+                    target = entries_by_id.get(dependency)
+                    if target is None:
+                        raise CatalogError(f"{label}: missing dependency {dependency}")
+                    if entry["channel"] == "stable" and target["channel"] == "experimental":
+                        raise CatalogError(f"{label}: stable component depends on experimental component {dependency}")
     return output, groups
 
 
 def generate_manifest(index_path: Path = DEFAULT_INDEX) -> str:
     output, groups = load_and_validate_sources(index_path)
+    if output.get("schemaVersion") == 2:
+        components = [dict(entry, type=group) for group, entries in groups.items() for entry in entries]
+        return dump_yaml_subset(
+            {
+                "schemaVersion": 2,
+                "catalogVersion": output["catalogVersion"],
+                "generatedAt": output["generatedAt"],
+                "components": components,
+            }
+        )
     items: dict[str, list[dict[str, Any]]] = {}
     for group, entries in groups.items():
         if not entries:
