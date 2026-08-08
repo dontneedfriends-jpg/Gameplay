@@ -2214,16 +2214,6 @@
     <string name="nexus_invalid_source_metadata">Цей керований мод має неповні відомості про джерело, тому повторити операцію неможливо.</string>
     <string name="nexus_archive_memory_error">Архів потребує більше пам’яті, ніж дозволено Android. Повторіть спробу після оновлення Gameplay або виберіть менший файл.</string>
     <!-- Bionic FG (AI) Frame Generation -->
-    <string name="bfg_tab_title">ШІ-генерація кадрів</string>
-    <string name="bfg_enable">Увімкнути ШІ-генерацію кадрів</string>
-    <string name="bfg_description">Вбудована ШІ-інтерполяція кадрів. Додаткових покупок не потрібно.</string>
-    <string name="bfg_multiplier">Множник кадрів</string>
-    <string name="bfg_flow_scale">Масштаб потоку</string>
-    <string name="bfg_flow_scale_desc">Менше — швидше; більше — краще відстежує рух, але навантажує GPU сильніше.</string>
-    <string name="bfg_model">Модель</string>
-    <string name="bfg_model_desc">Clear чіткіший, але важчий</string>
-    <string name="bfg_model_standard">Стандартна</string>
-    <string name="bfg_model_clear">Clear</string>
     <string name="steam_invite_tab_title">Запросити</string>
     <string name="steam_invite_header">Друзів: %1$d</string>
     <string name="steam_invite_joinable">У цій грі — торкніться, щоб приєднатися</string>
