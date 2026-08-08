@@ -20,6 +20,8 @@ import app.gamenative.utils.CURRENT_UFS_PARSE_VERSION
 import app.gamenative.utils.FileUtils
 import app.gamenative.utils.Net
 import app.gamenative.utils.SteamUtils
+import app.gamenative.utils.redactUrlForLogging
+import com.winlator.xenvironment.components.EnvRedactor
 import `in`.dragonbra.javasteam.enums.EOSType
 import `in`.dragonbra.javasteam.enums.EResult
 import `in`.dragonbra.javasteam.steam.handlers.steamcloud.AppFileChangeList
@@ -296,21 +298,26 @@ object SteamAutoCloud {
         }
 
         val getFilesDiff: (List<UserFileInfo>, List<UserFileInfo>) -> Pair<Boolean, FileChanges> = { currentFiles, oldFiles ->
+            // Steam Cloud paths use '/' while local wine paths use the platform separator, and
+            // Windows paths are case-insensitive while the Linux layer is not. Normalize both
+            // sides before comparing so identical files are not treated as delete+create.
+            val normalizeKey: (String) -> String = { it.replace('\\', '/').lowercase() }
+
             val overlappingFiles = currentFiles.filter { currentFile ->
-                oldFiles.any { currentFile.prefixPath == it.prefixPath }
+                oldFiles.any { normalizeKey(currentFile.prefixPath) == normalizeKey(it.prefixPath) }
             }
 
             val newFiles = currentFiles.filter { currentFile ->
-                !oldFiles.any { currentFile.prefixPath == it.prefixPath }
+                !oldFiles.any { normalizeKey(currentFile.prefixPath) == normalizeKey(it.prefixPath) }
             }
 
             val deletedFiles = oldFiles.filter { oldFile ->
-                !currentFiles.any { oldFile.prefixPath == it.prefixPath }
+                !currentFiles.any { normalizeKey(oldFile.prefixPath) == normalizeKey(it.prefixPath) }
             }
 
             val modifiedFiles = overlappingFiles.filter { file ->
                 oldFiles.first {
-                    it.prefixPath == file.prefixPath
+                    normalizeKey(it.prefixPath) == normalizeKey(file.prefixPath)
                 }.let {
                     Timber.i("Comparing SHA of ${it.prefixPath} and ${file.prefixPath}")
                     Timber.i("[${it.sha.joinToString(", ")}]\n[${file.sha.joinToString(", ")}]")
@@ -488,6 +495,8 @@ object SteamAutoCloud {
             "$scheme${urlHost}$urlPath"
         }
 
+        val filesFailed = AtomicInteger(0)
+
         val downloadFiles: (List<AppFileInfo>, AppFileChangeList, CoroutineScope) -> Deferred<UserFilesDownloadResult> = { filesToDownload, fileList, parentScope ->
             parentScope.async {
                 val filesDownloaded = AtomicInteger(0)
@@ -517,27 +526,34 @@ object SteamAutoCloud {
                         filesToDownload.map { file ->
                             async {
                                 semaphore.withPermit {
-                                    val result = downloadSingleFile(
-                                        appInfo = appInfo,
-                                        steamCloud = steamCloud,
-                                        hashCacheDao = hashCacheDao,
-                                        file = file,
-                                        fileList = fileList,
-                                        getFilePrefixPath = getFilePrefixPath,
-                                        getFullFilePath = getFullFilePath,
-                                        buildUrl = buildUrl,
-                                        httpClient = downloadHttpClient,
-                                        totalRawBytes = totalRawBytes,
-                                        downloadedRawBytes = downloadedRawBytes,
-                                        lastReportedPercent = lastReportedPercent,
-                                        completedFiles = completedFiles,
-                                        totalFiles = totalFiles,
-                                        progressMessage = progressMessage,
-                                        onProgress = onProgress,
-                                    )
+                                    var result: UserFilesDownloadResult? = null
+                                    var attempts = 0
+                                    while (result == null && attempts < MAX_USER_FILE_RETRIES) {
+                                        attempts++
+                                        result = downloadSingleFile(
+                                            appInfo = appInfo,
+                                            steamCloud = steamCloud,
+                                            hashCacheDao = hashCacheDao,
+                                            file = file,
+                                            fileList = fileList,
+                                            getFilePrefixPath = getFilePrefixPath,
+                                            getFullFilePath = getFullFilePath,
+                                            buildUrl = buildUrl,
+                                            httpClient = downloadHttpClient,
+                                            totalRawBytes = totalRawBytes,
+                                            downloadedRawBytes = downloadedRawBytes,
+                                            lastReportedPercent = lastReportedPercent,
+                                            completedFiles = completedFiles,
+                                            totalFiles = totalFiles,
+                                            progressMessage = progressMessage,
+                                            onProgress = onProgress,
+                                        )
+                                    }
                                     if (result != null) {
                                         filesDownloaded.addAndGet(result.filesDownloaded)
                                         bytesDownloaded.addAndGet(result.bytesDownloaded)
+                                    } else {
+                                        filesFailed.incrementAndGet()
                                     }
                                 }
                             }
@@ -645,13 +661,13 @@ object SteamAutoCloud {
                                 blockRequest.urlPath,
                             )
 
-                            Timber.i("Uploading to $httpUrl")
+                            Timber.i("Uploading to ${redactUrlForLogging(httpUrl.toString())}")
                             Timber.i(
                                 "Block Request:" +
                                     "\n\tblockOffset: ${blockRequest.blockOffset}" +
                                     "\n\tblockLength: ${blockRequest.blockLength}" +
                                     "\n\trequestHeaders:\n\t\t${
-                                        blockRequest.requestHeaders.joinToString("\n\t\t") { "${it.name}: ${it.value}" }
+                                        blockRequest.requestHeaders.joinToString("\n\t\t") { "${it.name}: ${EnvRedactor.redactText(it.value)}" }
                                     }" +
                                     "\n\texplicitBodyData: [${
                                         blockRequest.explicitBodyData.joinToString(
@@ -698,7 +714,7 @@ object SteamAutoCloud {
 
                             val httpClient = steamInstance.steamClient!!.configuration.httpClient
 
-                            Timber.i("Sending request to ${request.url} using\n$request")
+                            Timber.i("Sending request to ${request.url}")
 
                             withTimeout(SteamService.requestTimeout) {
                                 val response = httpClient.newCall(request).execute()
@@ -756,6 +772,10 @@ object SteamAutoCloud {
                     ).await()
 
                     Timber.i("File ${file.prefixPath} commit success: $commitSuccess")
+                    if (commitSuccess != true) {
+                        uploadFileSuccess = false
+                        uploadBatchSuccess = false
+                    }
                 }
 
                 steamCloud.completeAppUploadBatch(
@@ -851,6 +871,16 @@ object SteamAutoCloud {
                         filesDownloaded = downloadInfo.filesDownloaded
                         bytesDownloaded = downloadInfo.bytesDownloaded
                     }.inWholeMicroseconds
+
+                    if (filesFailed.get() > 0) {
+                        Timber.e(
+                            "Failed to download ${filesFailed.get()} of ${appFileListChange.files.size} cloud " +
+                                "user file(s) after $MAX_USER_FILE_RETRIES tries",
+                        )
+                        syncResult = SyncResult.DownloadFail
+                        return@async PostSyncInfo(syncResult)
+                    }
+
 
                     val updatedLocalFiles: Map<String, List<UserFileInfo>>
                     val hasLocalChanges: Boolean
@@ -952,6 +982,9 @@ object SteamAutoCloud {
                         val downloadInfo = downloadFiles(neverSynced, appFileListChange, parentScope).await()
                         filesDownloaded += downloadInfo.filesDownloaded
                         bytesDownloaded += downloadInfo.bytesDownloaded
+                        if (filesFailed.get() > 0) {
+                            syncResult = SyncResult.DownloadFail
+                        }
                         steamInstance.fileChangeListsDao.insert(appInfo.id, getLocalUserFilesAsPrefixMap().values.flatten())
                         downloadInfo.filesDownloaded
                     }
@@ -1192,7 +1225,7 @@ object SteamAutoCloud {
             buildUrl(useHttps, urlHost, urlPath)
         }
 
-        Timber.i("Downloading $httpUrl")
+        Timber.i("Downloading ${redactUrlForLogging(httpUrl.toString())}")
 
         val headers = Headers.headersOf(
             *fileDownloadInfo.requestHeaders
@@ -1230,6 +1263,8 @@ object SteamAutoCloud {
             response.close()
             return null
         }
+
+        var fileFullyWritten = false
 
         try {
             val totalFileSize = fileDownloadInfo.rawFileSize.toLong()
@@ -1305,6 +1340,8 @@ object SteamAutoCloud {
                 return null
             }
 
+            fileFullyWritten = true
+
             val actualSize = Files.size(actualFilePath)
             if (actualSize != totalFileSize) {
                 Timber.w("Downloaded size for $prefixedPath was $actualSize, expected $totalFileSize - skipping cache seed")
@@ -1345,6 +1382,11 @@ object SteamAutoCloud {
             return null
         } finally {
             response.close()
+            // A partial or zero-byte file left behind by a failed download would hash-conflict
+            // with the cloud manifest on the next sync and block launch forever. Remove it.
+            if (!fileFullyWritten) {
+                runCatching { Files.deleteIfExists(actualFilePath) }
+            }
         }
     }
 
