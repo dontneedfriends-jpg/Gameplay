@@ -12,7 +12,8 @@ import timber.log.Timber
 /**
  * Backing state for the QuickMenu invite tab.
  *
- * Deliberately constructed inside QuickMenu (see the BfgMenuState precedent) rather than plumbed
+ * Deliberately constructed inside QuickMenu (see the InGameContainerSettings
+ * precedent) rather than plumbed
  * in from XServerScreen, which sits at the dex verifier's register limit.
  *
  * The host process already knows which app it is serving, so nothing here needs an app id.
