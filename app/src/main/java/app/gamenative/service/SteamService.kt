@@ -182,6 +182,7 @@ import okhttp3.FormBody
 import org.json.JSONArray
 import org.json.JSONObject
 import com.winlator.container.ContainerManager
+import com.winlator.xenvironment.components.EnvRedactor
 import app.gamenative.statsgen.StatType
 import app.gamenative.statsgen.StatsAchievementsGenerator
 import app.gamenative.statsgen.VdfParser
@@ -197,12 +198,12 @@ class SteamService : Service(), IChallengeUrlChanged {
     private val logger = object : LogListener {
         override fun onLog(clazz: Class<*>, message: String?, throwable: Throwable?) {
             val logMessage = message ?: "No message given"
-            Timber.i(throwable, "[${clazz.simpleName}] -> $logMessage")
+            Timber.i(throwable, "[${clazz.simpleName}] -> ${EnvRedactor.redactText(logMessage)}")
         }
 
         override fun onError(clazz: Class<*>, message: String?, throwable: Throwable?) {
             val logMessage = message ?: "No message given"
-            Timber.e(throwable, "[${clazz.simpleName}] -> $logMessage")
+            Timber.e(throwable, "[${clazz.simpleName}] -> ${EnvRedactor.redactText(logMessage)}")
         }
     }
 
@@ -3094,9 +3095,7 @@ class SteamService : Service(), IChallengeUrlChanged {
                     packageIds = emptyList(),
                 ).await()
 
-                Timber.d("Access tokens response:")
-                Timber.d("  - Granted tokens: ${tokens.appTokens.keys}")
-                Timber.d("  - Denied tokens: ${tokens.appTokensDenied}")
+                Timber.d("PICS access tokens: granted=${tokens.appTokens.size} denied=${tokens.appTokensDenied.size}")
 
                 // Step 2: Filter to only appIds that have tokens (we own them)
                 val ownedAppIds = tokens.appTokens.keys.filter { it in dlcAppIds }.toSet()
@@ -4392,9 +4391,7 @@ class SteamService : Service(), IChallengeUrlChanged {
 
     override fun onChanged(qrAuthSession: QrAuthSession?) {
         qrAuthSession?.let { qr ->
-            if (!BuildConfig.DEBUG) {
-                Timber.d("QR code changed -> ${qr.challengeUrl}")
-            }
+            Timber.d("QR code changed")
 
             val event = SteamEvent.QrChallengeReceived(qr.challengeUrl)
             PluviaApp.events.emit(event)

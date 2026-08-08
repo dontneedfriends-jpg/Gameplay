@@ -13,6 +13,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import timber.log.Timber
 import app.gamenative.utils.Net
+import com.winlator.xenvironment.components.EnvRedactor
 
 
 data class EpicAuthResponse(
@@ -58,8 +59,8 @@ object EpicAuthClient {
             val body = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
-                Timber.e("Authentication failed: ${response.code} - $body")
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $body"))
+                Timber.e("Authentication failed: ${response.code} - ${EnvRedactor.redactText(body)}")
+                return@withContext Result.failure(Exception("HTTP ${response.code}: ${EnvRedactor.redactText(body)}"))
             }
 
             val json = JSONObject(body)
@@ -114,8 +115,8 @@ object EpicAuthClient {
             val body = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
-                Timber.e("Token refresh failed: ${response.code} - $body")
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $body"))
+                Timber.e("Token refresh failed: ${response.code} - ${EnvRedactor.redactText(body)}")
+                return@withContext Result.failure(Exception("HTTP ${response.code}: ${EnvRedactor.redactText(body)}"))
             }
 
             val json = JSONObject(body)
@@ -163,8 +164,8 @@ object EpicAuthClient {
             val body = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
-                Timber.e("Failed to get game exchange token: ${response.code} - $body")
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $body"))
+                Timber.e("Failed to get game exchange token: ${response.code} - ${EnvRedactor.redactText(body)}")
+                return@withContext Result.failure(Exception("HTTP ${response.code}: ${EnvRedactor.redactText(body)}"))
             }
 
             val json = JSONObject(body)
@@ -215,8 +216,8 @@ object EpicAuthClient {
 
             if (!response.isSuccessful) {
                 val errorBody = response.body?.string() ?: "Unknown error"
-                Timber.e("Failed to get ownership token: ${response.code} - $errorBody")
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $errorBody"))
+                Timber.e("Failed to get ownership token: ${response.code} - ${EnvRedactor.redactText(errorBody)}")
+                return@withContext Result.failure(Exception("HTTP ${response.code}: ${EnvRedactor.redactText(errorBody)}"))
             }
 
             val tokenBytes = response.body?.bytes()

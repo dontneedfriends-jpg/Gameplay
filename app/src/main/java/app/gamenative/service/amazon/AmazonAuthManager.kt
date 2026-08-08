@@ -48,7 +48,6 @@ object AmazonAuthManager {
         Timber.d("[Amazon] Auth flow started (serial=${serial.take(8)}…)")
         Timber.d("[Amazon] Client ID: device:$clientId")
         Timber.d("[Amazon] Auth URL scope: device_auth_access")
-        Timber.d("[Amazon] Full auth URL: $authUrl")
 
         return authUrl
     }

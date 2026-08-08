@@ -2,6 +2,7 @@ package app.gamenative.service.amazon
 
 import android.content.Context
 import app.gamenative.utils.Net
+import app.gamenative.utils.redactUrlForLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -175,12 +176,12 @@ object AmazonSdkManager {
             if (response.isSuccessful) {
                 response.body?.bytes()
             } else {
-                Timber.tag(TAG).e("fetchBytes: HTTP ${response.code} for $url")
+                Timber.tag(TAG).e("fetchBytes: HTTP ${response.code} for ${redactUrlForLogging(url)}")
                 null
             }
         }
     } catch (e: Exception) {
-        Timber.tag(TAG).e(e, "fetchBytes failed: $url")
+        Timber.tag(TAG).e(e, "fetchBytes failed: ${redactUrlForLogging(url)}")
         null
     }
 
@@ -204,7 +205,7 @@ object AmazonSdkManager {
                 tmpFile.renameTo(destFile)
                 true
             } else {
-                Timber.tag(TAG).e("downloadFile: HTTP ${response.code} for $url")
+                Timber.tag(TAG).e("downloadFile: HTTP ${response.code} for ${redactUrlForLogging(url)}")
                 tmpFile.delete()
                 false
             }

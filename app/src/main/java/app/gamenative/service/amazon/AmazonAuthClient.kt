@@ -1,6 +1,7 @@
 package app.gamenative.service.amazon
 
 import app.gamenative.utils.Net
+import com.winlator.xenvironment.components.EnvRedactor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -68,8 +69,8 @@ object AmazonAuthClient {
             val responseBody = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
-                Timber.e("[Amazon] Device registration failed: ${response.code} - $responseBody")
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+                Timber.e("[Amazon] Device registration failed: ${response.code} - ${EnvRedactor.redactText(responseBody)}")
+                return@withContext Result.failure(Exception("HTTP ${response.code}: ${EnvRedactor.redactText(responseBody)}"))
             }
 
             val json = JSONObject(responseBody)
@@ -123,8 +124,8 @@ object AmazonAuthClient {
             val responseBody = response.body?.string() ?: ""
 
             if (!response.isSuccessful) {
-                Timber.e("[Amazon] Token refresh failed: ${response.code} - $responseBody")
-                return@withContext Result.failure(Exception("HTTP ${response.code}: $responseBody"))
+                Timber.e("[Amazon] Token refresh failed: ${response.code} - ${EnvRedactor.redactText(responseBody)}")
+                return@withContext Result.failure(Exception("HTTP ${response.code}: ${EnvRedactor.redactText(responseBody)}"))
             }
 
             val json = JSONObject(responseBody)
@@ -168,7 +169,7 @@ object AmazonAuthClient {
                 val responseBody = response.body?.string() ?: ""
 
                 if (!response.isSuccessful) {
-                    Timber.w("[Amazon] Deregister returned ${response.code}: $responseBody")
+                    Timber.w("[Amazon] Deregister returned ${response.code}: ${EnvRedactor.redactText(responseBody)}")
                     // Non-fatal: credentials will still be cleared locally
                 } else {
                     Timber.i("[Amazon] Device deregistered successfully")

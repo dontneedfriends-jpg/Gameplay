@@ -5,6 +5,7 @@ import app.gamenative.data.AmazonGame
 import app.gamenative.data.DownloadInfo
 import app.gamenative.enums.Marker
 import app.gamenative.utils.MarkerUtils
+import app.gamenative.utils.redactUrlForLogging
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -78,12 +79,12 @@ class AmazonDownloadManager @Inject constructor(
                 return@withContext Result.failure(Exception("Failed to fetch download spec from Amazon"))
             }
 
-            Timber.tag(TAG).d("Download spec: url=${spec.downloadUrl}, version=${spec.versionId}")
+            Timber.tag(TAG).d("Download spec: url=${redactUrlForLogging(spec.downloadUrl)}, version=${spec.versionId}")
 
             // ── 3. Manifest ──────────────────────────────────────────────────
             downloadInfo.updateStatusMessage("Fetching manifest…")
             val manifestUrl = appendPath(spec.downloadUrl, "manifest.proto")
-            Timber.tag(TAG).d("Manifest URL: $manifestUrl")
+            Timber.tag(TAG).d("Manifest URL: ${redactUrlForLogging(manifestUrl)}")
             val manifestBytes = fetchBytes(manifestUrl)
             if (manifestBytes == null) {
                 cleanupOnFailure()
@@ -343,7 +344,7 @@ class AmazonDownloadManager @Inject constructor(
             if (!response.isSuccessful) null else response.body.bytes()
         }
     } catch (e: Exception) {
-        Timber.tag(TAG).e(e, "fetchBytes failed for $url")
+        Timber.tag(TAG).e(e, "fetchBytes failed for ${redactUrlForLogging(url)}")
         null
     }
 }

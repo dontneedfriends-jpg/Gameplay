@@ -132,7 +132,7 @@ object EpicAuthManager {
 
             saveCredentials(context, credentials)
 
-            Timber.i("Epic authentication successful: ${credentials.displayName}")
+            Timber.i("Epic authentication successful")
             Result.success(credentials)
         } catch (e: Exception) {
             Timber.e(e, "Epic authentication exception: ${e.message}")

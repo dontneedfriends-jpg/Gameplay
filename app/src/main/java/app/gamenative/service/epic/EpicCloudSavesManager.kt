@@ -101,7 +101,7 @@ object EpicCloudSavesManager {
             }
 
             val creds = credentials.getOrNull()!!
-            Timber.tag("Epic").d("[Cloud Saves] Using account: ${creds.accountId} (${creds.displayName})")
+            Timber.tag("Epic").d("[Cloud Saves] Using account: ${creds.accountId}")
 
             //  Determine sync action - Upload,Download, Conflict or none
             val action = determineSyncAction(context, creds.accountId, game, preferredAction)

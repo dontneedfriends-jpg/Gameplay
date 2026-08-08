@@ -8,6 +8,7 @@ import app.gamenative.data.LibraryItem
 import app.gamenative.db.dao.EpicGameDao
 import app.gamenative.utils.Net
 import app.gamenative.utils.sanitizeForFilename
+import com.winlator.xenvironment.components.EnvRedactor
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -299,8 +300,8 @@ class EpicManager @Inject constructor(
 
                 if (!response.isSuccessful) {
                     val error = response.body?.string() ?: "Unknown error"
-                    Timber.tag("Epic").e("Library fetch failed: ${response.code} - $error")
-                    return@withContext Result.failure(Exception("HTTP ${response.code}: $error"))
+                    Timber.tag("Epic").e("Library fetch failed: ${response.code} - ${EnvRedactor.redactText(error)}")
+                    return@withContext Result.failure(Exception("HTTP ${response.code}: ${EnvRedactor.redactText(error)}"))
                 }
 
                 val body = response.body?.string()

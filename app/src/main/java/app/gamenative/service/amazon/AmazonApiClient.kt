@@ -2,6 +2,8 @@ package app.gamenative.service.amazon
 
 import app.gamenative.data.AmazonGame
 import app.gamenative.utils.Net
+import app.gamenative.utils.redactUrlForLogging
+import com.winlator.xenvironment.components.EnvRedactor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -120,7 +122,7 @@ object AmazonApiClient {
             Net.http.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "(no body)"
-                    Timber.e("[Amazon] HTTP ${response.code} from $url (target=${target.substringAfterLast('.')}): $errorBody")
+                    Timber.e("[Amazon] HTTP ${response.code} from $url (target=${target.substringAfterLast('.')}): ${EnvRedactor.redactText(errorBody)}")
                     return null
                 }
 
@@ -128,7 +130,7 @@ object AmazonApiClient {
                 JSONObject(responseText)
             }
         } catch (e: Exception) {
-            Timber.e(e, "[Amazon] POST to $url failed")
+            Timber.e(e, "[Amazon] POST to ${redactUrlForLogging(url)} failed")
             null
         }
     }
@@ -221,7 +223,7 @@ object AmazonApiClient {
             return@withContext null
         }
         val versionId = response.optString("versionId", "")
-        Timber.i("[Amazon] GetGameDownload: versionId=$versionId url=$downloadUrl")
+        Timber.i("[Amazon] GetGameDownload: versionId=$versionId url=${redactUrlForLogging(downloadUrl)}")
         GameDownloadSpec(downloadUrl = downloadUrl, versionId = versionId)
     }
 
@@ -299,7 +301,7 @@ object AmazonApiClient {
         }
 
         val manifestUrl = appendPath(spec.downloadUrl, "manifest.proto")
-        Timber.tag("Amazon").d("fetchDownloadSize: manifest URL = $manifestUrl")
+        Timber.tag("Amazon").d("fetchDownloadSize: manifest URL = ${redactUrlForLogging(manifestUrl)}")
 
         val manifestBytes = try {
             val request = Request.Builder()
@@ -341,7 +343,7 @@ object AmazonApiClient {
         bearerToken: String,
     ): GameDownloadSpec? = withContext(Dispatchers.IO) {
         val url = "$DISTRIBUTION_URL/download/channel/${AmazonConstants.LAUNCHER_CHANNEL_ID}"
-        Timber.tag("Amazon").d("fetchSdkDownload: GET $url")
+        Timber.tag("Amazon").d("fetchSdkDownload: GET ${redactUrlForLogging(url)}")
 
         try {
             val request = Request.Builder()
@@ -354,7 +356,7 @@ object AmazonApiClient {
             Net.http.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "(no body)"
-                    Timber.tag("Amazon").e("fetchSdkDownload: HTTP ${response.code}: $errorBody")
+                    Timber.tag("Amazon").e("fetchSdkDownload: HTTP ${response.code}: ${EnvRedactor.redactText(errorBody)}")
                     return@withContext null
                 }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import app.gamenative.data.GameSource
 import com.winlator.container.Container
 import com.winlator.core.envvars.EnvVars
+import com.winlator.xenvironment.components.EnvRedactor
 import timber.log.Timber
 
 class WineEnvVarFix(
@@ -35,10 +36,10 @@ class WineEnvVarFix(
 
             container.envVars = envVars.toString()
             container.saveData()
-            Timber.tag("GameFixes").i("Added env vars '$envVarsToSet' for game $gameId")
+            Timber.tag("GameFixes").i("Added env vars '${EnvRedactor.redactText(envVarsToSet.toString())}' for game $gameId")
             true
         } catch (e: Exception) {
-            Timber.tag("GameFixes").e(e, "Failed to add env vars '$envVarsToSet' for game $gameId")
+            Timber.tag("GameFixes").e(e, "Failed to add env vars '${EnvRedactor.redactText(envVarsToSet.toString())}' for game $gameId")
             false
         }
     }

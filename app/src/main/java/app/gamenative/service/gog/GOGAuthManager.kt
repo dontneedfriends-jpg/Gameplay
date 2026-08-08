@@ -3,6 +3,7 @@ package app.gamenative.service.gog
 import android.content.Context
 import app.gamenative.data.GOGCredentials
 import app.gamenative.utils.Net
+import com.winlator.xenvironment.components.EnvRedactor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -275,7 +276,7 @@ object GOGAuthManager {
             }.use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
-                    Timber.tag("GOG").e("Failed to get game token: HTTP ${response.code} - $errorBody")
+                    Timber.tag("GOG").e("Failed to get game token: HTTP ${response.code} - ${EnvRedactor.redactText(errorBody)}")
                     return Result.failure(Exception("Failed to get game-specific token: HTTP ${response.code}"))
                 }
 
@@ -395,7 +396,7 @@ object GOGAuthManager {
             }.use { response ->
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
-                    Timber.tag("GOG").e("Failed to refresh credentials: HTTP ${response.code} - $errorBody")
+                    Timber.tag("GOG").e("Failed to refresh credentials: HTTP ${response.code} - ${EnvRedactor.redactText(errorBody)}")
                     return Result.failure(Exception("Failed to refresh credentials: HTTP ${response.code}"))
                 }
 

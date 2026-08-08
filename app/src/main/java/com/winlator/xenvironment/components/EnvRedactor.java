@@ -26,6 +26,9 @@ public final class EnvRedactor {
     private static final Pattern BEARER_PATTERN = Pattern.compile(
             "(?i)(Bearer\\s+)[A-Za-z0-9._~+/=-]+"
     );
+    private static final Pattern JSON_VALUE_PATTERN = Pattern.compile(
+            "(?i)(\"(?:access[_-]?token|refresh[_-]?token|auth[_-]?code|exchange[_-]?code|id[_-]?token|client[_-]?secret|code|password|token)\\s*\"\\s*:\\s*\")([^\"\\\\]|\\\\.)*"
+    );
 
     private EnvRedactor() {}
 
@@ -79,6 +82,7 @@ public final class EnvRedactor {
     public static String redactText(String text) {
         if (text == null) return "null";
         String redacted = replaceValue(BEARER_PATTERN, text);
+        redacted = replaceValue(JSON_VALUE_PATTERN, redacted);
         redacted = replaceValue(ASSIGNMENT_PATTERN, redacted);
         return replaceValue(ARGUMENT_PATTERN, redacted);
     }
