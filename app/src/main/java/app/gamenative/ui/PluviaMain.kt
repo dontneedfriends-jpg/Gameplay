@@ -903,7 +903,20 @@ fun PluviaMain(
                     viewModel.browseAllInstallerExecutables(context, failedSessionId)
                 }
             } else {
-                null
+                {
+                    setMessageDialogState(MessageDialogState(false))
+                    preLaunchApp(
+                        context = context,
+                        appId = state.launchedAppId,
+                        skipCloudSync = true,
+                        setLoadingDialogVisible = viewModel::setLoadingDialogVisible,
+                        setLoadingProgress = viewModel::setLoadingDialogProgress,
+                        setLoadingMessage = viewModel::setLoadingDialogMessage,
+                        setMessageDialogState = setMessageDialogState,
+                        onSuccess = viewModel::launchApp,
+                        isOffline = viewModel.isOffline.value,
+                    )
+                }
             }
             if (failedSessionId != null) {
                 onActionClick = {
@@ -2324,6 +2337,7 @@ fun preLaunchApp(
                         type = DialogType.SYNC_FAIL,
                         title = context.getString(R.string.sync_error_title),
                         message = context.getString(R.string.main_sync_failed, postSyncInfo.syncResult.toString()),
+                        confirmBtnText = context.getString(R.string.main_launch_anyway),
                         dismissBtnText = context.getString(R.string.ok),
                     ),
                 )
