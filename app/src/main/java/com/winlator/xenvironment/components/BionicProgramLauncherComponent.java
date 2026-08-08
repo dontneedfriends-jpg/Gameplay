@@ -17,7 +17,6 @@ import androidx.annotation.NonNull;
 
 import com.winlator.PrefManager;
 
-import app.gamenative.utils.BionicFgManager;
 import app.gamenative.utils.LsfgVkManager;
 import com.winlator.box86_64.Box86_64Preset;
 import com.winlator.box86_64.Box86_64PresetManager;
@@ -250,7 +249,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         //   1. essential system values
         //   2. selected backend (only the selected one)
         //   3. container env
-        //   4. game-specific env (LSFG/BFG, real Steam)
+        //   4. game-specific env (LSFG, real Steam)
         //   5. debug overrides
         EnvVars launchEnv = new EnvVars();
 
@@ -367,12 +366,6 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
             LsfgVkManager.ensureRuntimeInstalled(environment.getContext(), container);
             LsfgVkManager.writeConfig(container);
             LsfgVkManager.applyLaunchEnv(container, launchEnv);
-        }
-
-        if (BionicFgManager.isSupported(container)) {
-            BionicFgManager.ensureRuntimeInstalled(environment.getContext(), container);
-            BionicFgManager.writeConfig(container);
-            BionicFgManager.applyLaunchEnv(container, launchEnv);
         }
 
         // --- Layer 5: debug overrides -----------------------------------------

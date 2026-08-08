@@ -56,7 +56,7 @@ import timber.log.Timber
  *
  * Lives outside XServerScreen on purpose: that composable sits at the dex
  * verifier's register limit, and any extra locals there trip a VerifyError
- * at class load (same constraint as BfgMenuState / SteamInviteState). The
+ * at class load (same constraint as SteamInviteState). The
  * overlay is hosted by QuickMenu and owns the game pause for its whole
  * lifetime via [overlayActive], so XServerScreen needs zero new locals.
  */

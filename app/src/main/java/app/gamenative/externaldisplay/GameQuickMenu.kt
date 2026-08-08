@@ -85,7 +85,6 @@ fun GameQuickMenu(
             ?: app.getLogoUrl()
             ?: app.logoUrl.takeIf { app.logoHash.isNotBlank() }
     }.orEmpty().takeIf { PrefManager.dualScreenGameUseLogo }.orEmpty()
-    val hudFpsMultiplier = if (isLsfgAvailable && lsfgMultiplier >= 2) lsfgMultiplier else 1
     val lowerPanel = remember(container?.id) {
         mutableStateOf(PrefManager.dualScreenGameDefaultPanel)
     }
@@ -115,9 +114,9 @@ fun GameQuickMenu(
                 performanceHudConfig = performanceHudConfig,
                 performanceHudFpsProvider = {
                     val raw = frameRating?.currentFPS ?: 0f
-                    if (raw.isFinite()) raw.coerceAtLeast(0f) * hudFpsMultiplier else 0f
+                    if (raw.isFinite()) raw.coerceAtLeast(0f) else 0f
                 },
-                performanceHudKey = 31 * System.identityHashCode(frameRating) + hudFpsMultiplier,
+                performanceHudKey = 31 * System.identityHashCode(frameRating),
                 onShowDashboard = {
                     lowerPanel.value = 0
                     if (isVisible) onDismiss()

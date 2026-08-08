@@ -110,7 +110,6 @@ import app.gamenative.externaldisplay.GameQuickMenu
 import app.gamenative.ui.component.QuickMenuAction
 import app.gamenative.ui.component.SteamInviteState
 import app.gamenative.ui.component.parseBooleanExtra
-import app.gamenative.utils.BionicFgManager
 import app.gamenative.ui.component.parsePositiveFpsLimit
 import app.gamenative.ui.data.PerformanceHudConfig
 import app.gamenative.ui.data.PerformanceHudSize
@@ -124,6 +123,7 @@ import app.gamenative.utils.downloader.CoreDriverDownloader
 import app.gamenative.utils.CustomGameScanner
 import app.gamenative.utils.ExecutableSelectionUtils
 import app.gamenative.utils.LsfgQuickMenuHelper
+import app.gamenative.utils.LsfgVkManager
 import app.gamenative.utils.ManifestComponentHelper
 import app.gamenative.utils.launchdependencies.BionicSteamAssetsDependency
 import app.gamenative.utils.downloader.DXWrapperDownloader
@@ -585,8 +585,6 @@ fun XServerScreen(
         container.putExtra(FPS_LIMITER_ENABLED_EXTRA, fpsLimiterEnabled)
         container.putExtra(FPS_LIMITER_TARGET_EXTRA, fpsLimiterTarget)
         container.saveData()
-        // The limiter also drives the bionic-fg layer's frame pacing
-        BionicFgManager.updateConfigAtRuntime(container)
     }
 
     fun loadPerformanceHudConfig(): PerformanceHudConfig {
@@ -673,7 +671,7 @@ fun XServerScreen(
             ?.setFrameRateLimit(limit)
         xServerView?.getxServer()
             ?.getExtension<PresentExtension>(PresentExtension.MAJOR_OPCODE.toInt())
-            ?.setEagerIdleRelease(BionicFgManager.isArmed(container))
+            ?.setEagerIdleRelease(LsfgVkManager.isArmed(container))
     }
 
     fun effectiveFpsLimit(): Int =
@@ -806,12 +804,7 @@ fun XServerScreen(
         val hud = PerformanceHudView(
             context = context,
             fpsProvider = {
-                val raw = frameRating?.currentFPS ?: 0f
-                val mult = when {
-                    isLsfgAvailable && lsfgMultiplier >= 2 -> lsfgMultiplier
-                    else -> 1
-                }
-                raw * mult
+                frameRating?.currentFPS ?: 0f
             },
             initialConfig = performanceHudConfig,
             initialCompactMode = PrefManager.performanceHudCompactMode,
@@ -3933,6 +3926,7 @@ private fun setupXEnvironment(
                 PluviaApp.events.emit(AndroidEvent.SetBootingSplashText("Installing prerequisites..."))
             }
             chainCommands(nextRemaining)
+            app.gamenative.diagnostics.LaunchTrace.stage(app.gamenative.diagnostics.LaunchStage.GAME_PROCESS_CREATED, "success")
             guestProgramLauncherComponent.start()
         }
         guestProgramLauncherComponent.setTerminationCallback { _ -> advanceStep(true) }
@@ -4044,9 +4038,11 @@ private fun setupXEnvironment(
     }
 
     try {
+        app.gamenative.diagnostics.LaunchTrace.stage(app.gamenative.diagnostics.LaunchStage.WINE_BOOT)
         environment.startEnvironmentComponents()
     } catch (e: Exception) {
         Timber.e(e, "Failed to start environment components, cleaning up")
+        app.gamenative.diagnostics.LaunchTrace.finish("failed")
         try {
             environment.stopEnvironmentComponents()
         } catch (cleanupEx: Exception) {
@@ -5964,7 +5960,7 @@ private fun extractSteamFiles(
                 editor.setStringValue(activeProcessKey, "SteamClientDll64", "$steamRoot\\steamclient64.dll")
                 editor.setStringValue(activeProcessKey, "Universe", "Public")
             }
-            Timber.i("Set HKCU\\Software\\Valve\\Steam\\ActiveProcess registry values (bionic mode, ActiveUser=$accountId)")
+            Timber.i("Set HKCU\\Software\\Valve\\Steam\\ActiveProcess registry values (bionic mode)")
         } catch (e: Exception) {
             Timber.e(e, "Failed to write ActiveProcess registry values")
         }

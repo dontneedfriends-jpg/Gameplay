@@ -11,23 +11,23 @@ import timber.log.Timber
 import kotlin.jvm.JvmStatic
 
 /**
- * Manages the lsfg-vk Vulkan implicit layer for frame generation.
+ * Manages the lsfg-vk Vulkan implicit layer for frame generation (2.x config).
  *
  * The layer works by intercepting vkQueuePresentKHR inside the container's
- * Vulkan driver and running Lossless Scaling frame generation (LSFG_3_1 /
- * LSFG_3_1P) transparently. No overlay, no MediaProjection — it hooks the
- * real swapchain presentation path.
+ * Vulkan driver and running Lossless Scaling frame generation (LSFG 3.1)
+ * transparently. No overlay, no MediaProjection — it hooks the real swapchain
+ * presentation path.
  *
  * Flow:
  * 1. At launch time: install the layer .so + manifest into the container's
  *    filesystem where the Vulkan loader discovers implicit layers.
  * 2. Copy Lossless.dll from the Steam install dir (app 993090) into the
  *    container's ~/.local/share/lsfg-vk/ directory.
- * 3. Write conf.toml with the DLL path, multiplier, flow scale, and
- *    performance mode. Set env vars so the layer finds its config.
- * 4. At runtime: the Vulkan loader loads the layer, which hooks
- *    vkCreateSwapchainKHR / vkQueuePresentKHR and runs framegen on the
- *    game's actual swapchain images.
+ * 3. Write conf.toml (version 2) with a [[profile]] entry, the DLL path,
+ *    multiplier, flow scale, and performance mode. The layer reads it on init.
+ * 4. Set env vars so the layer finds its config and the active profile
+ *    (LSFGVK_PROFILE overrides process-based detection, which is unreliable
+ *    under Wine where /proc/self/exe points to the Wine loader).
  */
 object LsfgVkManager {
     private const val TAG = "LsfgVkManager"
@@ -42,16 +42,15 @@ object LsfgVkManager {
     private const val LAYER_RELATIVE_DIR = ".local/share/vulkan/implicit_layer.d"
     private const val DLL_RELATIVE_DIR = ".local/share/lsfg-vk"
     private const val LIB_FILENAME = "liblsfg-vk-layer.so"
-    private const val MANIFEST_FILENAME = "VkLayer_LS_frame_generation.json"
+    private const val MANIFEST_FILENAME = "VkLayer_LSFGVK_frame_generation.json"
     private const val VERSION_FILENAME = ".lsfg_vk_runtime_version"
 
     // Relative path from implicit_layer.d back to lib/
     private const val MANIFEST_LIBRARY_PATH = "../../../lib/$LIB_FILENAME"
 
-    // Process identifier written to conf.toml [[game]] exe field.
-    // Under Wine, /proc/self/exe points to the Wine loader, so we use this
-    // stable identifier instead. Set via LSFG_PROCESS env var.
-    private const val PROCESS_EXE_IDENTIFIER = "gamenative-lsfg"
+    // Profile name written to conf.toml [[profile]] name and selected via the
+    // LSFGVK_PROFILE env var (overrides process-based detection).
+    private const val PROFILE_NAME = "gamenative-lsfg"
 
     // Container extra keys
     const val EXTRA_ARMED = "lsfgEnabled"
@@ -59,13 +58,13 @@ object LsfgVkManager {
     const val EXTRA_FLOW_SCALE = "lsfgFlowScale"
     const val EXTRA_PERFORMANCE_MODE = "lsfgPerformanceMode"
 
-    // Environment variables consumed by the lsfg-vk layer
-    private const val ENV_DISABLE = "DISABLE_LSFG"
-    private const val ENV_CONFIG = "LSFG_CONFIG"
-    private const val ENV_PROCESS = "LSFG_PROCESS"
+    // Environment variables consumed by the lsfg-vk 2.x layer
+    private const val ENV_DISABLE = "DISABLE_LSFGVK"
+    private const val ENV_CONFIG = "LSFGVK_CONFIG"
+    private const val ENV_PROFILE = "LSFGVK_PROFILE"
 
     // Current runtime version (bumped when the bundled .so changes)
-    private const val RUNTIME_VERSION = "v1.0.2-android-arm64-v8a"
+    private const val RUNTIME_VERSION = "v2.0.0-dev39-android-arm64-v8a"
 
     // Asset paths
     private const val ASSET_DIR = "lsfg_vk/android_arm64_v8a"
@@ -122,7 +121,7 @@ object LsfgVkManager {
      *
      * Installs:
      * - liblsfg-vk-layer.so → ~/.local/lib/
-     * - VkLayer_LS_frame_generation.json → ~/.local/share/vulkan/implicit_layer.d/
+     * - VkLayer_LSFGVK_frame_generation.json → ~/.local/share/vulkan/implicit_layer.d/
      * - Lossless.dll → ~/.local/share/lsfg-vk/  (copied from Steam install dir)
      *
      * Uses versioned caching to skip redundant copies.
@@ -213,7 +212,12 @@ object LsfgVkManager {
 
     /**
      * Write the lsfg-vk conf.toml for this container.
-     * The layer reads this on init to find the DLL and game settings.
+     *
+     * The 2.x layer requires version = 2 and a [[profile]] entry. A profile is
+     * only written when frame generation is active: the parser rejects
+     * multiplier <= 1, so "off" is expressed by omitting the profile entirely.
+     * Selection is done via LSFGVK_PROFILE (set in applyLaunchEnv), which
+     * overrides process-based detection.
      *
      * @return true if the config was written successfully
      */
@@ -230,7 +234,7 @@ object LsfgVkManager {
             val configText = buildConfigToml(
                 dllPath = dllPath,
                 enabled = frameGenActive,
-                multiplier = if (frameGenActive) savedMultiplier else 1,
+                multiplier = savedMultiplier.coerceIn(2, 4),
                 flowScale = flowScale(container),
                 performanceMode = performanceMode(container) && frameGenActive,
             )
@@ -256,7 +260,7 @@ object LsfgVkManager {
         // Clear any stale env vars first
         envVars.remove(ENV_DISABLE)
         envVars.remove(ENV_CONFIG)
-        envVars.remove(ENV_PROCESS)
+        envVars.remove(ENV_PROFILE)
 
         if (!isSupported(container)) {
             // Remove the manifest so the Vulkan loader can't find the layer
@@ -276,7 +280,7 @@ object LsfgVkManager {
         }
 
         envVars.put(ENV_CONFIG, configFile(container).absolutePath)
-        envVars.put(ENV_PROCESS, PROCESS_EXE_IDENTIFIER)
+        envVars.put(ENV_PROFILE, PROFILE_NAME)
 
         // Add the container's implicit_layer.d to VK_LAYER_PATH so the
         // Vulkan loader discovers the lsfg-vk layer installed there.
@@ -335,25 +339,26 @@ object LsfgVkManager {
         flowScale: Float,
         performanceMode: Boolean,
     ): String = buildString {
-        appendLine("version = 1")
+        appendLine("version = 2")
         appendLine()
         appendLine("[global]")
         if (!dllPath.isNullOrBlank()) {
             appendLine("dll = ${tomlString(dllPath)}")
         }
-        appendLine("no_fp16 = false")
+        appendLine("allow_fp16 = true")
         appendLine()
 
-        if (!dllPath.isNullOrBlank()) {
-            val effectiveMultiplier = if (enabled) multiplier.coerceIn(2, 4) else 1
-            appendLine("[[game]]")
-            appendLine("exe = ${tomlString(PROCESS_EXE_IDENTIFIER)}")
-            appendLine("multiplier = $effectiveMultiplier")
-            appendLine("flow_scale = ${formatFlowScale(flowScale)}")
-            appendLine("performance_mode = ${if (enabled && performanceMode) "true" else "false"}")
-            appendLine("hdr_mode = false")
-            appendLine("experimental_present_mode = ${tomlString("fifo")}")
-        }
+        // Always write a [[profile]] so the layer stays loaded and hot-reload
+        // can toggle between on (multiplier >= 2) and off (multiplier == 1,
+        // passthrough) at runtime. Without a profile the layer fails to load
+        // and runtime re-enabling can never take effect.
+        appendLine("[[profile]]")
+        appendLine("name = ${tomlString(PROFILE_NAME)}")
+        appendLine("active_in = ${tomlString(PROFILE_NAME)}")
+        appendLine("multiplier = ${if (enabled) multiplier.coerceIn(2, 4) else 1}")
+        appendLine("flow_scale = ${formatFlowScale(flowScale)}")
+        appendLine("performance_mode = ${if (performanceMode && enabled) "true" else "false"}")
+        appendLine("pacing = ${tomlString("none")}")
     }
 
     private fun tomlString(value: String): String = buildString {
@@ -374,17 +379,22 @@ object LsfgVkManager {
 
     private fun formatFlowScale(value: Float): String =
         String.format(Locale.US, "%.2f", value.coerceIn(0.25f, 1.0f))
+
     // ---- Runtime hot-reload -----------------------------------------------
 
     /**
      * Update the lsfg-vk conf.toml while the container is running.
-     * The layer detects the file timestamp change on the next present call
-     * and returns VK_ERROR_OUT_OF_DATE_KHR, which forces a swapchain recreation
-     * with the new settings.
+     * The layer detects the file timestamp change on the next present call and
+     * reloads the config, rebuilding the framegen context on the existing
+     * swapchain.
+     *
+     * The config is always rewritten with a [[profile]] entry: multiplier >= 2
+     * arms frame generation, multiplier == 1 puts the layer into passthrough
+     * (no generated frames) so disabling works on the fly.
      *
      * @param container The running container
-     * @param enabled Whether frame generation is active (sets multiplier to 1 if false)
-     * @param multiplier Frame generation multiplier (2-4)
+     * @param enabled Whether frame generation is active
+     * @param multiplier Frame generation multiplier (2-4, ignored when disabled)
      * @param flowScale Flow scale factor (0.25-1.0)
      * @param performanceMode Whether performance mode is enabled
      * @return true if the config was updated successfully
@@ -400,38 +410,35 @@ object LsfgVkManager {
         if (!isSupported(container)) return false
 
         val dllPath = containerDllPath(container)
-        val configFile = File(container.rootDir, CONFIG_RELATIVE_PATH)
+        if (dllPath == null) {
+            Timber.tag(TAG).w("Lossless.dll missing, cannot hot-reload")
+            return false
+        }
 
+        val configFile = File(container.rootDir, CONFIG_RELATIVE_PATH)
         if (!configFile.exists()) {
             Timber.tag(TAG).w("conf.toml not found, cannot hot-reload")
             return false
         }
 
         return try {
-            val effectiveMultiplier = if (enabled && dllPath != null) {
-                multiplier.coerceIn(2, 4)
-            } else {
-                1 // multiplier <= 1 means pass-through (no framegen)
-            }
-            val effectiveFlowScale = flowScale.coerceIn(0.25f, 1.0f)
-            val effectivePerfMode = performanceMode && enabled
-
+            // multiplier == 1 keeps a valid profile while expressing "off".
+            val profileMultiplier = if (enabled) multiplier.coerceIn(2, 4) else 1
             val configText = buildString {
-                appendLine("version = 1")
+                appendLine("version = 2")
                 appendLine()
                 appendLine("[global]")
-                if (!dllPath.isNullOrBlank()) {
-                    appendLine("dll = ${tomlString(dllPath)}")
-                }
-                appendLine("no_fp16 = false")
+                appendLine("dll = ${tomlString(dllPath)}")
+                appendLine("allow_fp16 = true")
                 appendLine()
-                appendLine("[[game]]")
-                appendLine("exe = ${tomlString(PROCESS_EXE_IDENTIFIER)}")
-                appendLine("multiplier = $effectiveMultiplier")
-                appendLine("flow_scale = ${formatFlowScale(effectiveFlowScale)}")
-                appendLine("performance_mode = ${if (effectivePerfMode) "true" else "false"}")
-                appendLine("hdr_mode = false")
-                appendLine("experimental_present_mode = ${tomlString("fifo")}")
+
+                appendLine("[[profile]]")
+                appendLine("name = ${tomlString(PROFILE_NAME)}")
+                appendLine("active_in = ${tomlString(PROFILE_NAME)}")
+                appendLine("multiplier = $profileMultiplier")
+                appendLine("flow_scale = ${formatFlowScale(flowScale)}")
+                appendLine("performance_mode = ${if (performanceMode) "true" else "false"}")
+                appendLine("pacing = ${tomlString("none")}")
             }
 
             val ok = FileUtils.writeString(configFile, configText)
@@ -441,7 +448,7 @@ object LsfgVkManager {
             if (ok) {
                 Timber.tag(TAG).i(
                     "Hot-reloaded conf.toml: enabled=%s, multiplier=%d, flowScale=%.2f, perf=%s",
-                    enabled, effectiveMultiplier, effectiveFlowScale, effectivePerfMode
+                    enabled, profileMultiplier, flowScale, performanceMode
                 )
             }
             ok
@@ -450,5 +457,4 @@ object LsfgVkManager {
             false
         }
     }
-
 }
