@@ -1,6 +1,7 @@
 package app.gamenative
 
 import android.content.Context
+import app.gamenative.diagnostics.LaunchTrace
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -43,6 +44,7 @@ class CrashHandler(
             val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
             val crashHandler = CrashHandler(context.applicationContext, defaultHandler)
             Thread.setDefaultUncaughtExceptionHandler(crashHandler)
+            LaunchTrace.init(context.applicationContext)
         }
 
         /**
@@ -102,6 +104,7 @@ class CrashHandler(
         PrefManager.recentlyCrashed = true
 
         saveCrashToFile(throwable)
+        LaunchTrace.finish("failed")
         defaultHandler?.uncaughtException(thread, throwable)
     }
 
@@ -144,6 +147,10 @@ class CrashHandler(
             }
 
             File(crashFileDir, "pluvia_crash_$timestamp.txt").writeText(crashReport)
+
+            runCatching {
+                app.gamenative.diagnostics.LaunchReport.write(context, container = null)
+            }
 
             cleanupOldCrashFiles()
         } catch (e: Exception) {

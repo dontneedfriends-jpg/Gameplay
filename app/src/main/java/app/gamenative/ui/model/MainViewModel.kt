@@ -521,6 +521,7 @@ class MainViewModel @Inject constructor(
     fun launchApp(context: Context, appId: String) {
         // Show booting splash before launching the app
         CrashContext.setStage("preparing_launch")
+        app.gamenative.diagnostics.LaunchTrace.stage(app.gamenative.diagnostics.LaunchStage.DEVICE_PROBED)
         viewModelScope.launch {
             viewModelScope.launch(Dispatchers.IO) {
                 libraryPlayHistoryDao.upsert(
@@ -609,6 +610,7 @@ class MainViewModel @Inject constructor(
 
             apiJob.await()
             CrashContext.setStage("launching_game")
+            app.gamenative.diagnostics.LaunchTrace.stage(app.gamenative.diagnostics.LaunchStage.PRELAUNCH_SETUP, "success")
 
             // Installer sessions get an explicit stage label on the boot splash.
             runCatching {

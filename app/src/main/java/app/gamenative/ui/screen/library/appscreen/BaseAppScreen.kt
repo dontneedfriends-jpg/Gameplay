@@ -5,6 +5,10 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
 import app.gamenative.ui.component.dialog.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
@@ -52,6 +57,7 @@ import app.gamenative.utils.GameCompatibilityCache
 import app.gamenative.utils.GameCompatibilityService
 import app.gamenative.utils.ManifestInstaller
 import app.gamenative.utils.createPinnedShortcut
+import com.winlator.container.Container
 import com.winlator.container.ContainerData
 import com.winlator.core.GPUInformation
 import java.io.File
@@ -536,6 +542,120 @@ abstract class BaseAppScreen {
         return AppMenuOption(
             AppOptionMenuType.ShareDiagnostics,
             onClick = { shareDiagnostics(context, libraryItem) },
+        )
+    }
+
+    @Composable
+    protected open fun getExportSupportBundleOption(
+        context: Context,
+        libraryItem: LibraryItem,
+    ): AppMenuOption? {
+        val container = runCatching {
+            ContainerUtils.getContainer(context, libraryItem.appId)
+        }.getOrNull()
+        if (container == null && !DiagnosticsLog.exists(context, libraryItem.appId)) return null
+
+        var showDialog by remember { mutableStateOf(false) }
+        if (showDialog) {
+            showSupportBundleDialog(
+                context = context,
+                libraryItem = libraryItem,
+                container = container,
+                onDismiss = { showDialog = false },
+            )
+        }
+
+        return AppMenuOption(
+            AppOptionMenuType.ExportSupportBundle,
+            onClick = { showDialog = true },
+        )
+    }
+
+    @Composable
+    private fun showSupportBundleDialog(
+        context: Context,
+        libraryItem: LibraryItem,
+        container: Container?,
+        onDismiss: () -> Unit,
+    ) {
+        val envVars = remember { mutableStateOf<com.winlator.core.envvars.EnvVars?>(null) }
+        val contents = remember { mutableStateOf<app.gamenative.diagnostics.SupportBundle.BundleContents?>(null) }
+        val exporting = remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
+
+        LaunchedEffect(Unit) {
+            contents.value = withContext(Dispatchers.IO) {
+                app.gamenative.diagnostics.SupportBundle.collect(context, container, envVars.value)
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { if (!exporting.value) onDismiss() },
+            title = { Text(stringResource(R.string.support_bundle_title)) },
+            text = {
+                val bundle = contents.value
+                if (bundle == null) {
+                    Text(stringResource(R.string.support_bundle_exporting))
+                } else {
+                    Column {
+                        Text(
+                            stringResource(R.string.support_bundle_show_contents),
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(bundle.summary, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = contents.value != null && !exporting.value,
+                    onClick = {
+                        val bundle = contents.value ?: return@TextButton
+                        exporting.value = true
+                        scope.launch {
+                            val zip = withContext(Dispatchers.IO) {
+                                val dest = File(
+                                    context.getExternalFilesDir(null),
+                                    "support_bundles/gameplay_support_${libraryItem.appId}.zip",
+                                )
+                                app.gamenative.diagnostics.SupportBundle.export(
+                                    context,
+                                    container,
+                                    envVars.value,
+                                    dest,
+                                )
+                            }
+                            exporting.value = false
+                            onDismiss()
+                            shareSupportBundle(context, zip)
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.support_bundle_export))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !exporting.value,
+                    onClick = onDismiss,
+                ) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
+    private fun shareSupportBundle(context: Context, file: File) {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/zip"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_TITLE, file.name)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(R.string.support_bundle_share_title)),
         )
     }
 
@@ -1136,6 +1256,7 @@ abstract class BaseAppScreen {
             getTestGraphicsOption(context, libraryItem, onTestGraphics)?.let { menuOptions.add(it) }
             getPlayWithDiagnosticsOption(context, libraryItem, onPlayWithDiagnostics)?.let { menuOptions.add(it) }
             getShareDiagnosticsOption(context, libraryItem)?.let { menuOptions.add(it) }
+            getExportSupportBundleOption(context, libraryItem)?.let { menuOptions.add(it) }
             getResetContainerOption(context, libraryItem)?.let { menuOptions.add(it) }
             getCreateShortcutOption(context, libraryItem)?.let { menuOptions.add(it) }
             getExportContainerOption(context, libraryItem, exportFrontendLauncher)?.let { menuOptions.add(it) }

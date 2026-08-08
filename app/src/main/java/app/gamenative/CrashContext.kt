@@ -1,5 +1,7 @@
 package app.gamenative
 
+import app.gamenative.diagnostics.LaunchTrace
+
 /** Launch metadata captured without retaining paths, credentials, or other user secrets. */
 data class CrashContextSnapshot(
     val appId: String? = null,
@@ -16,6 +18,7 @@ object CrashContext {
 
     fun beginLaunch(appId: String) {
         current = CrashContextSnapshot(appId = appId, launchStage = "launch_requested")
+        LaunchTrace.begin()
     }
 
     fun update(
@@ -36,15 +39,20 @@ object CrashContext {
 
     fun setStage(stage: String) {
         current = current.copy(launchStage = stage)
+        LaunchTrace.stageLegacy(stage)
     }
 
     fun snapshot(): CrashContextSnapshot = current
 
     fun clear() {
         current = CrashContextSnapshot()
+        LaunchTrace.finish("cancelled")
     }
 
     fun clearIfMatches(appId: String) {
-        if (current.appId == appId) current = CrashContextSnapshot()
+        if (current.appId == appId) {
+            current = CrashContextSnapshot()
+            LaunchTrace.finish("cancelled")
+        }
     }
 }
