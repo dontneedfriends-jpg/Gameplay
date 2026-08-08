@@ -41,7 +41,7 @@ fun AlertDialog(
     titleContentColor: Color = AlertDialogDefaults.titleContentColor,
     textContentColor: Color = AlertDialogDefaults.textContentColor,
     tonalElevation: Dp = AlertDialogDefaults.TonalElevation,
-    properties: DialogProperties = DialogProperties(),
+    properties: DialogProperties = secondScreenDialogProperties(DialogProperties()),
 ) = androidx.compose.material3.AlertDialog(
     onDismissRequest = onDismissRequest,
     confirmButton = confirmButton,

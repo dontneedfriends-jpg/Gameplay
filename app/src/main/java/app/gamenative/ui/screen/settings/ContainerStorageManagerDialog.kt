@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Storage
 import app.gamenative.ui.component.dialog.AlertDialog
+import app.gamenative.ui.component.dialog.secondScreenDialogProperties
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -571,7 +572,9 @@ fun ContainerStorageManagerDialog(
                 onDismissRequest()
             }
         },
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = secondScreenDialogProperties(
+            DialogProperties(usePlatformDefaultWidth = false),
+        ),
     ) {
         Box(
             modifier = Modifier

@@ -1469,10 +1469,12 @@ fun ContainerConfigDialog(
         } else {
             Dialog(
                 onDismissRequest = onDismissCheck,
-                properties = DialogProperties(
-                    usePlatformDefaultWidth = false,
-                    dismissOnClickOutside = false,
-                    decorFitsSystemWindows = false,
+                properties = secondScreenDialogProperties(
+                    DialogProperties(
+                        usePlatformDefaultWidth = false,
+                        dismissOnClickOutside = false,
+                        decorFitsSystemWindows = false,
+                    ),
                 ),
                 content = configurationContent,
             )

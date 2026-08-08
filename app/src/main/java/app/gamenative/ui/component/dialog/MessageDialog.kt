@@ -28,6 +28,7 @@ import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import app.gamenative.R
 import app.gamenative.ui.component.ConsoleDialogButton
 import app.gamenative.ui.component.GamepadHint
@@ -70,6 +71,9 @@ fun MessageDialog(
 
             AlertDialog(
                 shape = RoundedCornerShape(16.dp),
+                properties = secondScreenDialogProperties(
+                    DialogProperties(usePlatformDefaultWidth = false),
+                ),
                 icon = icon?.let { { Icon(imageVector = icon, contentDescription = null) } },
                 title = title?.let { { Text(it) } },
                 text = {

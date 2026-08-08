@@ -35,6 +35,7 @@ fun LoadingDialog(
         visible -> {
             Dialog(
                 onDismissRequest = onDismissRequest,
+                properties = secondScreenDialogProperties(),
             ) {
                 Card {
                     Column(

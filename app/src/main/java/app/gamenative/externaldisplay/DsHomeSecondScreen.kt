@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.view.Display
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -111,6 +112,8 @@ import app.gamenative.ui.component.GamepadActionBar
 import app.gamenative.ui.component.GamepadButton
 import app.gamenative.ui.component.focusRing
 import app.gamenative.ui.component.GameStatsRow
+import app.gamenative.ui.component.dialog.LocalSecondScreenDialogWindowToken
+import app.gamenative.ui.component.dialog.LocalSecondScreenDialogWindowType
 import app.gamenative.ui.data.GameCardStats
 import app.gamenative.ui.data.PerformanceHudConfig
 import app.gamenative.ui.data.shouldLoadNextLibraryPage
@@ -233,8 +236,22 @@ object DsHomeSecondScreen {
     var presentationActive by mutableStateOf(false)
         private set
 
+    /** Window token of the shown Presentation window, used to bind second-screen dialogs. */
+    var presentationWindowToken: IBinder? by mutableStateOf(null)
+        private set
+
+    /** Window type of the shown Presentation window (TYPE_PRESENTATION, hidden in the SDK). */
+    var presentationWindowType: Int? by mutableStateOf(null)
+        private set
+
     fun markPresentationActive(active: Boolean) {
         presentationActive = active
+    }
+
+    fun publishPresentationWindow(token: IBinder?, type: Int?) {
+        Timber.d("publishPresentationWindow token=$token type=$type (was token=$presentationWindowToken type=$presentationWindowType)")
+        presentationWindowToken = token
+        presentationWindowType = type
     }
 
     fun publish(model: Model) {
@@ -348,27 +365,31 @@ class DsHomePresentation(
                             modifier = Modifier.fillMaxSize(),
                             color = MaterialTheme.colorScheme.background,
                         ) {
-                            val model = DsHomeSecondScreen.model
-                            if (model != null) {
-                                SideEffect { updateInputMode(model.mode) }
-                                when (model.mode) {
-                                    DsHomeSecondScreen.Mode.GRID -> DsHomeSecondScreenGrid(model)
-                                    DsHomeSecondScreen.Mode.DETAILS -> DsHomeSecondScreenDetails(model)
-                                    DsHomeSecondScreen.Mode.CARD -> model.cardContent?.invoke()
-                                    DsHomeSecondScreen.Mode.QUICK_MENU -> SecondScreenGamePanel(
-                                        model = model,
-                                        showMenu = true,
-                                    )
-                                    DsHomeSecondScreen.Mode.QUICK_MENU_PASSIVE -> model.menuContent?.invoke()
-                                    DsHomeSecondScreen.Mode.GAME_DASHBOARD -> SecondScreenGamePanel(
-                                        model = model,
-                                        showMenu = false,
-                                    )
-                                    DsHomeSecondScreen.Mode.SETTINGS -> model.settingsContent?.invoke()
+                            CompositionLocalProvider(
+                                LocalSecondScreenDialogWindowType provides DsHomeSecondScreen.presentationWindowType,
+                                LocalSecondScreenDialogWindowToken provides DsHomeSecondScreen.presentationWindowToken,
+                            ) {                                val model = DsHomeSecondScreen.model
+                                if (model != null) {
+                                    SideEffect { updateInputMode(model.mode) }
+                                    when (model.mode) {
+                                        DsHomeSecondScreen.Mode.GRID -> DsHomeSecondScreenGrid(model)
+                                        DsHomeSecondScreen.Mode.DETAILS -> DsHomeSecondScreenDetails(model)
+                                        DsHomeSecondScreen.Mode.CARD -> model.cardContent?.invoke()
+                                        DsHomeSecondScreen.Mode.QUICK_MENU -> SecondScreenGamePanel(
+                                            model = model,
+                                            showMenu = true,
+                                        )
+                                        DsHomeSecondScreen.Mode.QUICK_MENU_PASSIVE -> model.menuContent?.invoke()
+                                        DsHomeSecondScreen.Mode.GAME_DASHBOARD -> SecondScreenGamePanel(
+                                            model = model,
+                                            showMenu = false,
+                                        )
+                                        DsHomeSecondScreen.Mode.SETTINGS -> model.settingsContent?.invoke()
+                                    }
+                                } else {
+                                    SideEffect { updateInputMode(DsHomeSecondScreen.Mode.DETAILS) }
+                                    SecondScreenStandby()
                                 }
-                            } else {
-                                SideEffect { updateInputMode(DsHomeSecondScreen.Mode.DETAILS) }
-                                SecondScreenStandby()
                             }
                         }
                     }
@@ -1166,9 +1187,16 @@ fun DsHomePresentationHost() {
         }
         val presentation = DsHomePresentation(context, display)
         runCatching { presentation.show() }
-            .onSuccess { DsHomeSecondScreen.markPresentationActive(true) }
+            .onSuccess {
+                DsHomeSecondScreen.markPresentationActive(true)
+                DsHomeSecondScreen.publishPresentationWindow(
+                    token = presentation.window?.decorView?.windowToken,
+                    type = presentation.window?.attributes?.type,
+                )
+            }
             .onFailure { Timber.e(it, "Failed to show DS_HOME presentation") }
         onDispose {
+            DsHomeSecondScreen.publishPresentationWindow(null, null)
             DsHomeSecondScreen.markPresentationActive(false)
             runCatching { presentation.dismiss() }
         }

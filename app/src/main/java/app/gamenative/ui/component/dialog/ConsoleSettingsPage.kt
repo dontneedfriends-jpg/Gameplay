@@ -40,10 +40,12 @@ fun ConsoleSettingsPage(
 
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnClickOutside = false,
-            decorFitsSystemWindows = false,
+        properties = secondScreenDialogProperties(
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnClickOutside = false,
+                decorFitsSystemWindows = false,
+            ),
         ),
     ) {
         Scaffold(

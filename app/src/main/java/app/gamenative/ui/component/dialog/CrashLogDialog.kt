@@ -44,9 +44,11 @@ fun CrashLogDialog(
 
         Dialog(
             onDismissRequest = onDismissRequest,
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnClickOutside = false,
+            properties = secondScreenDialogProperties(
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnClickOutside = false,
+                ),
             ),
             content = {
                 Scaffold(
